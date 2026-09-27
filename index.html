@@ -55,13 +55,13 @@
   --shadow-float: 0 24px 55px -14px rgba(15,72,150,.22), inset 0 1px 0 rgba(255,255,255,.7);
   --font: 'IRANSansX', Tahoma, sans-serif;
   --topbar-bg: rgba(255,255,255,.4);
-  /* رنگ‌های نمودار سهم شرکت‌ها: طیف آبیِ خود داشبورد، از پررنگ (بیشترین سهم) تا آسمانی؛ پله‌ها بررسی‌شده که از هم و از زمینه جدا دیده شوند */
-  --cat-1: #295DC4; --cat-2: #2176D8; --cat-3: #128EEC; --cat-4: #00A7FE;
-  --cat-5: #00C1FF; --cat-other: #CBD5E3;
+  /* رنگ‌های نمودار سهم شرکت‌ها: آبی روشن، فیروزه‌ای، بنفش، آسمانی، آبی‌بنفش؛ ترتیب ثابت و بررسی‌شده برای کوررنگی در هر دو تم */
+  --cat-1: #70ADFF; --cat-2: #00CDB6; --cat-3: #B199FF; --cat-4: #008DCE;
+  --cat-5: #8FA7FF; --cat-other: #CBD5E3;
 }
 html[data-theme="dark"] {
-  --cat-1: #4167AD; --cat-2: #487DC1; --cat-3: #4F94D5; --cat-4: #58ABE8;
-  --cat-5: #62C3FA; --cat-other: #4A5570;
+  --cat-1: #5893F6; --cat-2: #00AA93; --cat-3: #876DDA; --cat-4: #33A1D2;
+  --cat-5: #5366CE; --cat-other: #4A5570;
   --surface: rgba(255,255,255,.07);
   --surface-tint: rgba(255,255,255,.04);
   --ink: #EAF0FB;
@@ -253,7 +253,7 @@ main { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding
 /* ---------- Summary cards ---------- */
 .summary-row {
   display: grid; gap: 14px; margin-bottom: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
 }
 .summary-card {
   background: linear-gradient(135deg, rgba(22,86,245,.62) 0%, rgba(23,169,255,.62) 100%);
@@ -687,6 +687,16 @@ html[data-theme="dark"] .trend-tip { background: #EAF0FB; color: #0F1B33; }
   .share-legend { width: 100%; }
 }
 
+/* ---------- رتبه‌ی امروز در تیم (نمای اپراتور) ---------- */
+.rank-card .value { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.rank-card .value small { font-size: .6em; font-weight: 700; opacity: .85; }
+.medal { width: 30px; height: 37px; flex-shrink: 0; filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+.medal .ribbon-l { fill: #1656F5; } .medal .ribbon-r { fill: #00B4FF; }
+.medal text { font: 800 11px var(--font); fill: rgba(0,0,0,.55); }
+.medal.gold .disc { fill: #F5C542; } .medal.gold .ring { fill: none; stroke: #FFE58A; stroke-width: 1.5; }
+.medal.silver .disc { fill: #C9D1DC; } .medal.silver .ring { fill: none; stroke: #F1F4F8; stroke-width: 1.5; }
+.medal.bronze .disc { fill: #D08A4E; } .medal.bronze .ring { fill: none; stroke: #F0B98A; stroke-width: 1.5; }
+
 </style>
 </head>
 <body>
@@ -1089,10 +1099,11 @@ window.APP_CONFIG = Object.freeze({
 
     renderTopbar(profile, manager);
     $('period-label').textContent = `دوره‌ی جاری: ${CURRENT_PERIOD.label}`;
-    loadSyncStatus();
+    loadSyncStatus().then((ts) => { lastSyncedAt = ts; });
 
     if (profile.role === 'operator') await renderOperatorView(profile);
     else await renderManagerialView(profile);
+    startAutoRefresh();
   }
 
   function renderTopbar(profile, manager) {
@@ -1107,19 +1118,67 @@ window.APP_CONFIG = Object.freeze({
     $('user-group-info').textContent = groupInfo;
   }
 
+  let lastSyncedAt = null;
   async function loadSyncStatus() {
     const { data } = await sb.from('sync_status').select('last_synced_at').eq('id', 1).maybeSingle();
     const note = $('sync-note');
     note.textContent = (data && data.last_synced_at)
       ? `آخرین به‌روزرسانی: ${new Date(data.last_synced_at).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}`
       : '';
+    return (data && data.last_synced_at) || null;
+  }
+
+  // --- تازه‌سازی خودکار: هر ۲ دقیقه (و وقتی تب دوباره فعال می‌شود) اگر ورک‌فلو داده‌ی تازه نوشته باشد،
+  // صفحه بدون پرش دوباره ساخته می‌شود؛ ردیف‌های باز، جستجو، فیلتر و اسکرول حفظ می‌شوند.
+  const REFRESH_MS = 2 * 60 * 1000;
+  let refreshing = false;
+  async function checkForUpdate() {
+    if (refreshing || document.hidden || !state.profile) return;
+    const t = getTodayJalali();
+    if (t[0] * 10000 + t[1] * 100 + t[2] !== TODAY_SORT) { location.reload(); return; } // روز عوض شده
+    refreshing = true;
+    try {
+      const ts = await loadSyncStatus();
+      if (ts && ts !== lastSyncedAt) {
+        lastSyncedAt = ts;
+        await refreshView();
+      }
+    } catch (e) {
+      console.error('auto refresh failed', e);
+    } finally {
+      refreshing = false;
+    }
+  }
+  async function refreshView() {
+    const scrollY = window.scrollY;
+    if (state.profile.role === 'operator') {
+      const monthOpen = !!document.querySelector('#month-card-detail.open');
+      await renderOperatorView(state.profile, { keepMonthOpen: monthOpen });
+    } else {
+      const openIds = [...document.querySelectorAll('#tree-root .tree-row.open')].map((r) => r.getAttribute('data-id'));
+      const search = state.search, companyFilter = state.companyFilter;
+      await renderManagerialView(state.profile, { silent: true });
+      state.search = search; state.companyFilter = companyFilter;
+      if (search) $('tree-search').value = search;
+      if (companyFilter && $('company-filter')) $('company-filter').value = companyFilter;
+      if (search || companyFilter) updateTreeFilter();
+      openIds.forEach((id) => {
+        const row = document.querySelector(`#tree-root .tree-row[data-id="${CSS.escape(id)}"]`);
+        if (row && !row.classList.contains('open')) toggleRow(row);
+      });
+    }
+    window.scrollTo(0, scrollY);
+  }
+  function startAutoRefresh() {
+    setInterval(checkForUpdate, REFRESH_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
   }
 
   // ---------------------------------------------------------------
   // نمای اپراتور
   // ---------------------------------------------------------------
-  async function renderOperatorView(profile) {
-    const [{ data, error }, { data: ownStatus, error: statusError }, { data: scopeRows }, { data: companyRows }] = await Promise.all([
+  async function renderOperatorView(profile, { keepMonthOpen = false } = {}) {
+    const [{ data, error }, { data: ownStatus, error: statusError }, { data: scopeRows }, { data: companyRows }, { data: rankRows }] = await Promise.all([
       sb.from('daily_targets')
         .select('report_date_jalali, report_date_sort, target_count, daily_salary')
         .eq('operator_id', profile.id)
@@ -1143,7 +1202,10 @@ window.APP_CONFIG = Object.freeze({
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
         .lte('report_date_sort', CURRENT_PERIOD.endSort)
         .limit(5000),
+      // رتبه‌ی امروز در تیم سرگروه (تابع امن: فقط رتبه‌ی خودم و تعداد اعضای تیم)
+      sb.rpc('my_today_rank', { p_date_sort: String(TODAY_SORT) }),
     ]);
+    const rank = Array.isArray(rankRows) ? rankRows[0] : rankRows;
     const groupCompanies = (scopeRows || []).map((r) => (r.company || '').trim()).filter(Boolean);
 
     if (statusError) console.error('issuer_active_status query failed', statusError);
@@ -1168,8 +1230,9 @@ window.APP_CONFIG = Object.freeze({
       <div class="summary-card"><div class="label">جمع کل حقوق <span class="unit">(ریال)</span></div><div class="value salary">${formatNum(totalSalary)}</div></div>
       <div class="summary-card"><div class="label">جمع کل ثبت‌شده</div><div class="value">${formatNum(total)}</div></div>
       <div class="summary-card"><div class="label">صدور امروز</div><div class="value">${formatNum(todayCount)}</div></div>
-      <div class="summary-card"><div class="label">روزهای فعالیت در ماه</div><div class="value">${formatNum(rows.length)}</div></div>
+      <div class="summary-card"><div class="label">روزهای فعالیت</div><div class="value">${formatNum(rows.length)}</div></div>
       <div class="summary-card"><div class="label">آخرین روز فعالیت</div><div class="value date">${last ? esc(faDigits(last.report_date_jalali)) : '—'}</div></div>
+      ${renderRankCard(rank)}
     `;
 
     bindShareDonutHover();
@@ -1211,6 +1274,31 @@ window.APP_CONFIG = Object.freeze({
     };
     toggle.addEventListener('click', flip);
     toggle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+    if (keepMonthOpen) flip();
+  }
+
+  // کارت «رتبه‌ی امروز در تیم»: «۵ از ۳۶»؛ نفرات ۱ تا ۳ (با صدور بیشتر از صفر) مدال طلا/نقره/برنز می‌گیرند
+  const MEDALS = {
+    1: { cls: 'gold', label: 'مدال طلا' },
+    2: { cls: 'silver', label: 'مدال نقره' },
+    3: { cls: 'bronze', label: 'مدال برنز' },
+  };
+  function medalSvg(n) {
+    const m = MEDALS[n];
+    return `<svg class="medal ${m.cls}" viewBox="0 0 32 40" role="img" aria-label="${m.label}">
+      <path class="ribbon-l" d="M8 0h7l-4 15H4z"/><path class="ribbon-r" d="M17 0h7l4 15h-7z"/>
+      <circle class="disc" cx="16" cy="25" r="12"/><circle class="ring" cx="16" cy="25" r="8.5"/>
+      <text x="16" y="29.5" text-anchor="middle">${n}</text></svg>`;
+  }
+  function renderRankCard(rank) {
+    if (!rank || !rank.team_size) return '';
+    const r = Number(rank.team_rank), size = Number(rank.team_size), mine = Number(rank.today_count) || 0;
+    const medal = (mine > 0 && r <= 3) ? medalSvg(r) : '';
+    return `
+      <div class="summary-card rank-card ${medal ? 'has-medal' : ''}" title="رتبه بر اساس تعداد صدور امروز در تیم سرگروه شما">
+        <div class="label">رتبه‌ی امروز در تیم</div>
+        <div class="value">${medal}<span>${formatNum(r)} <small>از ${formatNum(size)}</small></span></div>
+      </div>`;
   }
 
   function rowsTableHtml(rows, salaryHeader = 'حقوق روز') {
@@ -1515,9 +1603,9 @@ window.APP_CONFIG = Object.freeze({
   // ---------------------------------------------------------------
   // نمای مدیریتی (سرگروه / سرپرست / مدیر)
   // ---------------------------------------------------------------
-  async function renderManagerialView(profile) {
+  async function renderManagerialView(profile, { silent = false } = {}) {
     const content = $('content-area');
-    content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
+    if (!silent) content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes] = await Promise.all([
@@ -1742,15 +1830,18 @@ window.APP_CONFIG = Object.freeze({
       root.innerHTML = '<div class="empty-state">کسی با این مشخصات پیدا نشد</div>';
       return;
     }
-    root.innerHTML = matches.map((p, i) => buildNodeHtml(p.id, i)).join('');
+    root.innerHTML = sortKidsForDisplay(matches.map((p) => p.id)).map((id, i) => buildNodeHtml(id, i)).join('');
   }
 
-  // اپراتورها: آنلاین‌ها اول (الفبایی)، بعد آفلاین‌ها؛ نودهای غیربرگ دست‌نخورده
+  // اپراتورها: بیشترین صدور امروز بالاتر؛ بعد آنلاین‌ها؛ بعد الفبایی. نودهای غیربرگ دست‌نخورده
+  const todayOf = (id) => (state.targetsByOperator[id] && state.targetsByOperator[id].todayCount) || 0;
   function sortKidsForDisplay(ids) {
     return ids.slice().sort((a, b) => {
       const aLeaf = !(state.childrenOf[a] || []).length;
       const bLeaf = !(state.childrenOf[b] || []).length;
       if (!aLeaf || !bLeaf) return 0;
+      const tA = todayOf(a), tB = todayOf(b);
+      if (tA !== tB) return tB - tA;
       const onA = isFullyActive(state.statusByOperator[a]);
       const onB = isFullyActive(state.statusByOperator[b]);
       if (onA !== onB) return onA ? -1 : 1;
