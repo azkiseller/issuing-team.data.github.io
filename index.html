@@ -2264,7 +2264,8 @@ window.APP_CONFIG = Object.freeze({
     if (cf) cf.addEventListener('change', (e) => { state.companyFilter = e.target.value; updateTreeFilter(); });
   }
 
-  // شرکت‌ها به تفکیک گروه‌های شرکتی (هر جفت سرگروه یک گروه). بسته: جمع هر گروه؛ باز: شرکت‌های هر گروه.
+  // شرکت‌ها به تفکیک گروه‌های شرکتی (هر جفت سرگروه یک گروه)، با نام «گروه ۱، ۲، ...».
+  // شماره‌ی گروه ثابت است (بر اساس مجموعه‌ی شرکت‌ها، نه تعداد فعال) تا با هر به‌روزرسانی جابه‌جا نشود.
   // شرکت‌هایی که در هیچ گروهی نیستند نمایش داده نمی‌شوند.
   function companyGroups(companyStats) {
     const countBy = {};
@@ -2272,15 +2273,13 @@ window.APP_CONFIG = Object.freeze({
     const groups = {};
     Object.entries(state.scopeByLead).forEach(([leadId, companies]) => {
       const key = companies.slice().sort().join('|');
-      const g = (groups[key] = groups[key] || { companies, leads: [] });
-      const lead = state.profileById[leadId];
-      if (lead && lead.full_name) g.leads.push(lead.full_name);
+      groups[key] = groups[key] || { key, companies };
     });
-    return Object.values(groups).map((g) => {
+    return Object.values(groups).sort((a, b) => a.key.localeCompare(b.key, 'fa')).map((g, i) => {
       const items = g.companies.map((c) => ({ company: c, active_count: countBy[c] || 0 }))
         .sort((a, b) => b.active_count - a.active_count);
-      return { label: g.leads.length ? `گروه ${g.leads.join(' و ')}` : 'گروه', items, total: items.reduce((s, x) => s + x.active_count, 0) };
-    }).sort((a, b) => b.total - a.total);
+      return { label: `گروه ${formatNum(i + 1)}`, items, total: items.reduce((s, x) => s + x.active_count, 0) };
+    });
   }
   function renderCompanyGroups(companyStats) {
     const groups = companyGroups(companyStats);
@@ -2288,10 +2287,7 @@ window.APP_CONFIG = Object.freeze({
     return `
       <section class="company-groups ${state.companiesOpen ? 'open' : ''}">
         <div class="cg-toggle" id="cg-toggle" role="button" tabindex="0" aria-expanded="${!!state.companiesOpen}">
-          <span class="cg-title">کاربران فعال در شرکت‌ها</span>
-          <div class="cg-summary">
-            ${groups.map((g) => `<span class="cg-sum"><span class="cg-sum-name">${esc(g.label)}</span><b>${formatNum(g.total)}</b></span>`).join('')}
-          </div>
+          <span class="cg-title">کاربران فعال در هر شرکت</span>
           <span class="cg-more">جزئیات <span class="cg-chevron">▾</span></span>
         </div>
         <div class="cg-drawer"><div class="cg-drawer-inner">

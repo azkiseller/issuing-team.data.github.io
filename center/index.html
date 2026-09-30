@@ -5335,9 +5335,16 @@ async function enterApp(user) {
 
 const ONLINE_THRESHOLD_MS = 60 * 1000;
 
+// جدول/تابعی که در دیتابیس وجود ندارد (404): بعد از اولین پاسخ دیگر درخواست تکراری نفرست
+function isMissingResource(error) {
+  return !!error && (['PGRST202', 'PGRST205', '42P01', '42883'].includes(error.code) || error.status === 404);
+}
+let presenceMissing = false;
 async function sendPresenceHeartbeat() {
+  if (presenceMissing) return;
   try {
-    await supabaseClient.rpc('touch_last_seen');
+    const { error } = await supabaseClient.rpc('touch_last_seen');
+    if (isMissingResource(error)) presenceMissing = true;
   } catch (e) { }
 }
 
@@ -7123,8 +7130,10 @@ function updateBugsNotification(currentKeys) {
   document.querySelectorAll('.bugs-dot').forEach(dot => { dot.style.display = hasNew ? 'inline-block' : 'none'; });
 }
 
+let bugsMissing = false;
 async function loadBugs(userId) {
   const container = document.getElementById('bugs-list');
+  if (bugsMissing) return;
   const { data, error } = await supabaseClient
     .from(TABLE_BUGS)
     .select('*')
@@ -7132,6 +7141,7 @@ async function loadBugs(userId) {
     .order('check_date_sort', { ascending: false });
 
   if (error) {
+    if (isMissingResource(error)) bugsMissing = true;
     if (!lastRenderedBugsKeysStr) {
       container.innerHTML = `<div class="empty-state">خطا در دریافت اطلاعات: ${error.message}</div>`;
     }
