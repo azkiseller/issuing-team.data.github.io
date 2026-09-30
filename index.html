@@ -982,8 +982,9 @@ window.APP_CONFIG = Object.freeze({
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
   });
 
-  // کلاینت ازکی سنتر (فقط برای منیجر/سرپرست ارشد): هر دو صفحه روی یک دامنه‌اند و هر پروژه سشن
-  // خودش را با کلید جدا در localStorage نگه می‌دارد؛ پس ورود هم‌زمان در هر دو، جابه‌جایی بدون لاگین مجدد است.
+  // ورود یکپارچه‌ی منیجر/سرپرست ارشد با ازکی سنتر: هر دو صفحه روی یک دامنه‌اند و هر پروژه سشن خودش را
+  // با کلید جدا در localStorage نگه می‌دارد. سشن طرف دیگر با تابع sso-bridge ساخته می‌شود: توکن این طرف
+  // را می‌گیرد، اعتبارسنجی و نقش را چک می‌کند و یک توکن یک‌بارمصرف ورود برمی‌گرداند (بدون رمز).
   let centerSb = null;
   function getCenterSb() {
     if (!centerSb && cfg.CENTER_SUPABASE_URL && cfg.CENTER_SUPABASE_KEY) {
@@ -993,9 +994,42 @@ window.APP_CONFIG = Object.freeze({
     }
     return centerSb;
   }
-  // اطلاعات ورود فقط تا پایان boot در حافظه می‌ماند (نه ذخیره)، برای ورود هم‌زمان به ازکی سنتر
-  let pendingCreds = null;
-  let centerLogin = null; // Promise ورود هم‌زمان؛ لینک «ازکی سنتر» قبل از رفتن منتظرش می‌ماند
+  let centerLogin = null; // Promise ساخت سشن ازکی سنتر؛ لینک «ازکی سنتر» قبل از رفتن منتظرش می‌ماند
+  const CENTER_TOKEN_KEY = cfg.CENTER_SUPABASE_URL
+    ? `sb-${new URL(cfg.CENTER_SUPABASE_URL).host.split('.')[0]}-auth-token` : '';
+
+  // از سشنِ «from» یک سشن در «to» می‌سازد (پروژه‌ی مقصد باید تابع sso-bridge داشته باشد)
+  async function bridgeSession(fromClient, toClient, toUrl, toKey) {
+    const { data: from } = await fromClient.auth.getSession();
+    if (!from.session) return false;
+    const res = await fetch(`${toUrl}/functions/v1/sso-bridge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: toKey },
+      body: JSON.stringify({ peer_token: from.session.access_token }),
+    });
+    if (!res.ok) return false;
+    const { token_hash } = await res.json();
+    if (!token_hash) return false;
+    const { error } = await toClient.auth.verifyOtp({ token_hash, type: 'magiclink' });
+    return !error;
+  }
+  async function ensureCenterSession() {
+    const csb = getCenterSb();
+    if (!csb) return false;
+    try {
+      const { data } = await csb.auth.getSession();
+      if (data.session) return true;
+      return await bridgeSession(sb, csb, cfg.CENTER_SUPABASE_URL, cfg.CENTER_SUPABASE_KEY);
+    } catch (e) { console.warn('ساخت سشن ازکی سنتر ناموفق بود', e); return false; }
+  }
+  // بدون سشن این طرف ولی با سشن ازکی سنتر (منیجر/ارشدی که از آنجا آمده): ورود خودکار
+  async function tryLoginFromCenter() {
+    let has = false;
+    try { has = !!(CENTER_TOKEN_KEY && localStorage.getItem(CENTER_TOKEN_KEY)); } catch (e) {}
+    if (!has) return false;
+    try { return await bridgeSession(getCenterSb(), sb, cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); }
+    catch (e) { return false; }
+  }
 
   const ROLE_LABELS = {
     operator: 'اپراتور',
@@ -1215,9 +1249,7 @@ window.APP_CONFIG = Object.freeze({
     }
 
     $('login-password').value = '';
-    pendingCreds = { email, password };
     await boot();
-    pendingCreds = null;
   });
 
   $('logout-btn').addEventListener('click', async () => {
@@ -1239,7 +1271,8 @@ window.APP_CONFIG = Object.freeze({
   // شروع برنامه بعد از لاگین
   // ---------------------------------------------------------------
   async function boot() {
-    const { data: sessionData } = await sb.auth.getSession();
+    let { data: sessionData } = await sb.auth.getSession();
+    if (!sessionData.session && await tryLoginFromCenter()) ({ data: sessionData } = await sb.auth.getSession());
     if (!sessionData.session) return;
 
     $('login-screen').hidden = true;
@@ -1277,22 +1310,12 @@ window.APP_CONFIG = Object.freeze({
     $('period-label').textContent = `دوره‌ی جاری: ${CURRENT_PERIOD.label}`;
     loadSyncStatus().then((ts) => { lastSyncedAt = ts; });
 
-    if (SEES_ALL_ROLES.includes(profile.role) && pendingCreds) centerLogin = signInCenter(pendingCreds);
+    if (SEES_ALL_ROLES.includes(profile.role)) centerLogin = ensureCenterSession();
     renderUnitSwitcher(profile);
     if (profile.role === 'supervisor' && profile.unit === 'center') { renderCenterOnlyNotice(); return; }
     if (profile.role === 'operator') await renderOperatorView(profile);
     else await renderManagerialView(profile);
     startAutoRefresh();
-  }
-
-  // ورود هم‌زمان به ازکی سنتر با همان نام کاربری و رمز؛ اگه نشد، صفحه‌ی سنتر خودش فرم ورود نشان می‌دهد
-  async function signInCenter(creds) {
-    const csb = getCenterSb();
-    if (!csb) return;
-    try {
-      const { error } = await csb.auth.signInWithPassword(creds);
-      if (error) console.warn('ورود هم‌زمان به ازکی سنتر ناموفق بود:', error.message);
-    } catch (e) { console.warn('ورود هم‌زمان به ازکی سنتر ناموفق بود', e); }
   }
 
   // انتخاب‌گر واحد (ازکی سلر | ازکی سنتر) برای منیجر و سرپرست ارشد

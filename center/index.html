@@ -2298,6 +2298,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 
 // ---- ورود یکپارچه‌ی منیجر و سرپرست ارشد با داشبورد ازکی سلر ----
 // هر دو صفحه روی یک دامنه‌اند و هر پروژه سشن خودش را با کلید جدا در localStorage نگه می‌دارد.
+// سشن طرف دیگر با تابع sso-bridge ساخته می‌شود (توکن این طرف ← اعتبارسنجی و چک نقش ← توکن یک‌بارمصرف؛ بدون رمز).
 // کلید عمومی (anon) است؛ امنیت داده‌ها با RLS تأمین می‌شود.
 const SEES_ALL_ROLES = ['manager', 'senior_supervisor'];
 const SELLER_URL = '../';
@@ -2312,12 +2313,37 @@ function getSellerClient() {
   }
   return sellerClient;
 }
-let sellerLogin = null; // Promise ورود هم‌زمان؛ لینک «ازکی سلر» قبل از رفتن منتظرش می‌ماند
-async function signInSeller(creds) {
+let sellerLogin = null; // Promise ساخت سشن ازکی سلر؛ لینک «ازکی سلر» قبل از رفتن منتظرش می‌ماند
+const SELLER_TOKEN_KEY = 'sb-ssqqjkhzgcgojbacjitq-auth-token';
+// از سشنِ «from» یک سشن در «to» می‌سازد (پروژه‌ی مقصد باید تابع sso-bridge داشته باشد)
+async function bridgeSession(fromClient, toClient, toUrl, toKey) {
+  const { data: from } = await fromClient.auth.getSession();
+  if (!from.session) return false;
+  const res = await fetch(toUrl + '/functions/v1/sso-bridge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: toKey },
+    body: JSON.stringify({ peer_token: from.session.access_token })
+  });
+  if (!res.ok) return false;
+  const { token_hash } = await res.json();
+  if (!token_hash) return false;
+  const { error } = await toClient.auth.verifyOtp({ token_hash, type: 'magiclink' });
+  return !error;
+}
+async function ensureSellerSession() {
   try {
-    const { error } = await getSellerClient().auth.signInWithPassword(creds);
-    if (error) console.warn('ورود هم‌زمان به ازکی سلر ناموفق بود:', error.message);
-  } catch (e) { console.warn('ورود هم‌زمان به ازکی سلر ناموفق بود', e); }
+    const { data } = await getSellerClient().auth.getSession();
+    if (data.session) return true;
+    return await bridgeSession(supabaseClient, getSellerClient(), SELLER_SUPABASE_URL, SELLER_SUPABASE_KEY);
+  } catch (e) { console.warn('ساخت سشن ازکی سلر ناموفق بود', e); return false; }
+}
+// بدون سشن این طرف ولی با سشن ازکی سلر (منیجر/ارشدی که از آنجا آمده): ورود خودکار
+async function tryLoginFromSeller() {
+  let has = false;
+  try { has = !!localStorage.getItem(SELLER_TOKEN_KEY); } catch (e) {}
+  if (!has) return false;
+  try { return await bridgeSession(getSellerClient(), supabaseClient, SUPABASE_URL, SUPABASE_ANON_KEY); }
+  catch (e) { return false; }
 }
 function renderUnitSwitcher() {
   const who = document.querySelector('.topbar .who');
@@ -2369,8 +2395,10 @@ loginForm.addEventListener('submit', async (e) => {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
 
-  const creds = { email: usernameToEmail(username), password };
-  const { data, error } = await supabaseClient.auth.signInWithPassword(creds);
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: usernameToEmail(username),
+    password
+  });
 
   loginBtn.disabled = false;
   loginBtn.textContent = 'ورود';
@@ -2383,7 +2411,7 @@ loginForm.addEventListener('submit', async (e) => {
   supabaseClient.from('login_events').insert({ user_id: data.user.id }).then(({ error: logError }) => {
     if (logError) console.warn('ثبت رویداد ورود ناموفق بود:', logError);
   });
-  enterApp(data.user, creds);
+  enterApp(data.user);
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -5129,7 +5157,7 @@ async function loadCenterAgentReport(userId) {
   container.innerHTML = itemsHtml;
 }
 
-async function enterApp(user, creds) {
+async function enterApp(user) {
   loginScreen.style.display = 'none';
   appScreen.style.display = 'block';
   document.getElementById('user-label').textContent = user.email.split('@')[0];
@@ -5151,7 +5179,7 @@ async function enterApp(user, creds) {
   // منیجر و سرپرست ارشد نمای سرپرست را می‌بینند (فقط خواندن؛ نوشتن با RLS برای سرپرست است)
   const seesAll = !profileError && profile && SEES_ALL_ROLES.includes(profile.role);
   if (seesAll) {
-    if (creds) sellerLogin = signInSeller(creds);
+    sellerLogin = ensureSellerSession();
     renderUnitSwitcher();
   }
   const isSupervisor = !profileError && profile && (profile.role === 'supervisor' || seesAll);
@@ -7085,7 +7113,8 @@ async function loadBugs(userId) {
 }
 
 (async () => {
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  let { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session && await tryLoginFromSeller()) ({ data: { session } } = await supabaseClient.auth.getSession());
   if (session) enterApp(session.user);
 })();
 
