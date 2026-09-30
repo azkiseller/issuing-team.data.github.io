@@ -739,7 +739,20 @@ html[data-theme="dark"] .trend-tip { background: #EAF0FB; color: #0F1B33; }
 .summary-card.expandable:hover { transform: translateY(-2px); }
 .summary-card.expandable:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .summary-card.expandable.open { box-shadow: 0 0 0 2px rgba(255,255,255,.85), var(--shadow-card); }
-.card-hint { position: absolute; bottom: 8px; left: 0; right: 0; font-size: 10.5px; font-weight: 600; opacity: .8; }
+/* عدد بالاتر، راهنما جدا در پایین کارت */
+.summary-card.expandable { justify-content: flex-start; padding-bottom: 38px; }
+.summary-card.expandable .value { margin-top: 6px; }
+.card-hint {
+  position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  font-size: 10.5px; font-weight: 800; color: #0B6B3F;
+  background: rgba(255,255,255,.88); border-radius: 999px; padding: 2px 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+html[data-theme="dark"] .card-hint { color: #7CF0B0; background: rgba(8,20,40,.55); box-shadow: none; }
+/* نمودار پرنقطه (۹۶ ربع ساعت): نقطه‌ها فقط هنگام هاور؛ نقطه‌ی تنها همیشه */
+.trend.dense .trend-dot { opacity: 0; transition: opacity .1s; }
+.trend.dense .trend-dot.active, .trend.dense .trend-dot.solo { opacity: 1; }
 .card-chevron { display: inline-block; transition: transform .2s; }
 .summary-card.open .card-chevron { transform: rotate(180deg); }
 .hourly-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease, margin .3s ease; }
@@ -1550,12 +1563,13 @@ window.APP_CONFIG = Object.freeze({
 
   // نمودار ۲۴ ساعته‌ی میانگین کاربران فعال (سرپرست)
   const HOURLY_DAYS = 30;
+  // ۹۶ خانه‌ی ربع‌ساعتی از ۰۰:۰۰ تا ۲۳:۴۵ (slot = ساعت × ۴ + ربع)
   function hourlySeries(rows) {
-    const byHour = {};
-    (rows || []).forEach((r) => { byHour[r.hour] = r; });
-    return Array.from({ length: 24 }, (_, h) => {
-      const r = byHour[h];
-      const hh = `${String(h).padStart(2, '0')}:۰۰`;
+    const bySlot = {};
+    (rows || []).forEach((r) => { bySlot[r.slot] = r; });
+    return Array.from({ length: 96 }, (_, sl) => {
+      const r = bySlot[sl];
+      const hh = `${String(Math.floor(sl / 4)).padStart(2, '0')}:${String((sl % 4) * 15).padStart(2, '0')}`;
       return {
         target_count: r ? Number(r.avg_active) : 0,
         report_date_jalali: `ساعت ${hh}`,
@@ -1572,24 +1586,36 @@ window.APP_CONFIG = Object.freeze({
     }
     const maxDays = Math.max(...rows.map((r) => Number(r.days) || 0));
     return renderDailyTrendChart(hourlySeries(rows), 'hourly', title, {
-      aria: 'میانگین کاربران فعال در هر ساعت؛ با کلیدهای جهت‌نما بین ساعت‌ها جابه‌جا شوید',
-      axis: ['۰۰:۰۰', '۰۶:۰۰', '۱۲:۰۰', '۱۸:۰۰', '۲۳:۰۰'],
-      footnote: `میانگین هر ساعت روی ${formatNum(maxDays)} روز اخیر (حداکثر ${formatNum(HOURLY_DAYS)} روز)، از عکس‌های ۱۵ دقیقه‌ای`,
+      aria: 'میانگین کاربران فعال در هر ربع ساعت؛ با کلیدهای جهت‌نما بین زمان‌ها جابه‌جا شوید',
+      axis: ['۰۰:۰۰', '۰۶:۰۰', '۱۲:۰۰', '۱۸:۰۰', '۲۳:۴۵'],
+      dense: true,
+      footnote: `هر ربع ساعت، میانگین ${formatNum(maxDays)} روز اخیر (حداکثر ${formatNum(HOURLY_DAYS)} روز). ربع‌ساعت‌های بدون داده خالی می‌مانند.`,
     });
   }
 
   function renderDailyTrendChart(asc, id = 'trend', title = `روند صدور روزانه در ${CURRENT_PERIOD.label}`, opts = {}) {
     if (!asc || asc.length < 2) return '';
     const values = asc.map((r) => Number(r.target_count) || 0);
-    const max = Math.max(...values, 1);
+    const max = Math.max(...values.filter((_, i) => !asc[i].empty), 1);
     const n = values.length;
     const xs = values.map((_, i) => (i / (n - 1)) * 100);
-    const line = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${xs[i].toFixed(2)},${trendY(v, max).toFixed(2)}`).join(' ');
-    const area = `${line} L100,${TREND_H} L0,${TREND_H} Z`;
-    const dots = values.map((v, i) =>
-      `<span class="trend-dot" style="left:${xs[i]}%;top:${(trendY(v, max) / TREND_H) * 100}%"></span>`).join('');
+    // نقطه‌های «بدون داده» (empty) رسم نمی‌شوند: خط و سطح زیرش در آن‌جا قطع می‌شود
+    const segments = [];
+    let seg = [];
+    values.forEach((v, i) => {
+      if (asc[i].empty) { if (seg.length) segments.push(seg); seg = []; }
+      else seg.push(i);
+    });
+    if (seg.length) segments.push(seg);
+    const pt = (i) => `${xs[i].toFixed(2)},${trendY(values[i], max).toFixed(2)}`;
+    const line = segments.map((s) => s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' ')).join(' ');
+    const area = segments.filter((s) => s.length > 1)
+      .map((s) => `${s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' ')} L${xs[s[s.length - 1]].toFixed(2)},${TREND_H} L${xs[s[0]].toFixed(2)},${TREND_H} Z`).join(' ');
+    const solo = new Set(segments.filter((s) => s.length === 1).map((s) => s[0])); // نقطه‌ی تنها همیشه دیده شود
+    const dots = values.map((v, i) => (asc[i].empty ? '<span class="trend-dot" hidden></span>'
+      : `<span class="trend-dot ${solo.has(i) ? 'solo' : ''}" style="left:${xs[i]}%;top:${(trendY(v, max) / TREND_H) * 100}%"></span>`)).join('');
     return `
-      <div class="panel chart trend">
+      <div class="panel chart trend ${opts.dense ? 'dense' : ''}">
         <div class="trend-head">
           <div class="label">${esc(title)}</div>
           <div class="trend-max">بیشترین: ${formatNum(max)}</div>
@@ -1622,7 +1648,7 @@ window.APP_CONFIG = Object.freeze({
     const plot = $(`${id}-plot`);
     if (!plot) return;
     const values = asc.map((r) => Number(r.target_count) || 0);
-    const max = Math.max(...values, 1);
+    const max = Math.max(...values.filter((_, i) => !asc[i].empty), 1);
     const n = values.length;
     const tip = $(`${id}-tip`);
     const dots = plot.querySelectorAll('.trend-dot');
@@ -1637,7 +1663,7 @@ window.APP_CONFIG = Object.freeze({
       tip.querySelector('span').textContent = faDigits(asc[i].report_date_jalali) + (asc[i].note ? ` · ${asc[i].note}` : '');
       // تولتیپ داخل کادر بمونه: نزدیک لبه‌ها به سمت داخل می‌چسبه
       tip.style.left = `${x}%`;
-      const topPct = (trendY(values[i], max) / TREND_H) * 100;
+      const topPct = asc[i].empty ? 70 : (trendY(values[i], max) / TREND_H) * 100;
       tip.style.top = `${topPct}%`;
       tip.classList.toggle('below', topPct < 40); // نقطه‌های بالای نمودار: تولتیپ زیر نقطه
       tip.classList.toggle('edge-left', x < 12);
