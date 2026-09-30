@@ -732,6 +732,22 @@ html[data-theme="dark"] .trend-tip { background: #EAF0FB; color: #0F1B33; }
 .kpi-pay em { font-style: normal; margin-inline-start: auto; font-weight: 800; color: var(--accent-strong); }
 .kpi-pay.muted { color: var(--ink-faint); font-style: italic; }
 
+.trend-foot { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; text-align: right; }
+
+/* کارت «کاربران فعال» سرپرست: با کلیک، نمودار ساعتی زیر ردیف کارت‌ها باز می‌شود */
+.summary-card.expandable { cursor: pointer; position: relative; transition: transform .15s, box-shadow .15s; }
+.summary-card.expandable:hover { transform: translateY(-2px); }
+.summary-card.expandable:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.summary-card.expandable.open { box-shadow: 0 0 0 2px rgba(255,255,255,.85), var(--shadow-card); }
+.card-hint { position: absolute; bottom: 8px; left: 0; right: 0; font-size: 10.5px; font-weight: 600; opacity: .8; }
+.card-chevron { display: inline-block; transition: transform .2s; }
+.summary-card.open .card-chevron { transform: rotate(180deg); }
+.hourly-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease, margin .3s ease; }
+.hourly-drawer.open { grid-template-rows: 1fr; margin-bottom: 18px; }
+.hourly-drawer-inner { overflow: hidden; min-height: 0; }
+.hourly-drawer-inner > .panel { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) { .hourly-drawer, .card-chevron { transition: none; } }
+
 </style>
 </head>
 <body>
@@ -1040,6 +1056,7 @@ window.APP_CONFIG = Object.freeze({
     companyFilter: '',
     treeRootId: null,
     activeTab: 'team',
+    hourlyOpen: false,
     treeIds: new Set(),
   };
 
@@ -1531,7 +1548,37 @@ window.APP_CONFIG = Object.freeze({
 
   function trendY(v, max) { return TREND_H - (v / max) * TREND_H; }
 
-  function renderDailyTrendChart(asc, id = 'trend', title = `روند صدور روزانه در ${CURRENT_PERIOD.label}`) {
+  // نمودار ۲۴ ساعته‌ی میانگین کاربران فعال (سرپرست)
+  const HOURLY_DAYS = 30;
+  function hourlySeries(rows) {
+    const byHour = {};
+    (rows || []).forEach((r) => { byHour[r.hour] = r; });
+    return Array.from({ length: 24 }, (_, h) => {
+      const r = byHour[h];
+      const hh = `${String(h).padStart(2, '0')}:۰۰`;
+      return {
+        target_count: r ? Number(r.avg_active) : 0,
+        report_date_jalali: `ساعت ${hh}`,
+        empty: !r,
+        note: r ? [`میانگین ${formatNum(r.days)} روز`, r.today != null ? `امروز: ${formatNum(Number(r.today))}` : ''].filter(Boolean).join(' · ') : '',
+      };
+    });
+  }
+  function renderHourlyActive(rows) {
+    const title = 'میانگین کاربران فعال در ساعات روز';
+    if (!rows.length) {
+      return `<div class="panel chart trend"><div class="trend-head"><div class="label">${title}</div></div>
+        <div class="empty-state">داده از هر ۱۵ دقیقه جمع‌آوری می‌شود و نمودار از ساعت‌های بعد پر می‌شود.</div></div>`;
+    }
+    const maxDays = Math.max(...rows.map((r) => Number(r.days) || 0));
+    return renderDailyTrendChart(hourlySeries(rows), 'hourly', title, {
+      aria: 'میانگین کاربران فعال در هر ساعت؛ با کلیدهای جهت‌نما بین ساعت‌ها جابه‌جا شوید',
+      axis: ['۰۰:۰۰', '۰۶:۰۰', '۱۲:۰۰', '۱۸:۰۰', '۲۳:۰۰'],
+      footnote: `میانگین هر ساعت روی ${formatNum(maxDays)} روز اخیر (حداکثر ${formatNum(HOURLY_DAYS)} روز)، از عکس‌های ۱۵ دقیقه‌ای`,
+    });
+  }
+
+  function renderDailyTrendChart(asc, id = 'trend', title = `روند صدور روزانه در ${CURRENT_PERIOD.label}`, opts = {}) {
     if (!asc || asc.length < 2) return '';
     const values = asc.map((r) => Number(r.target_count) || 0);
     const max = Math.max(...values, 1);
@@ -1548,7 +1595,7 @@ window.APP_CONFIG = Object.freeze({
           <div class="trend-max">بیشترین: ${formatNum(max)}</div>
         </div>
         <div class="trend-plot" id="${id}-plot" tabindex="0" role="img"
-             aria-label="نمودار صدور روزانه؛ با کلیدهای جهت‌نما بین روزها جابه‌جا شوید">
+             aria-label="${esc(opts.aria || 'نمودار صدور روزانه؛ با کلیدهای جهت‌نما بین روزها جابه‌جا شوید')}">
           <svg viewBox="0 0 100 ${TREND_H}" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="${id}-fill" x1="0" y1="0" x2="0" y2="1">
@@ -1563,13 +1610,15 @@ window.APP_CONFIG = Object.freeze({
           ${dots}
           <div class="trend-tip" id="${id}-tip" hidden><b></b><span></span></div>
         </div>
-        <div class="trend-axis"><span>${esc(faDigits(asc[0].report_date_jalali))}</span><span>${esc(faDigits(asc[n - 1].report_date_jalali))}</span></div>
+        <div class="trend-axis">${(opts.axis || [asc[0].report_date_jalali, asc[n - 1].report_date_jalali]).map((t) => `<span>${esc(faDigits(t))}</span>`).join('')}</div>
+        ${opts.footnote ? `<div class="trend-foot">${esc(opts.footnote)}</div>` : ''}
       </div>
     `;
   }
 
   // لایه‌ی تعاملی: نزدیک‌ترین روز به نشانگر ماوس/انگشت (یا کلیدهای جهت‌نما) انتخاب می‌شه
-  function bindTrendChart(asc, id = 'trend') {
+  function bindTrendChart(asc, id = 'trend', opts = {}) {
+    const unit = opts.unit || 'صدور';
     const plot = $(`${id}-plot`);
     if (!plot) return;
     const values = asc.map((r) => Number(r.target_count) || 0);
@@ -1584,8 +1633,8 @@ window.APP_CONFIG = Object.freeze({
       const x = (i / (n - 1)) * 100;
       dots.forEach((d, k) => d.classList.toggle('active', k === i));
       tip.hidden = false;
-      tip.querySelector('b').textContent = `${formatNum(values[i])} صدور`;
-      tip.querySelector('span').textContent = faDigits(asc[i].report_date_jalali);
+      tip.querySelector('b').textContent = asc[i].empty ? 'بدون داده' : `${formatNum(values[i])} ${unit}`;
+      tip.querySelector('span').textContent = faDigits(asc[i].report_date_jalali) + (asc[i].note ? ` · ${asc[i].note}` : '');
       // تولتیپ داخل کادر بمونه: نزدیک لبه‌ها به سمت داخل می‌چسبه
       tip.style.left = `${x}%`;
       const topPct = (trendY(values[i], max) / TREND_H) * 100;
@@ -1744,7 +1793,7 @@ window.APP_CONFIG = Object.freeze({
     if (!silent) content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
-    const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, kpiRes] = await Promise.all([
+    const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes] = await Promise.all([
       sb.from('profiles').select('id, full_name, role, reports_to'),
       sb.from('daily_targets')
         .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary')
@@ -1761,6 +1810,10 @@ window.APP_CONFIG = Object.freeze({
       profile.role === 'operator'
         ? Promise.resolve({ data: [] })
         : sb.from('team_lead_partners').select('profile_id, partner_id'),
+      // میانگین کاربران فعال در هر ساعت روز (فقط سرپرست/مدیر؛ از عکس‌های ۱۵ دقیقه‌ای، ۳۰ روز اخیر)
+      (profile.role === 'supervisor' || profile.role === 'manager')
+        ? sb.rpc('active_hourly_profile', { p_days: HOURLY_DAYS })
+        : Promise.resolve({ data: null }),
       // شاخص‌های عملکرد دوره‌ی جاری (RLS: سرگروه فقط فردی/جفت/شیفت/کل خودش)
       profile.role === 'team_lead'
         ? sb.from('kpi_values').select('kpi, scope_type, scope_key, value, sample_size, updated_at').eq('period_start_sort', CURRENT_PERIOD.startSort)
@@ -1864,12 +1917,17 @@ window.APP_CONFIG = Object.freeze({
     const grandTotalSalary = state.subtreeSalary[summaryId] || 0;
     const myActive = state.activeCountBySubtree[summaryId] || 0;
 
+    // سرپرست/مدیر: کلیک روی کارت «کاربران فعال» نمودار ۲۴ ساعته را زیر ردیف کارت‌ها باز می‌کند
+    const hasHourly = !!(hourlyRes && hourlyRes.data);
     $('summary-row').innerHTML = `
       <div class="summary-card"><div class="label">جمع کل حقوق تیم <span class="unit">(ریال)</span></div><div class="value salary">${formatNum(grandTotalSalary)}</div></div>
       <div class="summary-card"><div class="label">جمع کل عملکرد تیم</div><div class="value">${formatNum(grandTotal)}</div></div>
-      <div class="summary-card">
+      <div class="summary-card ${hasHourly ? 'expandable' : ''} ${hasHourly && state.hourlyOpen ? 'open' : ''}" ${hasHourly
+        ? `id="active-card" role="button" tabindex="0" aria-expanded="${!!state.hourlyOpen}" aria-controls="hourly-drawer" title="نمایش میانگین کاربران فعال در ساعات روز"`
+        : ''}>
         <div class="label">کاربران فعال زیرمجموعه</div>
         <div class="value"><span class="pulse-dot"></span>${formatNum(myActive)}${profile.role === 'team_lead' ? ` <small>از ${formatNum(totalTeam)}</small>` : ''}</div>
+        ${hasHourly ? '<div class="card-hint"><span class="card-chevron">▾</span> نمودار ساعتی</div>' : ''}
       </div>
       <div class="summary-card"><div class="label">کل زیرمجموعه</div><div class="value">${formatNum(totalTeam)}</div></div>
     `;
@@ -1897,7 +1955,10 @@ window.APP_CONFIG = Object.freeze({
 
     const kpiRows = (kpiRes && kpiRes.data) || [];
     const showKpiTab = profile.role === 'team_lead' && kpiRows.length > 0;
-    content.innerHTML = (showKpiTab ? renderViewTabs() : '') + `
+    content.innerHTML = (hasHourly ? `
+      <div class="hourly-drawer ${state.hourlyOpen ? 'open' : ''}" id="hourly-drawer">
+        <div class="hourly-drawer-inner">${renderHourlyActive(hourlyRes.data)}</div>
+      </div>` : '') + (showKpiTab ? renderViewTabs() : '') + `
       <div id="tab-team" ${showKpiTab && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${bot ? renderBotPanel(botRows) : ''}
       ${companyStatsHtml}
@@ -1918,6 +1979,19 @@ window.APP_CONFIG = Object.freeze({
 
     renderTree(state.treeRootId);
     if (bot) bindTrendChart(dailySeries(botRows), 'bot');
+    if (hasHourly) {
+      if (hourlyRes.data.length) bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', { unit: 'کاربر فعال' });
+      const card = $('active-card');
+      const drawer = $('hourly-drawer');
+      const flipHourly = () => {
+        state.hourlyOpen = !state.hourlyOpen;
+        drawer.classList.toggle('open', state.hourlyOpen);
+        card.classList.toggle('open', state.hourlyOpen);
+        card.setAttribute('aria-expanded', String(state.hourlyOpen));
+      };
+      card.addEventListener('click', flipHourly);
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipHourly(); } });
+    }
 
     $('tree-search').addEventListener('input', (e) => {
       state.search = e.target.value.trim();
