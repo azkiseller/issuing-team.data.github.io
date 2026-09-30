@@ -822,6 +822,22 @@ html[data-theme="dark"] .card-hint { color: #7CF0B0; background: rgba(8,20,40,.5
 }
 @media (prefers-reduced-motion: reduce) { .cg-drawer, .cg-chevron { transition: none; } }
 
+/* ---------- انتخاب‌گر واحد (منیجر / سرپرست ارشد) ---------- */
+.unit-switch { display: inline-flex; gap: 3px; padding: 3px; margin-inline-start: 10px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); align-self: center; }
+.unit-opt { font: 700 12px var(--font); padding: 6px 14px; border-radius: 999px; color: var(--ink-soft);
+  text-decoration: none; white-space: nowrap; }
+.unit-opt.active { color: #fff; background: linear-gradient(135deg, var(--accent-deep), var(--accent)); }
+a.unit-opt:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.unit-opt.disabled { opacity: .55; cursor: default; }
+.unit-opt small { font-size: 10px; font-weight: 600; }
+@media (max-width: 560px) { .unit-switch { margin-inline-start: 0; margin-top: 8px; order: 5; } }
+
+.panel.center-notice { padding: 28px 24px; text-align: center; }
+.center-notice-title { font-size: 17px; font-weight: 800; margin-bottom: 8px; }
+.center-notice p { color: var(--ink-soft); font-size: 13.5px; margin: 6px 0; }
+.center-notice .center-link { display: inline-block; margin-top: 12px; padding: 10px 22px; border-radius: 999px; text-decoration: none; }
+
 </style>
 </head>
 <body>
@@ -909,6 +925,8 @@ window.APP_CONFIG = Object.freeze({
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcXFqa2h6Z2Nnb2piYWNqaXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjczOTEsImV4cCI6MjEwNTE0MzM5MX0.0a9maOTpqGBRNs5mIVvNONXpYBauL8yjlY-O8EtsDxU',
   // دامنه‌ای که آخر نام کاربری اضافه می‌شه تا ایمیل Supabase Auth ساخته بشه
   EMAIL_DOMAIN: 'bimename.com',
+  // آدرس داشبورد ازکی سنتر (برای انتخاب‌گر واحد منیجر/سرپرست ارشد و پیام سرپرست ازکی سنتر). خالی = هنوز منتشر نشده
+  CENTER_URL: '',
 });
 
 </script>
@@ -965,13 +983,17 @@ window.APP_CONFIG = Object.freeze({
     operator: 'اپراتور',
     team_lead: 'سرگروه',
     supervisor: 'سرپرست',
-    manager: 'مدیر',
+    senior_supervisor: 'سرپرست ارشد',
+    manager: 'منیجر',
     team_pair: 'دو تیم',
   };
   // نودهای مجازی: «تیم X و Y» برای سرگروه‌های پارتنر، و ریشه‌ی درخت برای سرگروهِ دارای پارتنر
   const PAIR_PREFIX = '__pair:';
   const TREE_ROOT_ID = '__root';
   const isVirtualId = (id) => String(id).startsWith('__');
+  // منیجر و سرپرست ارشد: کل ازکی سلر + دسترسی به ازکی سنتر
+  const SEES_ALL_ROLES = ['manager', 'senior_supervisor'];
+  const SUPERVISOR_ROLES = ['supervisor', 'senior_supervisor', 'manager'];
 
   const RECENT_DAYS_LIMIT = 200;
 
@@ -1201,7 +1223,7 @@ window.APP_CONFIG = Object.freeze({
     const userId = sessionData.session.user.id;
     const { data: profile, error } = await sb
       .from('profiles')
-      .select('id, full_name, role, reports_to')
+      .select('id, full_name, role, reports_to, unit')
       .eq('id', userId)
       .maybeSingle();
 
@@ -1230,9 +1252,38 @@ window.APP_CONFIG = Object.freeze({
     $('period-label').textContent = `دوره‌ی جاری: ${CURRENT_PERIOD.label}`;
     loadSyncStatus().then((ts) => { lastSyncedAt = ts; });
 
+    renderUnitSwitcher(profile);
+    if (profile.role === 'supervisor' && profile.unit === 'center') { renderCenterOnlyNotice(); return; }
     if (profile.role === 'operator') await renderOperatorView(profile);
     else await renderManagerialView(profile);
     startAutoRefresh();
+  }
+
+  // انتخاب‌گر واحد (ازکی سلر | ازکی سنتر) برای منیجر و سرپرست ارشد
+  function renderUnitSwitcher(profile) {
+    if (!SEES_ALL_ROLES.includes(profile.role)) return;
+    const centerUrl = cfg.CENTER_URL || '';
+    const el = document.createElement('nav');
+    el.className = 'unit-switch';
+    el.setAttribute('aria-label', 'انتخاب واحد');
+    el.innerHTML = `
+      <span class="unit-opt active" aria-current="page">ازکی سلر</span>
+      ${centerUrl
+        ? `<a class="unit-opt" href="${esc(centerUrl)}">ازکی سنتر</a>`
+        : '<span class="unit-opt disabled" title="داشبورد ازکی سنتر هنوز منتشر نشده است">ازکی سنتر <small>به‌زودی</small></span>'}`;
+    document.querySelector('.topbar-left').appendChild(el);
+  }
+  // سرپرست واحد ازکی سنتر: داده‌ای از ازکی سلر ندارد
+  function renderCenterOnlyNotice() {
+    const centerUrl = cfg.CENTER_URL || '';
+    $('period-label').textContent = '';
+    $('summary-row').innerHTML = '';
+    $('content-area').innerHTML = `
+      <div class="panel center-notice">
+        <div class="center-notice-title">شما سرپرست واحد ازکی سنتر هستید</div>
+        <p>داده‌های این صفحه مربوط به واحد صدور ثالث ازکی سلر است. داشبورد واحد شما جداست.</p>
+        ${centerUrl ? `<a class="primary center-link" href="${esc(centerUrl)}">ورود به داشبورد ازکی سنتر</a>` : '<p class="muted">لینک داشبورد ازکی سنتر به‌زودی اینجا قرار می‌گیرد.</p>'}
+      </div>`;
   }
 
   function renderTopbar(profile, manager) {
@@ -1902,7 +1953,7 @@ window.APP_CONFIG = Object.freeze({
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes] = await Promise.all([
-      sb.from('profiles').select('id, full_name, role, reports_to'),
+      sb.from('profiles').select('id, full_name, role, reports_to, unit'),
       sb.from('daily_targets')
         .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary')
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
@@ -1919,7 +1970,7 @@ window.APP_CONFIG = Object.freeze({
         ? Promise.resolve({ data: [] })
         : sb.from('team_lead_partners').select('profile_id, partner_id'),
       // میانگین کاربران فعال در هر ساعت روز (فقط سرپرست/مدیر؛ از عکس‌های ۱۵ دقیقه‌ای، ۳۰ روز اخیر)
-      (profile.role === 'supervisor' || profile.role === 'manager')
+      SUPERVISOR_ROLES.includes(profile.role)
         ? sb.rpc('active_hourly_profile', { p_days: HOURLY_DAYS })
         : Promise.resolve({ data: null }),
       // شاخص‌های عملکرد دوره‌ی جاری (RLS: سرگروه فقط فردی/جفت/شیفت/کل خودش)
@@ -1965,6 +2016,15 @@ window.APP_CONFIG = Object.freeze({
       state.treeRootId = TREE_ROOT_ID;
     } else {
       state.treeRootId = profile.id;
+      // منیجر (یا ارشدی که زیرمجموعه‌ی مستقیم ندارد): ریشه = افراد بالای درخت ازکی سلر
+      if (SEES_ALL_ROLES.includes(profile.role) && !(state.childrenOf[profile.id] || []).length) {
+        state.childrenOf[TREE_ROOT_ID] = state.visibleProfiles
+          .filter((p) => p.id !== profile.id && p.unit !== 'center' && p.role !== 'operator'
+            && (!p.reports_to || !state.profileById[p.reports_to]))
+          .map((p) => p.id);
+        state.treeRootId = TREE_ROOT_ID;
+        summaryId = TREE_ROOT_ID;
+      }
       // سرپرست/مدیر: سرگروه‌های پارتنری که زیر یک نفرند، جای خودشان یک نود تیم می‌گیرند
       Object.keys(state.childrenOf).forEach((parentId) => {
         const kids = state.childrenOf[parentId];
@@ -2193,6 +2253,7 @@ window.APP_CONFIG = Object.freeze({
       visiting.delete(id);
     }
     Object.keys(state.profileById).forEach(walk);
+    if (state.childrenOf[TREE_ROOT_ID]) walk(TREE_ROOT_ID); // ریشه‌ی مجازی (سرگروهِ دارای پارتنر یا منیجر)
     state.subtreeTotal = tot;
     state.subtreeSalary = sal;
     state.activeCountBySubtree = act;
