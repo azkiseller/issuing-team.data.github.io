@@ -927,6 +927,9 @@ window.APP_CONFIG = Object.freeze({
   EMAIL_DOMAIN: 'bimename.com',
   // آدرس داشبورد ازکی سنتر (برای انتخاب‌گر واحد منیجر/سرپرست ارشد و پیام سرپرست ازکی سنتر). خالی = هنوز منتشر نشده
   CENTER_URL: 'center/',
+  // پروژه‌ی Supabase ازکی سنتر (کلید عمومی): منیجر و سرپرست ارشد با یک ورود در هر دو داشبورد لاگین می‌شوند
+  CENTER_SUPABASE_URL: 'https://hbiygeecakpgjnfieyyt.supabase.co',
+  CENTER_SUPABASE_KEY: 'sb_publishable__MGWCrgYYtyMFFQ9NjK5XQ_Ps-emOHk',
 });
 
 </script>
@@ -978,6 +981,21 @@ window.APP_CONFIG = Object.freeze({
   const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
   });
+
+  // کلاینت ازکی سنتر (فقط برای منیجر/سرپرست ارشد): هر دو صفحه روی یک دامنه‌اند و هر پروژه سشن
+  // خودش را با کلید جدا در localStorage نگه می‌دارد؛ پس ورود هم‌زمان در هر دو، جابه‌جایی بدون لاگین مجدد است.
+  let centerSb = null;
+  function getCenterSb() {
+    if (!centerSb && cfg.CENTER_SUPABASE_URL && cfg.CENTER_SUPABASE_KEY) {
+      centerSb = window.supabase.createClient(cfg.CENTER_SUPABASE_URL, cfg.CENTER_SUPABASE_KEY, {
+        auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+    }
+    return centerSb;
+  }
+  // اطلاعات ورود فقط تا پایان boot در حافظه می‌ماند (نه ذخیره)، برای ورود هم‌زمان به ازکی سنتر
+  let pendingCreds = null;
+  let centerLogin = null; // Promise ورود هم‌زمان؛ لینک «ازکی سنتر» قبل از رفتن منتظرش می‌ماند
 
   const ROLE_LABELS = {
     operator: 'اپراتور',
@@ -1197,11 +1215,18 @@ window.APP_CONFIG = Object.freeze({
     }
 
     $('login-password').value = '';
+    pendingCreds = { email, password };
     await boot();
+    pendingCreds = null;
   });
 
   $('logout-btn').addEventListener('click', async () => {
     try { await sb.auth.signOut(); } catch (e) {}
+    // خروج از ازکی سنتر هم (برای منیجر/سرپرست ارشد که هم‌زمان وارد شده‌اند)
+    try {
+      const csb = getCenterSb();
+      if (csb) { const { data } = await csb.auth.getSession(); if (data.session) await csb.auth.signOut(); }
+    } catch (e) {}
     location.reload();
   });
 
@@ -1252,11 +1277,22 @@ window.APP_CONFIG = Object.freeze({
     $('period-label').textContent = `دوره‌ی جاری: ${CURRENT_PERIOD.label}`;
     loadSyncStatus().then((ts) => { lastSyncedAt = ts; });
 
+    if (SEES_ALL_ROLES.includes(profile.role) && pendingCreds) centerLogin = signInCenter(pendingCreds);
     renderUnitSwitcher(profile);
     if (profile.role === 'supervisor' && profile.unit === 'center') { renderCenterOnlyNotice(); return; }
     if (profile.role === 'operator') await renderOperatorView(profile);
     else await renderManagerialView(profile);
     startAutoRefresh();
+  }
+
+  // ورود هم‌زمان به ازکی سنتر با همان نام کاربری و رمز؛ اگه نشد، صفحه‌ی سنتر خودش فرم ورود نشان می‌دهد
+  async function signInCenter(creds) {
+    const csb = getCenterSb();
+    if (!csb) return;
+    try {
+      const { error } = await csb.auth.signInWithPassword(creds);
+      if (error) console.warn('ورود هم‌زمان به ازکی سنتر ناموفق بود:', error.message);
+    } catch (e) { console.warn('ورود هم‌زمان به ازکی سنتر ناموفق بود', e); }
   }
 
   // انتخاب‌گر واحد (ازکی سلر | ازکی سنتر) برای منیجر و سرپرست ارشد
@@ -1272,6 +1308,13 @@ window.APP_CONFIG = Object.freeze({
         ? `<a class="unit-opt" href="${esc(centerUrl)}">ازکی سنتر</a>`
         : '<span class="unit-opt disabled" title="داشبورد ازکی سنتر هنوز منتشر نشده است">ازکی سنتر <small>به‌زودی</small></span>'}`;
     document.querySelector('.topbar-left').appendChild(el);
+    const link = el.querySelector('a.unit-opt');
+    if (link) link.addEventListener('click', async (e) => {
+      if (!centerLogin) return;
+      e.preventDefault();
+      await centerLogin;
+      location.href = link.href;
+    });
   }
   // سرپرست واحد ازکی سنتر: داده‌ای از ازکی سلر ندارد
   function renderCenterOnlyNotice() {

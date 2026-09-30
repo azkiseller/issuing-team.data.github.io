@@ -349,6 +349,12 @@
     transition: color .15s;
   }
   .logout-link:hover { color: var(--danger); }
+  /* انتخاب‌گر واحد (منیجر و سرپرست ارشد) */
+  .unit-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--accent-soft); }
+  .unit-switch .unit-opt { padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--accent-strong); text-decoration: none; white-space: nowrap; }
+  .unit-switch .unit-opt.active { background: var(--accent-strong); color: #fff; }
+  .unit-switch a.unit-opt:hover { background: rgba(0,0,0,.06); }
+  @media (max-width: 560px) { .who { gap: 10px; } .unit-switch .unit-opt { padding: 4px 9px; font-size: 12px; } }
 
   main {
     max-width: 880px;
@@ -2290,6 +2296,46 @@ const TABLE_CENTER_AGENTS = "center_agents";
 const TABLE_SELLER_LOCATIONS = "seller_locations";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ---- ورود یکپارچه‌ی منیجر و سرپرست ارشد با داشبورد ازکی سلر ----
+// هر دو صفحه روی یک دامنه‌اند و هر پروژه سشن خودش را با کلید جدا در localStorage نگه می‌دارد.
+// کلید عمومی (anon) است؛ امنیت داده‌ها با RLS تأمین می‌شود.
+const SEES_ALL_ROLES = ['manager', 'senior_supervisor'];
+const SELLER_URL = '../';
+const SELLER_SUPABASE_URL = "https://ssqqjkhzgcgojbacjitq.supabase.co";
+const SELLER_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcXFqa2h6Z2Nnb2piYWNqaXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjczOTEsImV4cCI6MjEwNTE0MzM5MX0.0a9maOTpqGBRNs5mIVvNONXpYBauL8yjlY-O8EtsDxU";
+let sellerClient = null;
+function getSellerClient() {
+  if (!sellerClient) {
+    sellerClient = window.supabase.createClient(SELLER_SUPABASE_URL, SELLER_SUPABASE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+  }
+  return sellerClient;
+}
+let sellerLogin = null; // Promise ورود هم‌زمان؛ لینک «ازکی سلر» قبل از رفتن منتظرش می‌ماند
+async function signInSeller(creds) {
+  try {
+    const { error } = await getSellerClient().auth.signInWithPassword(creds);
+    if (error) console.warn('ورود هم‌زمان به ازکی سلر ناموفق بود:', error.message);
+  } catch (e) { console.warn('ورود هم‌زمان به ازکی سلر ناموفق بود', e); }
+}
+function renderUnitSwitcher() {
+  const who = document.querySelector('.topbar .who');
+  if (!who || who.querySelector('.unit-switch')) return;
+  const nav = document.createElement('nav');
+  nav.className = 'unit-switch';
+  nav.setAttribute('aria-label', 'انتخاب واحد');
+  nav.innerHTML = '<a class="unit-opt" href="' + SELLER_URL + '">ازکی سلر</a><span class="unit-opt active" aria-current="page">ازکی سنتر</span>';
+  who.insertBefore(nav, who.firstChild);
+  const link = nav.querySelector('a');
+  link.addEventListener('click', async (e) => {
+    if (!sellerLogin) return;
+    e.preventDefault();
+    await sellerLogin;
+    location.href = link.href;
+  });
+}
+
 const loginScreen = document.getElementById('login-screen');
 const appScreen = document.getElementById('app-screen');
 const loginForm = document.getElementById('login-form');
@@ -2305,7 +2351,8 @@ stripSpaces(document.getElementById('username'));
 stripSpaces(document.getElementById('password'));
 
 function usernameToEmail(u) {
-  return u.trim() + '@' + USERNAME_EMAIL_DOMAIN;
+  const v = u.trim();
+  return v.includes('@') ? v : v + '@' + USERNAME_EMAIL_DOMAIN;
 }
 
 function showError(msg) {
@@ -2322,10 +2369,8 @@ loginForm.addEventListener('submit', async (e) => {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: usernameToEmail(username),
-    password
-  });
+  const creds = { email: usernameToEmail(username), password };
+  const { data, error } = await supabaseClient.auth.signInWithPassword(creds);
 
   loginBtn.disabled = false;
   loginBtn.textContent = 'ورود';
@@ -2338,11 +2383,16 @@ loginForm.addEventListener('submit', async (e) => {
   supabaseClient.from('login_events').insert({ user_id: data.user.id }).then(({ error: logError }) => {
     if (logError) console.warn('ثبت رویداد ورود ناموفق بود:', logError);
   });
-  enterApp(data.user);
+  enterApp(data.user, creds);
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await supabaseClient.auth.signOut();
+  // خروج از ازکی سلر هم (برای منیجر/سرپرست ارشد که هم‌زمان وارد شده‌اند)
+  try {
+    const { data } = await getSellerClient().auth.getSession();
+    if (data.session) await getSellerClient().auth.signOut();
+  } catch (e) {}
   location.reload();
 });
 
@@ -5079,7 +5129,7 @@ async function loadCenterAgentReport(userId) {
   container.innerHTML = itemsHtml;
 }
 
-async function enterApp(user) {
+async function enterApp(user, creds) {
   loginScreen.style.display = 'none';
   appScreen.style.display = 'block';
   document.getElementById('user-label').textContent = user.email.split('@')[0];
@@ -5098,8 +5148,14 @@ async function enterApp(user) {
   const isCenter = !profileError && profile && profile.role === 'center';
   const isLeader = !profileError && profile && profile.role === 'leader';
   const isCenterAgent = !profileError && profile && profile.role === 'center_agent';
-  const isSupervisor = !profileError && profile && profile.role === 'supervisor';
-  currentUserRole = (!profileError && profile) ? profile.role : null;
+  // منیجر و سرپرست ارشد نمای سرپرست را می‌بینند (فقط خواندن؛ نوشتن با RLS برای سرپرست است)
+  const seesAll = !profileError && profile && SEES_ALL_ROLES.includes(profile.role);
+  if (seesAll) {
+    if (creds) sellerLogin = signInSeller(creds);
+    renderUnitSwitcher();
+  }
+  const isSupervisor = !profileError && profile && (profile.role === 'supervisor' || seesAll);
+  currentUserRole = (!profileError && profile) ? (seesAll ? 'supervisor' : profile.role) : null;
   document.documentElement.classList.toggle('allow-select', currentUserRole === 'supervisor');
   // فونت IRANSansX فقط برای سرپرست و اپراتور (اپراتور = نقش agent یا هر نقش ناشناخته‌ای که به پنل تارگت روزانه می‌ره)
   const knownOtherRoles = ['admin', 'center', 'leader', 'center_agent'];
