@@ -1244,21 +1244,32 @@ window.APP_CONFIG = Object.freeze({
     btn.disabled = true;
     btn.textContent = 'در حال ورود...';
 
-    let result;
-    try {
-      result = await sb.auth.signInWithPassword({ email, password });
-    } catch (ex) {
-      btn.disabled = false;
-      btn.textContent = 'ورود';
-      showLoginError('اتصال به سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
-      return;
-    }
+    // صفحه‌ی ورود مشترک: همان نام کاربری/رمز هم‌زمان روی هر دو پروژه امتحان می‌شود و هر کس
+    // به داشبورد واحد خودش می‌رود (فقط سلر → همین‌جا، فقط سنتر → ازکی سنتر، هر دو → همین‌جا با انتخاب‌گر واحد)
+    const csb = getCenterSb();
+    const [sellerTry, centerTry] = await Promise.allSettled([
+      sb.auth.signInWithPassword({ email, password }),
+      csb ? csb.auth.signInWithPassword({ email, password }) : Promise.resolve({ error: { message: 'no center' } }),
+    ]);
+    const okOf = (t) => t.status === 'fulfilled' && !t.value.error && t.value.data && t.value.data.session;
+    const sellerOk = okOf(sellerTry);
+    const centerOk = okOf(centerTry);
 
     btn.disabled = false;
     btn.textContent = 'ورود';
 
-    if (result.error) {
-      const msg = result.error.message || '';
+    if (!sellerOk && centerOk) {
+      $('login-password').value = '';
+      location.href = cfg.CENTER_URL; // کاربر فقط ازکی سنتر: سشن ساخته شده، صفحه‌ی سنتر مستقیم باز می‌شود
+      return;
+    }
+    if (!sellerOk && !centerOk) {
+      if (sellerTry.status === 'rejected' && centerTry.status === 'rejected') {
+        showLoginError('اتصال به سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
+        return;
+      }
+      const result = sellerTry.status === 'fulfilled' ? sellerTry.value : centerTry.value;
+      const msg = (result.error && result.error.message) || '';
       if (/invalid.*credentials/i.test(msg)) showLoginError('نام کاربری یا رمز عبور اشتباه است.');
       else if (/rate|too many/i.test(msg)) showLoginError('تعداد تلاش‌ها زیاد بود. چند دقیقه بعد دوباره امتحان کنید.');
       else showLoginError('ورود ناموفق بود. لطفاً دوباره تلاش کنید.');
@@ -1266,6 +1277,7 @@ window.APP_CONFIG = Object.freeze({
     }
 
     $('login-password').value = '';
+    if (centerOk) centerLogin = Promise.resolve(true);
     await boot();
   });
 
@@ -1290,7 +1302,17 @@ window.APP_CONFIG = Object.freeze({
   async function boot() {
     let { data: sessionData } = await sb.auth.getSession();
     if (!sessionData.session && await tryLoginFromCenter()) ({ data: sessionData } = await sb.auth.getSession());
-    if (!sessionData.session) return;
+    if (!sessionData.session) {
+      // سشن ازکی سنتر دارد ولی حساب ازکی سلر نه (کاربر فقط سنتر): به داشبورد خودش برود
+      const csb = getCenterSb();
+      if (csb && cfg.CENTER_URL) {
+        try {
+          const { data } = await csb.auth.getSession();
+          if (data.session) { location.replace(cfg.CENTER_URL); return; }
+        } catch (e) {}
+      }
+      return;
+    }
 
     $('login-screen').hidden = true;
     $('app-screen').hidden = false;
