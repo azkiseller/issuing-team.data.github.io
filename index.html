@@ -688,6 +688,13 @@ html[data-theme="dark"] .trend-tip { background: #EAF0FB; color: #0F1B33; }
 
 /* ---------- سهم شرکت‌ها از صدورهای ماه (نمای اپراتور) ---------- */
 .panel.share-panel { text-align: center; padding: 22px 20px; }
+/* دو دونات کنار هم (سهم شرکت‌ها | فراوانی سفارشات)؛ موبایل زیر هم */
+.share-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.share-pair > .panel { margin-bottom: 0; min-width: 0; }
+.share-pair { margin-bottom: 18px; }
+.share-pair .share-wrap { gap: 18px; }
+.share-pair .share-legend { min-width: 0; }
+@media (max-width: 860px) { .share-pair { grid-template-columns: 1fr; } }
 .share-wrap { display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; margin-top: 6px; }
 .share-donut { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
 .share-donut svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -1498,7 +1505,7 @@ window.APP_CONFIG = Object.freeze({
   async function renderOperatorView(profile, { keepMonthOpen = false } = {}) {
     const [{ data, error }, { data: ownStatus, error: statusError }, { data: scopeRows }, { data: companyRows }, { data: rankRows }] = await Promise.all([
       sb.from('daily_targets')
-        .select('report_date_jalali, report_date_sort, target_count, daily_salary')
+        .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
         .eq('operator_id', profile.id)
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
         .lte('report_date_sort', CURRENT_PERIOD.endSort)
@@ -1557,7 +1564,7 @@ window.APP_CONFIG = Object.freeze({
     const topHtml = (groupCompanies.length
       ? renderGroupCompanies(ownStatus, groupCompanies)
       : renderCompaniesRow(ownStatus) + renderCompanyDonut(ownStatus))
-      + renderCompanyShareDonut(companyRows);
+      + sharePairHtml(renderCompanyShareDonut(companyRows), renderTransferShareDonut(rows));
 
     if (rows.length === 0) {
       content.innerHTML = topHtml + '<div class="panel"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>';
@@ -1709,7 +1716,7 @@ window.APP_CONFIG = Object.freeze({
       .sort((a, b) => b.count - a.count || a.company.localeCompare(b.company, 'fa'));
     const total = items.reduce((s, x) => s + x.count, 0);
     if (!total) return '';
-    if (items.length > SHARE_SLOTS + 1) {
+    if (items.length > SHARE_SLOTS) { // فقط ۵ رنگ داریم؛ از ۶ شرکت به بعد بقیه در «سایر»
       const rest = items.slice(SHARE_SLOTS);
       items = items.slice(0, SHARE_SLOTS).concat([{ company: 'سایر', count: rest.reduce((s, x) => s + x.count, 0), other: true }]);
     }
@@ -1717,7 +1724,41 @@ window.APP_CONFIG = Object.freeze({
       x.pct = (x.count / total) * 100;
       x.color = x.other ? 'var(--cat-other)' : `var(--cat-${i + 1})`;
     });
+    return sharePanelHtml({
+      title: `سهم شرکت‌ها از صدورهای ${CURRENT_PERIOD.label || 'این ماه'}`,
+      items, total, nameHeader: 'شرکت', aria: `سهم شرکت‌ها از ${formatNum(total)} صدور`,
+    });
+  }
 
+  // دو دونات کنار هم (سهم شرکت‌ها | فراوانی سفارشات)؛ اگه فقط یکی داده داشت، تمام‌عرض
+  function sharePairHtml(a, b) {
+    const parts = [a, b].filter(Boolean);
+    if (parts.length < 2) return parts.join('');
+    return `<div class="share-pair">${parts.join('')}</div>`;
+  }
+
+  // «فراوانی سفارشات»: سهم صدورهای انتقالی و غیرانتقالی اپراتور در دوره‌ی جاری
+  function renderTransferShareDonut(rows) {
+    let transfer = 0, nonTransfer = 0;
+    (rows || []).forEach((r) => {
+      transfer += Number(r.transfer_count) || 0;
+      nonTransfer += Number(r.non_transfer_count) || 0;
+    });
+    const total = transfer + nonTransfer;
+    if (!total) return '';
+    const items = [
+      { company: 'انتقالی', count: transfer, color: 'var(--cat-1)' },
+      { company: 'غیر انتقالی', count: nonTransfer, color: 'var(--cat-2)' },
+    ].filter((x) => x.count > 0);
+    items.forEach((x) => { x.pct = (x.count / total) * 100; });
+    return sharePanelHtml({
+      title: 'فراوانی سفارشات', items, total, nameHeader: 'نوع سفارش',
+      aria: `سهم سفارش‌های انتقالی و غیرانتقالی از ${formatNum(total)} صدور`,
+    });
+  }
+
+  // پنل دونات + جدول (مشترک بین «سهم شرکت‌ها» و «فراوانی سفارشات»)
+  function sharePanelHtml({ title, items, total, nameHeader, aria }) {
     // حلقه با SVG: هر شرکت یک کمان، با فاصله‌ی ۲ پیکسلی بین کمان‌ها
     const R = 48, C = 2 * Math.PI * R, GAP = items.length > 1 ? 2 : 0;
     let offset = 0;
@@ -1734,17 +1775,17 @@ window.APP_CONFIG = Object.freeze({
     const pctLabel = (p) => (p > 0 && p < 1 ? '<۱' : formatNum(Math.round(p)));
     return `
       <div class="panel chart share-panel">
-        <div class="label">سهم شرکت‌ها از صدورهای ${esc(CURRENT_PERIOD.label || 'این ماه')}</div>
+        <div class="label">${esc(title)}</div>
         <div class="share-wrap">
           <div class="share-donut">
-            <svg viewBox="0 0 120 120" role="img" aria-label="سهم شرکت‌ها از ${formatNum(total)} صدور">
+            <svg viewBox="0 0 120 120" role="img" aria-label="${esc(aria)}">
               <circle class="share-track" r="${R}" cx="60" cy="60"></circle>
               <g transform="rotate(-90 60 60)">${arcs}</g>
             </svg>
             <div class="share-center"><b>${formatNum(total)}</b><small>صدور</small></div>
           </div>
           <table class="share-legend">
-            <thead><tr><th>شرکت</th><th>صدور</th><th>سهم</th></tr></thead>
+            <thead><tr><th>${esc(nameHeader)}</th><th>صدور</th><th>سهم</th></tr></thead>
             <tbody>
               ${items.map((x, i) => `
                 <tr data-i="${i}">
