@@ -2134,7 +2134,7 @@ window.APP_CONFIG = Object.freeze({
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes] = await Promise.all([
       sb.from('profiles').select('id, full_name, role, reports_to, unit'),
       sb.from('daily_targets')
-        .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary')
+        .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
         .lte('report_date_sort', CURRENT_PERIOD.endSort)
         .order('report_date_sort', { ascending: false })
@@ -2550,7 +2550,10 @@ window.APP_CONFIG = Object.freeze({
       ? renderGroupCompanies(state.statusByOperator[id], group, `شرکت‌های فعال ${p.full_name || ''} از شرکت‌های گروه`)
       : '';
     const rows = sortAsc(state.rawTargetsByOperator[id]);
-    return groupHtml + (rows.length ? rowsTableHtml(rows) : '<div class="empty-state">رکوردی برای این فرد ثبت نشده است</div>');
+    // «فراوانی سفارشات» همین اپراتور (مثل نمای خود اپراتور)
+    const transferHtml = renderTransferShareDonut(rows);
+    if (transferHtml) bindShareDonutHover();
+    return groupHtml + transferHtml + (rows.length ? rowsTableHtml(rows) : '<div class="empty-state">رکوردی برای این فرد ثبت نشده است</div>');
   }
 
 
