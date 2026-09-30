@@ -2335,7 +2335,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // هر دو صفحه روی یک دامنه‌اند و هر پروژه سشن خودش را با کلید جدا در localStorage نگه می‌دارد.
 // سشن طرف دیگر با تابع sso-bridge ساخته می‌شود (توکن این طرف ← اعتبارسنجی و چک نقش ← توکن یک‌بارمصرف؛ بدون رمز).
 // کلید عمومی (anon) است؛ امنیت داده‌ها با RLS تأمین می‌شود.
-const SEES_ALL_ROLES = ['manager', 'senior_supervisor'];
+const SEES_ALL_ROLES = ['senior_manager', 'manager', 'senior_supervisor'];
 const SELLER_URL = '../';
 const SELLER_SUPABASE_URL = "https://ssqqjkhzgcgojbacjitq.supabase.co";
 const SELLER_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzcXFqa2h6Z2Nnb2piYWNqaXRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjczOTEsImV4cCI6MjEwNTE0MzM5MX0.0a9maOTpqGBRNs5mIVvNONXpYBauL8yjlY-O8EtsDxU";
@@ -5208,7 +5208,7 @@ async function enterApp(user) {
 
   if (!profileError && profile) {
     const ROLE_LABELS_FA = { supervisor: 'سرپرست', leader: 'سرگروه', center: 'سنتر', agent: 'کارشناس', center_agent: 'کارشناس سنتر',
-      admin: 'ادمین', manager: 'منیجر', senior_supervisor: 'سرپرست ارشد' };
+      admin: 'ادمین', manager: 'مدیر', senior_manager: 'مدیر ارشد', senior_supervisor: 'سرپرست ارشد' };
     const name = (profile.full_name || '').trim() || user.email.split('@')[0];
     document.getElementById('user-name').textContent = name;
     document.getElementById('user-avatar').textContent = name.charAt(0);

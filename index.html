@@ -1052,7 +1052,8 @@ window.APP_CONFIG = Object.freeze({
     team_lead: 'سرگروه',
     supervisor: 'سرپرست',
     senior_supervisor: 'سرپرست ارشد',
-    manager: 'منیجر',
+    manager: 'مدیر',
+    senior_manager: 'مدیر ارشد',
     team_pair: 'دو تیم',
   };
   // نودهای مجازی: «تیم X و Y» برای سرگروه‌های پارتنر، و ریشه‌ی درخت برای سرگروهِ دارای پارتنر
@@ -1060,8 +1061,8 @@ window.APP_CONFIG = Object.freeze({
   const TREE_ROOT_ID = '__root';
   const isVirtualId = (id) => String(id).startsWith('__');
   // منیجر و سرپرست ارشد: کل ازکی سلر + دسترسی به ازکی سنتر
-  const SEES_ALL_ROLES = ['manager', 'senior_supervisor'];
-  const SUPERVISOR_ROLES = ['supervisor', 'senior_supervisor', 'manager'];
+  const SEES_ALL_ROLES = ['senior_manager', 'manager', 'senior_supervisor'];
+  const SUPERVISOR_ROLES = ['supervisor', 'senior_supervisor', 'manager', 'senior_manager'];
 
   const RECENT_DAYS_LIMIT = 200;
 
