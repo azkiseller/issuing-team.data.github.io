@@ -786,6 +786,42 @@ html[data-theme="dark"] .card-hint { color: #7CF0B0; background: rgba(8,20,40,.5
 .hourly-drawer-inner > .panel { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .hourly-drawer, .card-chevron { transition: none; } }
 
+/* ---------- شرکت‌ها به تفکیک گروه (سرپرست) ---------- */
+.company-groups {
+  margin-bottom: 18px; padding: 12px 16px; border-radius: var(--radius-lg);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-card);
+  -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur));
+}
+.cg-toggle { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; cursor: pointer; border-radius: var(--radius); }
+.cg-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.company-groups:not(.open):hover { border-color: var(--accent); }
+.cg-title { font-size: 13.5px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.cg-summary { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.cg-sum { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+  background: var(--accent-soft); font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.cg-sum b { font-size: 14px; font-weight: 900; color: var(--good); font-variant-numeric: tabular-nums; }
+.cg-more { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; margin-inline-start: auto; }
+.cg-chevron { display: inline-block; font-size: 12px; transition: transform .2s; }
+.company-groups.open .cg-chevron { transform: rotate(180deg); }
+.cg-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; }
+.company-groups.open .cg-drawer { grid-template-rows: 1fr; }
+.cg-drawer-inner { overflow: hidden; min-height: 0; }
+.company-groups.open .cg-drawer-inner { padding-top: 12px; }
+.cg-row { padding: 10px 0; border-top: 1px solid var(--line); }
+.cg-row-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+.cg-row-head b { color: var(--good); font-weight: 900; }
+.cg-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.cg-chip { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px;
+  background: var(--surface-tint); border: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.cg-chip b { margin-inline-start: auto; color: var(--good); font-weight: 900; font-variant-numeric: tabular-nums; }
+.cg-chip.zero { opacity: .5; }
+.cg-chip.zero .pulse-dot { animation: none; background: var(--ink-faint); box-shadow: none; }
+@media (max-width: 560px) {
+  .cg-summary { flex-basis: 100%; order: 3; }
+  .cg-sum { flex: 1; justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) { .cg-drawer, .cg-chevron { transition: none; } }
+
 </style>
 </head>
 <body>
@@ -1096,6 +1132,7 @@ window.APP_CONFIG = Object.freeze({
     activeTab: 'team',
     hourlyOpen: false,
     botOpen: false,
+    companiesOpen: false,
     treeIds: new Set(),
   };
 
@@ -2012,6 +2049,8 @@ window.APP_CONFIG = Object.freeze({
       const countBy = {};
       companyStats.forEach((c) => { countBy[c.company] = c.active_count; });
       companyStatsHtml = companyPillsHtml(myScope.map((c) => ({ company: c, active_count: countBy[c] || 0 })));
+    } else if (companyStats.length && Object.keys(state.scopeByLead).length) {
+      companyStatsHtml = renderCompanyGroups(companyStats); // سرپرست/مدیر: گروه‌بندی بر اساس گروه‌های شرکتی سرگروه‌ها
     } else if (companyStats.length) {
       companyStatsHtml = companyPillsHtml(companyStats);
     }
@@ -2050,6 +2089,7 @@ window.APP_CONFIG = Object.freeze({
 
     renderTree(state.treeRootId);
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
+    bindCompanyGroups();
     if (hasHourly) {
       if (hourlyRes.data.length) bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', { unit: 'کاربر فعال' });
       const card = $('active-card');
@@ -2070,6 +2110,59 @@ window.APP_CONFIG = Object.freeze({
     });
     const cf = $('company-filter');
     if (cf) cf.addEventListener('change', (e) => { state.companyFilter = e.target.value; updateTreeFilter(); });
+  }
+
+  // شرکت‌ها به تفکیک گروه‌های شرکتی (هر جفت سرگروه یک گروه). بسته: جمع هر گروه؛ باز: شرکت‌های هر گروه.
+  // شرکت‌هایی که در هیچ گروهی نیستند نمایش داده نمی‌شوند.
+  function companyGroups(companyStats) {
+    const countBy = {};
+    companyStats.forEach((c) => { countBy[(c.company || '').trim()] = Number(c.active_count) || 0; });
+    const groups = {};
+    Object.entries(state.scopeByLead).forEach(([leadId, companies]) => {
+      const key = companies.slice().sort().join('|');
+      const g = (groups[key] = groups[key] || { companies, leads: [] });
+      const lead = state.profileById[leadId];
+      if (lead && lead.full_name) g.leads.push(lead.full_name);
+    });
+    return Object.values(groups).map((g) => {
+      const items = g.companies.map((c) => ({ company: c, active_count: countBy[c] || 0 }))
+        .sort((a, b) => b.active_count - a.active_count);
+      return { label: g.leads.length ? `گروه ${g.leads.join(' و ')}` : 'گروه', items, total: items.reduce((s, x) => s + x.active_count, 0) };
+    }).sort((a, b) => b.total - a.total);
+  }
+  function renderCompanyGroups(companyStats) {
+    const groups = companyGroups(companyStats);
+    if (!groups.length) return '';
+    return `
+      <section class="company-groups ${state.companiesOpen ? 'open' : ''}">
+        <div class="cg-toggle" id="cg-toggle" role="button" tabindex="0" aria-expanded="${!!state.companiesOpen}">
+          <span class="cg-title">کاربران فعال در شرکت‌ها</span>
+          <div class="cg-summary">
+            ${groups.map((g) => `<span class="cg-sum"><span class="cg-sum-name">${esc(g.label)}</span><b>${formatNum(g.total)}</b></span>`).join('')}
+          </div>
+          <span class="cg-more">جزئیات <span class="cg-chevron">▾</span></span>
+        </div>
+        <div class="cg-drawer"><div class="cg-drawer-inner">
+          ${groups.map((g) => `
+            <div class="cg-row">
+              <div class="cg-row-head"><span>${esc(g.label)}</span><b>${formatNum(g.total)} فعال</b></div>
+              <div class="cg-chips">
+                ${g.items.map((c) => `<span class="cg-chip ${c.active_count ? '' : 'zero'}"><span class="pulse-dot sm"></span>${esc(c.company)}<b>${formatNum(c.active_count)}</b></span>`).join('')}
+              </div>
+            </div>`).join('')}
+        </div></div>
+      </section>`;
+  }
+  function bindCompanyGroups() {
+    const t = $('cg-toggle');
+    if (!t) return;
+    const flip = () => {
+      state.companiesOpen = !state.companiesOpen;
+      t.closest('.company-groups').classList.toggle('open', state.companiesOpen);
+      t.setAttribute('aria-expanded', String(state.companiesOpen));
+    };
+    t.addEventListener('click', flip);
+    t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
   }
 
   function companyPillsHtml(list) {
