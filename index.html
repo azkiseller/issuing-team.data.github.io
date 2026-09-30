@@ -276,13 +276,13 @@ main { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding
 .summary-card { text-align: center; align-items: center; }
 .summary-card .label { font-size: 12px; color: rgba(255,255,255,.88); font-weight: 500; position: relative; line-height: 1.5; }
 .summary-card .value {
-  font-size: clamp(18px, 19cqi, 34px); font-weight: 900; color: #fff;
+  font-size: 36px; font-weight: 900; color: #fff;
   position: relative; line-height: 1.3; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.summary-card .value.salary { color: #CFFFE6; font-size: clamp(15px, 12.5cqi, 25px); }
+.summary-card .value.salary { color: #CFFFE6; font-size: 30px; }
 .summary-card .sub { font-size: 12px; color: rgba(255,255,255,.85); margin-top: 4px; position: relative; }
 .summary-card .value small { font-size: 13px; opacity: .85; font-weight: 600; }
-.summary-card .value.date { font-size: clamp(15px, 11cqi, 19px); }
+.summary-card .value.date { font-size: 26px; }
 .summary-card .label .unit { font-weight: 500; opacity: .8; }
 
 /* ---------- Panels / tables ---------- */
@@ -965,6 +965,30 @@ window.APP_CONFIG = Object.freeze({
   // ---------------------------------------------------------------
   const cfg = window.APP_CONFIG;
   const $ = (id) => document.getElementById(id);
+
+  // اعداد کارت‌های خلاصه: با بزرگ‌ترین اندازه‌ی CSS شروع می‌شن و فقط اگه توی کارت جا نشن، به‌اندازه‌ی لازم کوچیک می‌شن
+  // (یه عدد سه‌رقمی بزرگ می‌مونه، حقوق ۱۴ کاراکتری فقط تا جایی که جا بشه کوچیک می‌شه). با هر رندر و تغییر عرض اجرا می‌شه.
+  function fitSummaryValues() {
+    document.querySelectorAll('#summary-row .summary-card .value').forEach((v) => {
+      v.style.fontSize = '';
+      const card = v.closest('.summary-card');
+      const cs = getComputedStyle(card);
+      const avail = card.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (avail > 0 && v.scrollWidth > avail) {
+        const fs = parseFloat(getComputedStyle(v).fontSize);
+        v.style.fontSize = Math.max(11, Math.floor(fs * avail / v.scrollWidth * 0.97)) + 'px';
+      }
+    });
+  }
+  (function watchSummaryRow() {
+    const row = $('summary-row');
+    if (!row) return;
+    let raf = 0;
+    const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitSummaryValues); };
+    new MutationObserver(schedule).observe(row, { childList: true, subtree: true, characterData: true });
+    if ('ResizeObserver' in window) new ResizeObserver(schedule).observe(row);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
+  })();
 
   // تم
   $('theme-toggle').addEventListener('click', () => {
