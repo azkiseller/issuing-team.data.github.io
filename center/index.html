@@ -121,6 +121,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     transition: background .25s ease, border-color .25s ease, color .25s ease, transform .15s ease;
   }
   .theme-toggle:hover { transform: translateY(-1px); }
+  html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after { transition: none !important; }
+  html[data-theme="dark"] { color-scheme: dark; }
   .theme-toggle:active { transform: translateY(0); }
   .theme-toggle svg { width: 20px; height: 20px; }
   .theme-toggle .icon-sun { display: none; }
@@ -1693,7 +1695,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       var root = document.documentElement;
       var current = root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
       var next = current === 'dark' ? 'light' : 'dark';
+      // تعویض فوری: ترنزیشن رنگ همه‌ی عناصر موقع تعویض تم خاموش می‌شه (کندی)
+      root.classList.add('theme-switching');
       root.setAttribute('data-theme', next);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.remove('theme-switching'); }); });
       try { localStorage.setItem('dashboardTheme', next); } catch (e) {}
     });
   })();

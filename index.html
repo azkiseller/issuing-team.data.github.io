@@ -386,7 +386,17 @@ table.rows .pill.salary { color: var(--good); background: var(--good-soft); }
   box-shadow: inset 0 1px 4px rgba(15,72,150,.10);
 }
 .tree-search:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 4px var(--accent-soft); }
-select.tree-search option { color: #0F1B33; }
+select.tree-search option { color: #0F1B33; background: #fff; }
+html[data-theme="dark"] select.tree-search option { color: #EAF0FB; background: #161d31; }
+html[data-theme="dark"] { color-scheme: dark; }
+select.tree-search { color: var(--ink); }
+/* تعویض تم: بدون ترنزیشن رنگ روی همه‌ی عناصر (کندی موقع تعویض) */
+html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after { transition: none !important; }
+/* نتیجه‌ی فیلتر شرکت */
+.filter-summary { font-size: 13px; font-weight: 700; color: var(--ink); margin: 2px 4px 10px; }
+.filter-summary span { color: var(--good); font-weight: 600; }
+.team-badge { font-size: 11px; font-weight: 600; color: var(--ink-soft); background: var(--surface-tint); border: 1px solid var(--line);
+  padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
 .filters { display: flex; gap: 10px; }
 .filters .tree-search { flex: 1; }
 .filters select.tree-search { max-width: 170px; flex: 0 0 auto; }
@@ -1005,7 +1015,10 @@ window.APP_CONFIG = Object.freeze({
   $('theme-toggle').addEventListener('click', () => {
     const html = document.documentElement;
     const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    // تعویض فوری: ترنزیشن رنگ همه‌ی عناصر (کارت‌های شیشه‌ای، ردیف‌ها و ...) موقع تعویض تم خاموش می‌شه
+    html.classList.add('theme-switching');
     html.setAttribute('data-theme', next);
+    requestAnimationFrame(() => requestAnimationFrame(() => html.classList.remove('theme-switching')));
     try { localStorage.setItem('dashboardTheme', next); } catch (e) {}
   });
 
@@ -2183,6 +2196,7 @@ window.APP_CONFIG = Object.freeze({
     // --- تیم‌بندی: هر دو سرگروه پارتنر زیر یک نود «تیم X و Y»
     const partnerOf = {};
     (partnerRes.data || []).forEach((r) => { partnerOf[r.profile_id] = r.partner_id; });
+    state.partnerOf = partnerOf;
     function makePair(aId, bId) {
       const id = PAIR_PREFIX + aId;
       const a = state.profileById[aId], b = state.profileById[bId];
@@ -2445,16 +2459,28 @@ window.APP_CONFIG = Object.freeze({
     let matches = state.visibleProfiles.filter((p) => p.id !== state.profile.id && state.treeIds.has(p.id));
     if (q) matches = matches.filter((p) => (p.full_name || '').toLowerCase().includes(q));
     if (state.companyFilter) {
+      // هر اپراتوری که این شرکت را دارد (کنار شرکت‌های دیگرش هم باشد مهم نیست)
+      const want = normCompany(state.companyFilter);
       matches = matches.filter((p) => {
+        if (p.role !== 'operator') return false;
         const st = state.statusByOperator[p.id];
-        return st && splitCompanies(st.all_companies || st.companies).includes(state.companyFilter);
+        return !!st && splitCompanies(st.companies || st.all_companies).some((c) => normCompany(c) === want);
       });
     }
     if (matches.length === 0) {
       root.innerHTML = '<div class="empty-state">کسی با این مشخصات پیدا نشد</div>';
       return;
     }
-    root.innerHTML = sortKidsForDisplay(matches.map((p) => p.id)).map((id, i) => buildNodeHtml(id, i)).join('');
+    const ids = sortKidsForDisplay(matches.map((p) => p.id));
+    if (state.companyFilter) {
+      // فعال‌ها اول (ترتیب داخلی همان صدور امروز / الفبا)
+      ids.sort((a, b) => Number(isFullyActive(state.statusByOperator[b])) - Number(isFullyActive(state.statusByOperator[a])));
+      const activeN = ids.filter((id) => isFullyActive(state.statusByOperator[id])).length;
+      root.innerHTML = `<div class="filter-summary">${formatNum(ids.length)} نفر در «${esc(state.companyFilter)}» <span>(${formatNum(activeN)} فعال)</span></div>`
+        + ids.map((id, i) => buildNodeHtml(id, i, { team: teamLabelOf(id) })).join('');
+      return;
+    }
+    root.innerHTML = ids.map((id, i) => buildNodeHtml(id, i)).join('');
   }
 
   // اپراتورها: بیشترین صدور امروز بالاتر؛ بعد آنلاین‌ها؛ بعد الفبایی. نودهای غیربرگ دست‌نخورده
@@ -2483,7 +2509,20 @@ window.APP_CONFIG = Object.freeze({
       : '<div class="empty-state">زیرمجموعه‌ای ثبت نشده است</div>';
   }
 
-  function buildNodeHtml(id, idx) {
+  // نام تیم یک اپراتور: «تیم سرگروه» یا «تیم X و Y» برای سرگروه‌های پارتنر
+  function teamLabelOf(id) {
+    const p = state.profileById[id];
+    const lead = p && state.profileById[p.reports_to];
+    if (!lead || !lead.full_name) return '';
+    const pid = state.partnerOf && state.partnerOf[lead.id];
+    const partner = pid && state.profileById[pid];
+    return partner && partner.full_name ? `تیم ${lead.full_name} و ${partner.full_name}` : `تیم ${lead.full_name}`;
+  }
+  function normCompany(c) {
+    return String(c || '').replace(/[\u200c\u200f]/g, ' ').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
+  }
+
+  function buildNodeHtml(id, idx, opts) {
     const p = state.profileById[id];
     const kids = state.childrenOf[id] || [];
     const isLeaf = kids.length === 0;
@@ -2521,6 +2560,7 @@ window.APP_CONFIG = Object.freeze({
           ${lead}
           <span class="name">${esc(p.full_name || '—')}</span>
           <span class="tree-role">${esc(ROLE_LABELS[p.role] || p.role)}</span>
+          ${opts && opts.team ? `<span class="team-badge" title="تیم">${esc(opts.team)}</span>` : ''}
           <span class="tree-badges">${activeBadge}${companiesBadge}${todayBadge}${lastBadge}</span>
           <span class="tree-count">${countLabel}</span>
           <div class="tree-total-group">
