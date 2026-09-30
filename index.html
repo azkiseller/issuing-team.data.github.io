@@ -1347,6 +1347,11 @@ window.APP_CONFIG = Object.freeze({
         ? `<a class="unit-opt" href="${esc(centerUrl)}">ازکی سنتر</a>`
         : '<span class="unit-opt disabled" title="داشبورد ازکی سنتر هنوز منتشر نشده است">ازکی سنتر <small>به‌زودی</small></span>'}`;
     document.querySelector('.topbar-left').appendChild(el);
+    if (centerUrl) { // پیش‌بارگذاری صفحه‌ی ازکی سنتر برای جابه‌جایی سریع
+      const pre = document.createElement('link');
+      pre.rel = 'prefetch'; pre.href = centerUrl;
+      document.head.appendChild(pre);
+    }
     const link = el.querySelector('a.unit-opt');
     if (link) link.addEventListener('click', async (e) => {
       if (!centerLogin) return;
