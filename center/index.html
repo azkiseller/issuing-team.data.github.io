@@ -1592,7 +1592,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     padding: 18px 16px;
   }
   .summary-card .label { font-size: 14px; line-height: 1.6; }
-  .summary-card .value { font-size: 30px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .summary-card .value { font-size: 40px; line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .summary-card .value .unit { font-size: 13px; font-weight: 600; opacity: .85; margin-inline-start: 5px; }
   .summary-card .sub { font-size: 11.5px; color: rgba(255,255,255,.85); position: relative; min-height: 1em; }
   .summary-card .sub:empty { display: none; }
@@ -1663,7 +1663,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     .summary-card { padding: 14px 10px; }
     .summary-card:only-child, .summary-card:last-child:nth-child(odd), .summary-card.is-wide { grid-column: 1 / -1; }
     .summary-card .label { font-size: 12.5px; }
-    .summary-card .value { font-size: 24px; }
+    .summary-card .value { font-size: 34px; }
     .row-item { padding: 13px 14px; gap: 10px; }
     .row-date { min-width: 0; }
     .row-stats { flex-direction: column; gap: 2px; align-items: center; }
@@ -7319,5 +7319,32 @@ document.addEventListener('visibilitychange', () => {
 })();
 </script>
 
+<script>
+// اعداد کارت‌های خلاصه (همه‌ی تب‌ها): با بزرگ‌ترین اندازه شروع می‌شن و فقط اگه توی کارت جا نشن،
+// به‌اندازه‌ی لازم کوچیک می‌شن. با هر رندر، تعویض تب و تغییر عرض دوباره اجرا می‌شه (مثل ازکی سلر).
+(function () {
+  function fit() {
+    document.querySelectorAll('.summary-card .value').forEach(function (v) {
+      v.style.fontSize = '';
+      var card = v.closest('.summary-card');
+      if (!card || !card.offsetParent) return; // تب مخفی
+      var cs = getComputedStyle(card);
+      var avail = card.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (avail > 0 && v.scrollWidth > avail) {
+        var fs = parseFloat(getComputedStyle(v).fontSize);
+        v.style.fontSize = Math.max(11, Math.floor(fs * avail / v.scrollWidth * 0.97)) + 'px';
+      }
+    });
+  }
+  var raf = 0, mo;
+  // تغییرات style که خودِ fit روی اعداد می‌ذاره نباید دوباره fit رو صدا بزنه (حلقه‌ی بی‌پایان)
+  function run() { fit(); if (mo) mo.takeRecords(); }
+  function schedule() { cancelAnimationFrame(raf); raf = requestAnimationFrame(run); }
+  mo = new MutationObserver(schedule);
+  mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'style'] });
+  window.addEventListener('resize', schedule);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
+})();
+</script>
 </body>
 </html>
