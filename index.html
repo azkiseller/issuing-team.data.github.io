@@ -644,6 +644,31 @@ html[data-theme="dark"] .trend-tip { background: #EAF0FB; color: #0F1B33; }
 .bot-stat.saved .value { color: var(--good); }
 .bot-panel .panel.chart { margin-bottom: 0; }
 
+/* بسته (پیش‌فرض): جمع‌وجور، سه عدد کوچک در یک ردیف. باز: اندازه‌ی کامل + نمودار */
+.bot-toggle { cursor: pointer; border-radius: var(--radius); }
+.bot-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.bot-more { margin-inline-start: auto; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+.bot-chevron { display: inline-block; font-size: 12px; transition: transform .2s; }
+.bot-panel:not(.open) .bot-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bot-panel:not(.open) .bot-stat .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bot-panel:not(.open) .bot-stat .label .unit { display: none; }
+@media (max-width: 560px) { .bot-panel:not(.open) .bot-stat .label .long { display: none; } }
+.bot-panel.open .bot-chevron { transform: rotate(180deg); }
+.bot-panel { transition: padding .25s ease; }
+.bot-panel:not(.open) { padding: 12px 16px; }
+.bot-panel:not(.open) .bot-head { margin-bottom: 8px; }
+.bot-panel:not(.open) .bot-head h2 { font-size: 14px; }
+.bot-panel:not(.open) .bot-icon { font-size: 17px; }
+.bot-panel:not(.open) .bot-stats { gap: 8px; margin-bottom: 0; }
+.bot-panel:not(.open) .bot-stat { padding: 7px 10px; }
+.bot-panel:not(.open) .bot-stat .label { font-size: 11px; margin-bottom: 1px; }
+.bot-panel:not(.open) .bot-stat .value { font-size: clamp(14px, 10cqi, 17px); }
+.bot-panel:not(.open):hover { border-color: rgba(124,92,224,.6); }
+.bot-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s ease; }
+.bot-panel.open .bot-drawer { grid-template-rows: 1fr; }
+.bot-drawer-inner { overflow: hidden; min-height: 0; }
+@media (prefers-reduced-motion: reduce) { .bot-panel, .bot-drawer, .bot-chevron { transition: none; } }
+
 /* شرکت‌های گروه در نمای اپراتور: فعال‌ها پررنگ */
 .company-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .company-chip {
@@ -1070,6 +1095,7 @@ window.APP_CONFIG = Object.freeze({
     treeRootId: null,
     activeTab: 'team',
     hourlyOpen: false,
+    botOpen: false,
     treeIds: new Set(),
   };
 
@@ -1698,17 +1724,36 @@ window.APP_CONFIG = Object.freeze({
     const today = rows
       .filter((r) => Number(r.report_date_sort) === TODAY_SORT)
       .reduce((s, r) => s + (Number(r.target_count) || 0), 0);
+    // بسته: کارت جمع‌وجور؛ با کلیک به اندازه‌ی کامل باز می‌شود و نمودار روزانه نمایان می‌شود
     return `
-      <section class="bot-panel" aria-label="${esc(BOT_NAME)}">
-        <div class="bot-head"><span class="bot-icon" aria-hidden="true">🤖</span><h2>${esc(BOT_NAME)}</h2></div>
-        <div class="bot-stats">
-          <div class="bot-stat"><div class="label">صدور ${esc(CURRENT_PERIOD.label)}</div><div class="value">${formatNum(total)}</div></div>
-          <div class="bot-stat"><div class="label">صدور امروز</div><div class="value">${formatNum(today)}</div></div>
-          <div class="bot-stat saved"><div class="label">صرفه‌جویی در حقوق <span class="unit">(ریال)</span></div><div class="value">${formatNum(saved)}</div></div>
+      <section class="bot-panel ${state.botOpen ? 'open' : ''}" aria-label="${esc(BOT_NAME)}">
+        <div class="bot-toggle" id="bot-toggle" role="button" tabindex="0" aria-expanded="${!!state.botOpen}" aria-controls="bot-drawer">
+          <div class="bot-head">
+            <span class="bot-icon" aria-hidden="true">🤖</span><h2>${esc(BOT_NAME)}</h2>
+            <span class="bot-more" aria-hidden="true">نمودار روزانه <span class="bot-chevron">▾</span></span>
+          </div>
+          <div class="bot-stats">
+            <div class="bot-stat"><div class="label">صدور ${esc(CURRENT_PERIOD.label)}</div><div class="value">${formatNum(total)}</div></div>
+            <div class="bot-stat"><div class="label">صدور امروز</div><div class="value">${formatNum(today)}</div></div>
+            <div class="bot-stat saved"><div class="label">صرفه‌جویی<span class="long"> در حقوق</span> <span class="unit">(ریال)</span></div><div class="value">${formatNum(saved)}</div></div>
+          </div>
         </div>
-        ${renderDailyTrendChart(dailySeries(rows), 'bot', `صدور روزانه‌ی بات در ${CURRENT_PERIOD.label}`)}
+        <div class="bot-drawer" id="bot-drawer"><div class="bot-drawer-inner">
+          ${renderDailyTrendChart(dailySeries(rows), 'bot', `صدور روزانه‌ی بات در ${CURRENT_PERIOD.label}`)}
+        </div></div>
       </section>
     `;
+  }
+  function bindBotPanel() {
+    const t = $('bot-toggle');
+    if (!t) return;
+    const flip = () => {
+      state.botOpen = !state.botOpen;
+      t.closest('.bot-panel').classList.toggle('open', state.botOpen);
+      t.setAttribute('aria-expanded', String(state.botOpen));
+    };
+    t.addEventListener('click', flip);
+    t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
   }
 
   // ---------------------------------------------------------------
@@ -2004,7 +2049,7 @@ window.APP_CONFIG = Object.freeze({
     if (showKpiTab) bindViewTabs();
 
     renderTree(state.treeRootId);
-    if (bot) bindTrendChart(dailySeries(botRows), 'bot');
+    if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
     if (hasHourly) {
       if (hourlyRes.data.length) bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', { unit: 'کاربر فعال' });
       const card = $('active-card');
