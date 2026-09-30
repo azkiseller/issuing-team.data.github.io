@@ -133,6 +133,7 @@ html[data-theme="dark"] .bg-glow {
   transition: background .25s ease, border-color .25s ease, transform .15s ease;
 }
 .theme-toggle:hover { transform: translateY(-1px); }
+.theme-toggle svg { width: 20px; height: 20px; }
 .theme-toggle .icon-sun { display: none; }
 .theme-toggle .icon-moon { display: block; }
 html[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
@@ -838,14 +839,29 @@ a.unit-opt:hover { background: var(--accent-soft); color: var(--accent-strong); 
 .center-notice p { color: var(--ink-soft); font-size: 13.5px; margin: 6px 0; }
 .center-notice .center-link { display: inline-block; margin-top: 12px; padding: 10px 22px; border-radius: 999px; text-decoration: none; }
 
+/* ---------- موشن ورود شیشه‌ای (هم‌سان با ازکی سنتر؛ اسکریپت: motion.js) ---------- */
+.glass-reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-offset, 18px)) scale(.99);
+  transition: opacity .38s cubic-bezier(.2,.8,.2,1), transform .38s cubic-bezier(.2,.8,.2,1),
+              border-color .2s ease, box-shadow .2s ease, background .25s ease;
+}
+.glass-reveal.glass-in { opacity: 1; transform: none; }
+/* حالت hover قبلی که با transform ورود جایگزین می‌شد */
+.glass-reveal.glass-in.tree-row:hover { transform: translateY(-1px); }
+.glass-reveal.glass-in.summary-card.expandable:hover { transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .glass-reveal, .glass-reveal.glass-in { opacity: 1; transform: none; transition: none; }
+}
+
 </style>
 </head>
 <body>
 
 <div class="bg-glow"></div>
 <button class="theme-toggle" id="theme-toggle" type="button" title="تغییر پوسته" aria-label="تغییر پوسته">
-  <span class="icon-moon" aria-hidden="true">🌙</span>
-  <span class="icon-sun" aria-hidden="true">☀️</span>
+  <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
 </button>
 
 <!-- ===================== Login ===================== -->
@@ -1397,6 +1413,11 @@ window.APP_CONFIG = Object.freeze({
   }
   async function refreshView() {
     const scrollY = window.scrollY;
+    window.__revealInstant = true; // موشن ورود در به‌روزرسانی خودکار اجرا نشود
+    try { await refreshViewInner(); } finally { setTimeout(() => { window.__revealInstant = false; }, 0); }
+    window.scrollTo(0, scrollY);
+  }
+  async function refreshViewInner() {
     if (state.profile.role === 'operator') {
       const monthOpen = !!document.querySelector('#month-card-detail.open');
       await renderOperatorView(state.profile, { keepMonthOpen: monthOpen });
@@ -1413,7 +1434,6 @@ window.APP_CONFIG = Object.freeze({
         if (row && !row.classList.contains('open')) toggleRow(row);
       });
     }
-    window.scrollTo(0, scrollY);
   }
   function startAutoRefresh() {
     setInterval(checkForUpdate, REFRESH_MS);
@@ -2486,6 +2506,75 @@ window.APP_CONFIG = Object.freeze({
 
   // اگر قبلاً لاگین بوده، مستقیم وارد شو
   boot();
+})();
+
+</script>
+<script>
+// =====================================================================
+// موشن‌ها (هم‌سان با داشبورد ازکی سنتر): کارت‌ها و ردیف‌ها هنگام ورود به دید، شیشه‌ای و
+// پله‌پله ظاهر می‌شوند و هنگام خروج از دید، به سمت همان جهت محو می‌شوند.
+// در به‌روزرسانی خودکار (window.__revealInstant) بدون انیمیشن نمایش داده می‌شوند تا صفحه چشمک نزند.
+// =====================================================================
+(function () {
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion || !('IntersectionObserver' in window)) return;
+
+  var revealSelector = ['.summary-card', '.panel', '.bot-panel', '.tree-row', '.view-tabs', '.search-row'].join(',');
+  var REVEAL_MARGIN = 24;
+  var batch = 0, batchTimer = null;
+
+  function inViewport(el) {
+    var r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return false;
+    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    return r.top < (vh - REVEAL_MARGIN) && r.bottom > REVEAL_MARGIN;
+  }
+  function revealNow(el) { el.style.transitionDelay = '0ms'; el.classList.add('glass-in'); }
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var el = entry.target;
+      if (entry.isIntersecting) {
+        var delay = (batch % 8) * 35;
+        batch++;
+        clearTimeout(batchTimer);
+        batchTimer = setTimeout(function () { batch = 0; }, 180);
+        el.style.transitionDelay = delay + 'ms';
+        requestAnimationFrame(function () { el.classList.add('glass-in'); });
+      } else {
+        el.style.transitionDelay = '0ms';
+        el.classList.remove('glass-in');
+        el.style.setProperty('--reveal-offset', entry.boundingClientRect.top < 0 ? '-26px' : '26px');
+      }
+    });
+  }, { threshold: 0, rootMargin: '0px 0px -' + REVEAL_MARGIN + 'px 0px' });
+
+  function prepare(el) {
+    if (el.dataset.glassObserved) return;
+    el.dataset.glassObserved = '1';
+    // به‌روزرسانی خودکار: از همان ابتدا در حالت نهایی (بدون ترنزیشن)
+    if (window.__revealInstant) el.classList.add('glass-in');
+    el.classList.add('glass-reveal');
+    io.observe(el);
+    if (!window.__revealInstant) {
+      requestAnimationFrame(function () {
+        if (!el.classList.contains('glass-in') && inViewport(el)) revealNow(el);
+      });
+    }
+  }
+  function scan(root) {
+    if (!root || !root.querySelectorAll) return;
+    if (root.matches && root.matches(revealSelector)) prepare(root);
+    root.querySelectorAll(revealSelector).forEach(prepare);
+  }
+
+  function start() {
+    scan(document);
+    new MutationObserver(function (muts) {
+      muts.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType === 1) scan(n); }); });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
 
 </script>
