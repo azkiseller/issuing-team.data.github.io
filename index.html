@@ -875,6 +875,27 @@ a.unit-opt:hover { background: var(--accent-soft); color: var(--accent-strong); 
   .glass-reveal, .glass-reveal.glass-in { opacity: 1; transform: none; transition: none; }
 }
 
+/* ---------- گزارش عملکرد اپراتور (سرپرست؛ امتیاز Issuing + OCT) ---------- */
+.sla-weeks { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.sla-weeks button { font: 600 12.5px var(--font); color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line);
+  padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: background .15s, color .15s; }
+.sla-weeks button[aria-pressed="true"] { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--accent-deep), var(--accent)); }
+.sla-weeks button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sla-cards { display: grid; gap: 14px; margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.panel.sla-table-wrap { margin-bottom: 20px; overflow-x: auto; }
+table.rows.sla-table { table-layout: auto; min-width: 640px; }
+table.rows.sla-table th.num, table.rows.sla-table td.num { width: auto; white-space: nowrap; }
+table.rows.sla-table th small { font-weight: 400; }
+table.rows.sla-table td.muted { color: var(--ink-soft); font-size: 12.5px; }
+table.rows .pill.score-good { color: var(--good); background: var(--good-soft); min-width: 48px; }
+table.rows .pill.score-mid { color: var(--warn); background: rgba(224,138,23,.16); min-width: 48px; }
+table.rows .pill.score-low { color: var(--danger); background: var(--danger-soft); min-width: 48px; }
+table.rows .pill.muted { color: var(--ink-faint); background: var(--surface-tint); min-width: 48px; }
+.panel.sla-guide { margin-bottom: 14px; }
+.sla-guide summary { cursor: pointer; padding: 14px 20px; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+.sla-guide[open] summary { border-bottom: 1px solid var(--line); }
+.sla-note { padding: 12px 20px; font-size: 12px; color: var(--ink-faint); border-top: 1px solid var(--line); }
+
 </style>
 </head>
 <body>
@@ -1269,6 +1290,9 @@ window.APP_CONFIG = Object.freeze({
     companyFilter: '',
     treeRootId: null,
     activeTab: 'team',
+    sla: null,
+    slaWeek: null,
+    slaSearch: '',
     hourlyOpen: false,
     botOpen: false,
     companiesOpen: false,
@@ -2078,69 +2102,284 @@ window.APP_CONFIG = Object.freeze({
   function kpiBoundLabel(def, v) {
     return def.unit === 'min' ? `${formatNum(v)} دقیقه` : `${faDigits(String(v).replace('.', '٫'))}٪`;
   }
-  function renderViewTabs() {
+  const VIEW_TAB_LABELS = { team: 'تیم من', kpi: 'شاخص‌های عملکرد', sla: 'گزارش عملکرد اپراتور' };
+  function renderViewTabs(tabs) {
     return `
       <div class="view-tabs" role="tablist">
-        <button type="button" role="tab" data-tab="team" aria-selected="${state.activeTab !== 'kpi'}">تیم من</button>
-        <button type="button" role="tab" data-tab="kpi" aria-selected="${state.activeTab === 'kpi'}">شاخص‌های عملکرد</button>
+        ${tabs.map((t) => `<button type="button" role="tab" data-tab="${t}" aria-selected="${state.activeTab === t}">${VIEW_TAB_LABELS[t]}</button>`).join('')}
       </div>`;
   }
-  function bindViewTabs() {
+  function bindViewTabs(tabs) {
     document.querySelectorAll('.view-tabs [data-tab]').forEach((btn) => {
       btn.addEventListener('click', () => {
         state.activeTab = btn.getAttribute('data-tab');
         document.querySelectorAll('.view-tabs [data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
-        $('tab-team').hidden = state.activeTab === 'kpi';
-        $('tab-kpi').hidden = state.activeTab !== 'kpi';
+        tabs.forEach((t) => { $(`tab-${t}`).hidden = state.activeTab !== t; });
+        if (state.activeTab === 'sla') loadSlaTab();
       });
     });
   }
-  function renderKpiTab(rows) {
-    // برای هر شاخص، دقیق‌ترین دامنه‌ی موجود: فردی ← جفت ← شیفت ← کل
-    const pick = {};
-    rows.forEach((r) => {
-      const cur = pick[r.kpi];
-      if (!cur || KPI_SCOPE_ORDER.indexOf(r.scope_type) < KPI_SCOPE_ORDER.indexOf(cur.scope_type)) pick[r.kpi] = r;
+
+  // ---------------------------------------------------------------
+  // گزارش عملکرد اپراتور (فقط سرپرست): امتیاز issuing (تعداد صدور) + oct (میانگین زمان صدور)
+  // ---------------------------------------------------------------
+  // صدور از daily_targets؛ میانگین زمان صدور هفتگی از operator_sla (کارت 20516 متابیس، با n8n).
+  // هفته = شنبه تا جمعه. امتیاز نهایی = میانگین دو امتیاز (اگه OCT نداشت، فقط issuing).
+  const SLA_WEEKS = 6;
+  // issuing هفتگی: تا ۳۰ → ۱ ، تا ۶۰ → ۲ ، تا ۹۰ → ۳ ، تا ۱۲۰ → ۴ ، بیشتر → ۵ (روزانه همین سقف‌ها ÷ ۶)
+  const ISSUING_WEEK_BOUNDS = [30, 60, 90, 120];
+  const ISSUING_DAY_BOUNDS = [5, 10, 15, 20];
+  // oct (دقیقه): زیر ۳۰ → ۵ ، زیر ۴۰ → ۴ ، زیر ۵۰ → ۳ ، زیر ۶۰ → ۲ ، بقیه → ۱
+  const OCT_BOUNDS = [30, 40, 50, 60];
+
+  function issuingScore(count, bounds = ISSUING_WEEK_BOUNDS) {
+    const n = Number(count) || 0;
+    const i = bounds.findIndex((b) => n <= b);
+    return i < 0 ? 5 : i + 1;
+  }
+  function octScore(minutes) {
+    if (minutes == null) return null;
+    const i = OCT_BOUNDS.findIndex((b) => Number(minutes) < b);
+    return i < 0 ? 1 : 5 - i;
+  }
+  function slaFinalScore(issuing, oct) {
+    return oct == null ? issuing : (issuing + oct) / 2;
+  }
+  function scoreText(s) {
+    if (s == null) return '—';
+    return faDigits((Math.round(s * 100) / 100).toString().replace('.', '٫'));
+  }
+  function scorePill(s) {
+    if (s == null) return '<span class="pill muted">—</span>';
+    const lvl = s >= 4 ? 'good' : s >= 3 ? 'mid' : 'low';
+    return `<span class="pill score-${lvl}">${scoreText(s)}</span>`;
+  }
+  function minutesText(m) {
+    return m == null ? '—' : faDigits((Math.round(Number(m) * 10) / 10).toString().replace('.', '٫'));
+  }
+
+  // هفته‌های اخیر (قدیمی‌ترین اول)، هر کدام با روزهایش تا امروز
+  function slaWeeks(count = SLA_WEEKS) {
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const [gy, gm, gd] = fmt.format(new Date()).split('-').map(Number);
+    const today = Date.UTC(gy, gm - 1, gd);
+    const thisSat = today - ((new Date(today).getUTCDay() + 1) % 7) * 86400000;
+    const day = (ms) => {
+      const d = new Date(ms);
+      const [jy, jm, jd] = gregorianToJalali(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+      return { sort: jy * 10000 + jm * 100 + jd, jalali: `${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}` };
+    };
+    const weeks = [];
+    for (let w = count - 1; w >= 0; w--) {
+      const sat = thisSat - w * 7 * 86400000;
+      const days = [];
+      for (let k = 0; k < 7 && sat + k * 86400000 <= today; k++) days.push(day(sat + k * 86400000));
+      weeks.push({
+        startSort: String(days[0].sort),
+        startJalali: days[0].jalali,
+        endJalali: day(sat + 6 * 86400000).jalali,
+        days,
+        current: w === 0,
+      });
+    }
+    return weeks;
+  }
+
+  // داده‌ی خام هفته‌ها (RLS: زیرمجموعه‌ی سرپرست)
+  async function fetchSla(weeks) {
+    const targets = sb.from('daily_targets')
+      .select('operator_id, report_date_sort, target_count, daily_salary')
+      .gte('report_date_sort', weeks[0].startSort)
+      .lte('report_date_sort', String(TODAY_SORT))
+      .limit(20000);
+    const sla = sb.from('operator_sla')
+      .select('operator_id, period_start_sort, avg_issuance_minutes, orders_count, updated_at')
+      .eq('period_type', 'week')
+      .in('period_start_sort', weeks.map((w) => w.startSort))
+      .limit(10000);
+    const [t, s] = await Promise.all([targets, sla]);
+    if (t.error) throw t.error;
+    if (s.error) console.error('operator_sla query failed', s.error); // جدول هنوز ساخته نشده باشه: فقط issuing
+    return { targets: t.data || [], sla: s.data || [] };
+  }
+
+  // ردیف‌های هر اپراتور در هر هفته: { [weekStart]: { [operatorId]: {...} } }
+  function computeSla(weeks, raw) {
+    const weekOfDay = {};
+    weeks.forEach((w) => w.days.forEach((d) => { weekOfDay[d.sort] = w.startSort; }));
+    const out = {};
+    weeks.forEach((w) => { out[w.startSort] = {}; });
+    const cell = (wk, id) => (out[wk][id] = out[wk][id] || { orders: 0, salary: 0, activeDays: 0, oct: null, octOrders: null });
+    raw.targets.forEach((r) => {
+      const wk = weekOfDay[Number(r.report_date_sort)];
+      if (!wk) return;
+      const c = cell(wk, r.operator_id);
+      const n = Number(r.target_count) || 0;
+      c.orders += n;
+      c.salary += Number(r.daily_salary) || 0;
+      if (n > 0) c.activeDays += 1;
     });
-    const maxPay = KPI_BASE_PAY * KPI_WEIGHT;
-    let total = 0, pending = 0;
-    const cards = KPI_DEFS.map((def) => {
-      const r = pick[def.key];
-      const x = r ? Number(r.value) : null;
-      const score = kpiScore(def, x);
-      const pay = score == null ? null : Math.round(score * maxPay);
-      if (pay != null) total += pay; else pending += 1;
-      const scope = r ? (r.scope_type === 'shift' ? (SHIFT_LABEL[r.scope_key] || 'شیفت') : KPI_SCOPE_LABEL[r.scope_type]) : '';
-      const meter = (score != null) ? `
-        <div class="kpi-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(score * 100)}" aria-label="امتیاز ${def.title}">
-          <div class="kpi-meter-fill" style="width:${(score * 100).toFixed(1)}%"></div>
-        </div>
-        <div class="kpi-bounds"><span>${kpiBoundLabel(def, def.worst)} · صفر</span><span>${kpiBoundLabel(def, def.best)} · سقف</span></div>` : '';
-      const payHtml = !r ? '<div class="kpi-pay muted">هنوز داده‌ای ثبت نشده</div>'
-        : pay == null ? '<div class="kpi-pay muted">فرمول حقوق این شاخص هنوز تعیین نشده</div>'
-        : `<div class="kpi-pay"><b>${formatNum(pay)}</b> <span>از ${formatNum(maxPay)} ریال</span><em>${formatNum(Math.round(score * 100))}٪</em></div>`;
-      return `
-        <div class="panel kpi-card ${r ? '' : 'empty'}">
-          <div class="kpi-head">
-            <div><div class="kpi-title" dir="ltr">${esc(def.title)}</div><div class="kpi-desc">${esc(def.desc)}</div></div>
-            ${scope ? `<span class="kpi-scope">${esc(scope)}</span>` : ''}
-          </div>
-          <div class="kpi-value">${r ? kpiValueLabel(def, x) : '—'}</div>
-          ${meter}
-          ${payHtml}
-        </div>`;
-    }).join('');
-    const updated = rows.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), '');
+    raw.sla.forEach((r) => {
+      if (!out[r.period_start_sort]) return;
+      const c = cell(r.period_start_sort, r.operator_id);
+      c.oct = Number(r.avg_issuance_minutes);
+      c.octOrders = r.orders_count != null ? Number(r.orders_count) : null;
+    });
+    Object.values(out).forEach((byOp) => Object.values(byOp).forEach((c) => {
+      c.issuingScore = issuingScore(c.orders);
+      c.octScore = octScore(c.oct);
+      c.score = slaFinalScore(c.issuingScore, c.octScore);
+    }));
+    return out;
+  }
+
+  function slaGuideHtml() {
+    const iss = ['تا ۳۰ (روزی تا ۵)', '۳۱ تا ۶۰ (روزی ۵ تا ۱۰)', '۶۱ تا ۹۰ (روزی ۱۰ تا ۱۵)', '۹۱ تا ۱۲۰ (روزی ۱۵ تا ۲۰)', 'بیشتر از ۱۲۰ (روزی بیش از ۲۰)'];
+    const oct = ['۶۰ دقیقه و بیشتر', 'زیر ۶۰', 'زیر ۵۰', 'زیر ۴۰', 'زیر ۳۰'];
     return `
-      <div class="panel kpi-total">
-        <div>
-          <div class="label">جمع حقوق شاخص‌های عملکرد (${esc(CURRENT_PERIOD.label)})</div>
-          <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(KPI_BASE_PAY)} ریال</span></div>
-          ${pending ? `<div class="kpi-note">${formatNum(pending)} شاخص هنوز در جمع حساب نشده است.</div>` : ''}
-        </div>
-        <div class="kpi-updated">${updated ? `آخرین به‌روزرسانی: ${esc(new Date(updated).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}` : ''}</div>
+      <details class="panel sla-guide">
+        <summary>نحوه‌ی امتیازدهی</summary>
+        <table class="rows">
+          <thead><tr><th>امتیاز</th><th>Issuing (صدور هفتگی)</th><th>OCT (میانگین زمان صدور)</th></tr></thead>
+          <tbody>${[1, 2, 3, 4, 5].map((s, i) => `<tr><td>${scorePill(s)}</td><td>${iss[i]}</td><td>${oct[i]}</td></tr>`).join('')}</tbody>
+        </table>
+        <div class="sla-note">امتیاز نهایی = میانگین امتیاز Issuing و OCT. اگه زمان صدور هفته هنوز ثبت نشده باشه، فقط Issuing حساب می‌شه. هفته‌ی جاری هنوز کامل نشده است.</div>
+      </details>`;
+  }
+
+  function weekLabel(w) {
+    return `${faDigits(w.startJalali.slice(5))} تا ${faDigits(w.endJalali.slice(5))}${w.current ? ' (جاری)' : ''}`;
+  }
+
+  // ----- تب «گزارش عملکرد اپراتور» در نمای سرپرست (یک‌بار بارگذاری؛ با رفرش خودکار دوباره)
+  async function loadSlaTab() {
+    const box = $('tab-sla');
+    if (!box) return;
+    if (!state.sla) box.innerHTML = '<div class="loading">در حال بارگذاری گزارش عملکرد اپراتور...</div>';
+    try {
+      const weeks = slaWeeks();
+      const raw = await fetchSla(weeks);
+      state.sla = { weeks, byWeek: computeSla(weeks, raw), updatedAt: raw.sla.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), '') };
+      if (!state.slaWeek || !weeks.some((w) => w.startSort === state.slaWeek)) state.slaWeek = weeks[weeks.length - 1].startSort;
+      renderSlaTab();
+    } catch (e) {
+      console.error('sla load failed', e);
+      box.innerHTML = '<div class="empty-state">خطا در دریافت گزارش عملکرد اپراتور. صفحه را دوباره بارگذاری کنید.</div>';
+    }
+  }
+
+  function slaOperatorIds() {
+    return [...state.treeIds].filter((id) => {
+      const p = state.profileById[id];
+      return p && p.role === 'operator' && p.unit !== 'center';
+    });
+  }
+
+  function renderSlaTab() {
+    const box = $('tab-sla');
+    const { weeks, byWeek, updatedAt } = state.sla;
+    const ids = slaOperatorIds();
+    const week = weeks.find((w) => w.startSort === state.slaWeek);
+    const cells = byWeek[week.startSort];
+    const rows = ids.map((id) => ({ id, p: state.profileById[id], c: cells[id] || null }));
+    const withData = rows.filter((r) => r.c && (r.c.orders > 0 || r.c.oct != null));
+    const avg = (arr) => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
+    const totalOrders = withData.reduce((s, r) => s + r.c.orders, 0);
+    const octs = withData.filter((r) => r.c.oct != null);
+    const avgOct = avg(octs.map((r) => r.c.oct));
+    const avgScore = avg(withData.map((r) => r.c.score));
+
+    // سرگروه هر اپراتور = مدیر مستقیمش
+    const byLead = {};
+    withData.forEach((r) => {
+      const lid = r.p.reports_to || '';
+      (byLead[lid] = byLead[lid] || []).push(r);
+    });
+    const leadRows = Object.entries(byLead).map(([lid, list]) => {
+      const lo = list.filter((r) => r.c.oct != null);
+      return {
+        name: (state.profileById[lid] && state.profileById[lid].full_name) || '—',
+        count: list.length,
+        orders: list.reduce((s, r) => s + r.c.orders, 0),
+        oct: avg(lo.map((r) => r.c.oct)),
+        issuing: avg(list.map((r) => r.c.issuingScore)),
+        octScore: avg(lo.map((r) => r.c.octScore)),
+        score: avg(list.map((r) => r.c.score)),
+      };
+    }).sort((a, b) => b.score - a.score);
+
+    // روند میانگین امتیاز تیم در هفته‌ها
+    const trend = weeks.map((w) => {
+      const list = ids.map((id) => byWeek[w.startSort][id]).filter((c) => c && (c.orders > 0 || c.oct != null));
+      const s = avg(list.map((c) => c.score));
+      return { target_count: s == null ? 0 : Math.round(s * 100) / 100, report_date_jalali: `هفته ${weekLabel(w)}`, empty: s == null };
+    });
+
+    const q = (state.slaSearch || '').trim();
+    const opRows = rows
+      .filter((r) => !q || (r.p.full_name || '').includes(q))
+      .sort((a, b) => ((b.c ? b.c.score : -1) - (a.c ? a.c.score : -1)) || ((b.c ? b.c.orders : 0) - (a.c ? a.c.orders : 0)));
+
+    box.innerHTML = `
+      <div class="sla-weeks" role="group" aria-label="انتخاب هفته">
+        ${weeks.slice().reverse().map((w) => `<button type="button" data-week="${w.startSort}" aria-pressed="${w.startSort === week.startSort}">${weekLabel(w)}</button>`).join('')}
       </div>
-      <div class="kpi-grid">${cards}</div>`;
+      <div class="sla-cards">
+        <div class="summary-card"><div class="label">میانگین امتیاز نهایی</div><div class="value">${scoreText(avgScore)} <small>از ۵</small></div></div>
+        <div class="summary-card"><div class="label">میانگین زمان صدور <span class="unit">(دقیقه)</span></div><div class="value">${minutesText(avgOct)}</div></div>
+        <div class="summary-card"><div class="label">جمع صدور هفته</div><div class="value">${formatNum(totalOrders)}</div></div>
+        <div class="summary-card"><div class="label">اپراتورهای فعال هفته</div><div class="value">${formatNum(withData.length)} <small>از ${formatNum(ids.length)}</small></div></div>
+      </div>
+      ${renderDailyTrendChart(trend, 'slatrend', 'روند میانگین امتیاز نهایی در هفته‌های اخیر', {
+        aria: 'میانگین امتیاز نهایی هر هفته؛ با کلیدهای جهت‌نما بین هفته‌ها جابه‌جا شوید',
+        axis: weeks.map((w) => (w.current ? 'هفته‌ی جاری' : w.startJalali.slice(5))),
+      })}
+      ${leadRows.length > 1 ? `
+      <div class="section-label">خلاصه‌ی سرگروه‌ها</div>
+      <div class="panel sla-table-wrap">
+        <table class="rows sla-table">
+          <thead><tr><th>سرگروه</th><th class="num">نفرات</th><th class="num">صدور</th><th class="num">میانگین OCT</th><th class="num">Issuing</th><th class="num">OCT</th><th class="num">نهایی</th></tr></thead>
+          <tbody>${leadRows.map((l) => `
+            <tr><td>${esc(l.name)}</td><td class="num">${formatNum(l.count)}</td><td class="num">${formatNum(l.orders)}</td>
+            <td class="num">${minutesText(l.oct)}</td><td class="num">${scoreText(l.issuing)}</td><td class="num">${scoreText(l.octScore)}</td>
+            <td class="num">${scorePill(l.score)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+      <div class="section-label">اپراتورها — هفته‌ی ${esc(weekLabel(week))}</div>
+      <div class="filters"><input type="search" class="tree-search" id="sla-search" placeholder="جستجوی نام..." aria-label="جستجوی نام اپراتور" value="${esc(q)}"></div>
+      <div class="panel sla-table-wrap">
+        <table class="rows sla-table">
+          <thead><tr><th>اپراتور</th><th>سرگروه</th><th class="num">صدور</th><th class="num">Issuing</th><th class="num">OCT <small>(دقیقه)</small></th><th class="num">امتیاز OCT</th><th class="num">نهایی</th><th class="num">حقوق <small>(ریال)</small></th></tr></thead>
+          <tbody>${opRows.length ? opRows.map((r) => {
+            const c = r.c;
+            const lead = state.profileById[r.p.reports_to];
+            return `
+            <tr><td>${esc(r.p.full_name)}</td><td class="muted">${esc(lead ? lead.full_name : '—')}</td>
+            <td class="num">${c ? formatNum(c.orders) : '۰'}</td><td class="num">${scorePill(c ? c.issuingScore : null)}</td>
+            <td class="num">${minutesText(c && c.oct)}</td><td class="num">${scorePill(c ? c.octScore : null)}</td>
+            <td class="num">${scorePill(c ? c.score : null)}</td><td class="num"><span class="pill salary">${c ? formatNum(c.salary) : '۰'}</span></td></tr>`;
+          }).join('') : '<tr><td colspan="8" class="empty-state">اپراتوری پیدا نشد</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      ${slaGuideHtml()}
+      <div class="kpi-updated">${updatedAt ? `آخرین به‌روزرسانی زمان صدور: ${esc(new Date(updatedAt).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}` : 'زمان صدور هنوز از ورک‌فلو ثبت نشده است؛ فعلاً فقط امتیاز Issuing حساب می‌شود.'}</div>
+    `;
+    bindTrendChart(trend, 'slatrend', { unit: 'امتیاز' });
+    box.querySelectorAll('[data-week]').forEach((b) => b.addEventListener('click', () => {
+      state.slaWeek = b.getAttribute('data-week');
+      renderSlaTab();
+    }));
+    const search = $('sla-search');
+    search.addEventListener('input', (e) => {
+      state.slaSearch = e.target.value;
+      const pos = e.target.selectionStart;
+      renderSlaTab();
+      const s = $('sla-search');
+      s.focus();
+      s.setSelectionRange(pos, pos);
+    });
   }
 
   async function renderManagerialView(profile, { silent = false } = {}) {
@@ -2322,11 +2561,15 @@ window.APP_CONFIG = Object.freeze({
 
     const kpiRows = (kpiRes && kpiRes.data) || [];
     const showKpiTab = profile.role === 'team_lead' && kpiRows.length > 0;
+    // تب «گزارش عملکرد اپراتور» فقط برای سرپرست
+    const showSlaTab = profile.role === 'supervisor';
+    const tabs = ['team'].concat(showKpiTab ? ['kpi'] : [], showSlaTab ? ['sla'] : []);
+    if (!tabs.includes(state.activeTab)) state.activeTab = 'team';
     content.innerHTML = (hasHourly ? `
       <div class="hourly-drawer ${state.hourlyOpen ? 'open' : ''}" id="hourly-drawer">
         <div class="hourly-drawer-inner">${renderHourlyActive(hourlyRes.data)}</div>
-      </div>` : '') + (showKpiTab ? renderViewTabs() : '') + `
-      <div id="tab-team" ${showKpiTab && state.activeTab === 'kpi' ? 'hidden' : ''}>
+      </div>` : '') + (tabs.length > 1 ? renderViewTabs(tabs) : '') + `
+      <div id="tab-team" ${state.activeTab !== 'team' ? 'hidden' : ''}>
       ${bot ? renderBotPanel(botRows) : ''}
       ${companyStatsHtml}
       <div class="filters">
@@ -2341,8 +2584,12 @@ window.APP_CONFIG = Object.freeze({
       <div id="tree-root"></div>
       </div>
       ${showKpiTab ? `<div id="tab-kpi" ${state.activeTab === 'kpi' ? '' : 'hidden'}>${renderKpiTab(kpiRows)}</div>` : ''}
+      ${showSlaTab ? `<div id="tab-sla" ${state.activeTab === 'sla' ? '' : 'hidden'}></div>` : ''}
     `;
-    if (showKpiTab) bindViewTabs();
+    if (tabs.length > 1) bindViewTabs(tabs);
+    // تب SLA فقط وقتی باز است بارگذاری می‌شود (با رفرش خودکار هم دوباره)
+    state.sla = null;
+    if (state.activeTab === 'sla') loadSlaTab();
 
     renderTree(state.treeRootId);
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
