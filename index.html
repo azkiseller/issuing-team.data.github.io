@@ -959,7 +959,6 @@ body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]
   body.with-sidebar.side-collapsed #app-screen { grid-template-columns: 76px minmax(0, 1fr); }
   body.side-collapsed .sidebar { padding: 20px 12px; align-items: center; }
   body.side-collapsed .side-head { justify-content: center; }
-  body.side-collapsed .side-collapse svg { transform: rotate(180deg); }
   body.side-collapsed .side-brand,
   body.side-collapsed .side-units,
   body.side-collapsed .side-group-title,
@@ -1544,7 +1543,7 @@ window.APP_CONFIG = Object.freeze({
     aside.innerHTML = `
       <div class="side-head">
         <div class="side-brand"></div>
-        <button type="button" class="side-collapse" id="side-collapse" aria-pressed="false">${sideIcon('<path d="M9 6l6 6-6 6"/>')}</button>
+        <button type="button" class="side-collapse" id="side-collapse" aria-pressed="false">${sideIcon('<path d="M4 7h16M4 12h16M4 17h16"/>')}</button>
         <button type="button" class="side-close" id="side-close" aria-label="بستن منو">${sideIcon('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
       <div class="side-units"></div>
