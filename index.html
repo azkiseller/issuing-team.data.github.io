@@ -875,6 +875,77 @@ a.unit-opt:hover { background: var(--accent-soft); color: var(--accent-strong); 
   .glass-reveal, .glass-reveal.glass-in { opacity: 1; transform: none; transition: none; }
 }
 
+/* ---------- منوی کناری (سرپرست و بالاتر) ---------- */
+.side-open, .side-close, .side-scrim { display: none; }
+body.with-sidebar #app-screen { display: grid; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+body.with-sidebar .topbar-wrap { grid-column: 2; grid-row: 1; }
+body.with-sidebar main { grid-column: 2; grid-row: 2; width: 100%; max-width: 1080px; }
+.sidebar {
+  grid-column: 1; grid-row: 1 / span 2;
+  position: sticky; top: 0; height: 100vh; z-index: 20;
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 20px 16px; overflow-y: auto;
+  background: var(--topbar-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-inline-end: 1px solid var(--line);
+}
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+.sidebar .topbar-brand { border: 0; padding: 0; margin: 0; }
+.sidebar .topbar-brand img { height: 28px; }
+.sidebar .unit-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: 13px; width: 100%; }
+.sidebar .unit-opt { text-align: center; border-radius: 10px; padding: 9px 6px; font-size: 13px; }
+.sidebar .unit-switch:empty, .side-units:empty { display: none; }
+.side-nav { display: flex; flex-direction: column; gap: 4px; flex: 1 0 auto; }
+.side-group-title { font-size: 12px; font-weight: 700; color: var(--ink-faint); padding: 0 12px 6px; }
+.side-link {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px;
+  border: 0; border-radius: 12px; background: none; cursor: pointer;
+  font: 600 14px var(--font); color: var(--ink-soft); text-align: right;
+  transition: background .15s ease, color .15s ease;
+}
+.side-link svg { width: 19px; height: 19px; flex-shrink: 0; }
+.side-link:hover { background: var(--accent-soft); color: var(--ink); }
+.side-link[aria-current="page"] { color: #fff; background: linear-gradient(135deg, var(--accent-deep), var(--accent)); box-shadow: 0 8px 18px -8px rgba(22,86,245,.55); }
+.side-link:focus-visible, .side-open:focus-visible, .side-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.side-user {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px;
+  padding: 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+}
+.side-user .user-name { overflow-wrap: anywhere; }
+.side-user #logout-btn { grid-column: 1 / -1; justify-self: start; min-height: 32px; margin-top: 4px; }
+body.with-sidebar .topbar-left { gap: 12px; }
+.page-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
+body.with-sidebar[data-view="overview"] [data-page]:not([data-page="overview"]),
+body.with-sidebar[data-view="team"] [data-page]:not([data-page="team"]),
+body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]) { display: none !important; }
+
+@media (max-width: 900px) {
+  body.with-sidebar #app-screen { display: block; }
+  .sidebar {
+    position: fixed; top: 0; bottom: 0; right: 0; height: auto; width: min(300px, 86vw);
+    transform: translateX(105%); transition: transform .25s ease; z-index: 60;
+    background: var(--surface); box-shadow: -18px 0 40px rgba(15,27,51,.18);
+  }
+  html[data-theme="dark"] .sidebar { background: #0d1428; }
+  body.side-open-state .sidebar { transform: none; }
+  .side-close { display: flex; }
+  .side-open {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px;
+    border: 0; border-radius: 12px; cursor: pointer; color: #fff; font: 700 14px var(--font);
+    background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+  }
+  .side-open svg { width: 18px; height: 18px; }
+  .side-close {
+    align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  .side-close svg { width: 18px; height: 18px; }
+  body.side-open-state .side-scrim { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(5,10,25,.42); }
+  .page-title { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) { .sidebar, .side-link { transition: none; } }
+
 </style>
 </head>
 <body>
@@ -1394,6 +1465,7 @@ window.APP_CONFIG = Object.freeze({
     }
 
     renderTopbar(profile, manager);
+    if (usesSidebar(profile)) initSidebar(profile);
     $('period-label').textContent = `دوره‌ی جاری: ${CURRENT_PERIOD.label}`;
     loadSyncStatus().then((ts) => { lastSyncedAt = ts; });
 
@@ -1403,6 +1475,93 @@ window.APP_CONFIG = Object.freeze({
     if (profile.role === 'operator') await renderOperatorView(profile);
     else await renderManagerialView(profile);
     startAutoRefresh();
+  }
+
+  // ---------------------------------------------------------------
+  // منوی کناری (سرپرست و بالاتر): هر بخش یک صفحه؛ روی موبایل کشویی
+  // ---------------------------------------------------------------
+  const SIDE_ICONS = {
+    overview: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/>',
+    companies: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+  };
+  const SIDE_PAGES = [
+    { id: 'overview', label: 'نمای کلی' },
+    { id: 'team', label: 'تیم من' },
+    { id: 'companies', label: 'شرکت‌ها' },
+  ];
+  const sideIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${name}</svg>`;
+  function usesSidebar(profile) {
+    return SUPERVISOR_ROLES.includes(profile.role) && !(profile.role === 'supervisor' && profile.unit === 'center');
+  }
+  function initSidebar(profile) {
+    state.sidebar = true;
+    state.companiesOpen = true; // «شرکت‌ها» صفحه‌ی خودش را دارد؛ کارت باز شروع می‌شود
+    document.body.classList.add('with-sidebar');
+    const aside = document.createElement('aside');
+    aside.className = 'sidebar';
+    aside.id = 'sidebar';
+    aside.setAttribute('aria-label', 'منوی داشبورد');
+    aside.innerHTML = `
+      <div class="side-head">
+        <div class="side-brand"></div>
+        <button type="button" class="side-close" id="side-close" aria-label="بستن منو">${sideIcon('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
+      </div>
+      <div class="side-units"></div>
+      <nav class="side-nav" aria-label="بخش‌ها">
+        <div class="side-group-title">ازکی سلر</div>
+        ${SIDE_PAGES.map((p) => `<button type="button" class="side-link" data-go="${p.id}">${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
+      </nav>
+      <div class="side-user"></div>`;
+    const scrim = document.createElement('div');
+    scrim.className = 'side-scrim';
+    scrim.id = 'side-scrim';
+    const app = $('app-screen');
+    app.insertBefore(scrim, app.firstChild);
+    app.insertBefore(aside, app.firstChild);
+
+    // لوگو، کارت کاربر و دکمه‌ی خروج از نوار بالا به منو منتقل می‌شوند
+    const brand = document.querySelector('.topbar-brand');
+    if (brand) aside.querySelector('.side-brand').appendChild(brand);
+    const left = document.querySelector('.topbar-left');
+    const userBox = aside.querySelector('.side-user');
+    [...left.children].forEach((el) => userBox.appendChild(el));
+    userBox.appendChild($('logout-btn'));
+    left.innerHTML = `
+      <button type="button" class="side-open" id="side-open" aria-label="باز کردن منو" aria-controls="sidebar" aria-expanded="false">
+        ${sideIcon('<path d="M4 7h16M4 12h16M4 17h16"/>')}<span>منو</span>
+      </button>
+      <h1 class="page-title" id="page-title"></h1>`;
+
+    $('summary-row').dataset.page = 'overview';
+    $('period-label').dataset.page = 'overview';
+
+    const setOpen = (open) => {
+      document.body.classList.toggle('side-open-state', open);
+      $('side-open').setAttribute('aria-expanded', String(open));
+    };
+    $('side-open').addEventListener('click', () => setOpen(true));
+    $('side-close').addEventListener('click', () => setOpen(false));
+    scrim.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+    aside.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
+      setSidePage(b.getAttribute('data-go'));
+      setOpen(false);
+      window.scrollTo(0, 0);
+    }));
+    let saved = null;
+    try { saved = localStorage.getItem('azki-side-page'); } catch (e) {}
+    setSidePage(SIDE_PAGES.some((p) => p.id === saved) ? saved : 'overview');
+  }
+  function setSidePage(id) {
+    const page = SIDE_PAGES.find((p) => p.id === id) || SIDE_PAGES[0];
+    document.body.dataset.view = page.id;
+    document.querySelectorAll('#sidebar [data-go]').forEach((b) => {
+      if (b.getAttribute('data-go') === page.id) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+    $('page-title').textContent = page.label;
+    try { localStorage.setItem('azki-side-page', page.id); } catch (e) {}
   }
 
   // انتخاب‌گر واحد (ازکی سلر | ازکی سنتر) برای منیجر و سرپرست ارشد
@@ -1417,7 +1576,7 @@ window.APP_CONFIG = Object.freeze({
       ${centerUrl
         ? `<a class="unit-opt" href="${esc(centerUrl)}">ازکی سنتر</a>`
         : '<span class="unit-opt disabled" title="داشبورد ازکی سنتر هنوز منتشر نشده است">ازکی سنتر <small>به‌زودی</small></span>'}`;
-    document.querySelector('.topbar-left').appendChild(el);
+    (document.querySelector('#sidebar .side-units') || document.querySelector('.topbar-left')).appendChild(el);
     if (centerUrl) { // پیش‌بارگذاری صفحه‌ی ازکی سنتر برای جابه‌جایی سریع
       const pre = document.createElement('link');
       pre.rel = 'prefetch'; pre.href = centerUrl;
@@ -2320,15 +2479,18 @@ window.APP_CONFIG = Object.freeze({
         .flatMap((st) => splitCompanies(st.all_companies || st.companies))
     )).sort((a, b) => a.localeCompare(b, 'fa'));
 
+    const teamRows = bot ? (targetsRes.data || []).filter((r) => r.operator_id !== bot.id) : (targetsRes.data || []);
     const kpiRows = (kpiRes && kpiRes.data) || [];
     const showKpiTab = profile.role === 'team_lead' && kpiRows.length > 0;
     content.innerHTML = (hasHourly ? `
-      <div class="hourly-drawer ${state.hourlyOpen ? 'open' : ''}" id="hourly-drawer">
+      <div class="hourly-drawer ${state.hourlyOpen ? 'open' : ''}" id="hourly-drawer" data-page="overview">
         <div class="hourly-drawer-inner">${renderHourlyActive(hourlyRes.data)}</div>
       </div>` : '') + (showKpiTab ? renderViewTabs() : '') + `
       <div id="tab-team" ${showKpiTab && state.activeTab === 'kpi' ? 'hidden' : ''}>
-      ${bot ? renderBotPanel(botRows) : ''}
-      ${companyStatsHtml}
+      ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
+      ${bot ? `<div data-page="overview">${renderBotPanel(botRows)}</div>` : ''}
+      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}</div>` : ''}
+      <div data-page="team">
       <div class="filters">
         <input type="search" class="tree-search" id="tree-search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
         ${companyOptions.length ? `
@@ -2340,11 +2502,13 @@ window.APP_CONFIG = Object.freeze({
       <div class="section-label">ساختار زیرمجموعه</div>
       <div id="tree-root"></div>
       </div>
+      </div>
       ${showKpiTab ? `<div id="tab-kpi" ${state.activeTab === 'kpi' ? '' : 'hidden'}>${renderKpiTab(kpiRows)}</div>` : ''}
     `;
     if (showKpiTab) bindViewTabs();
 
     renderTree(state.treeRootId);
+    if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
     bindCompanyGroups();
     if (hasHourly) {

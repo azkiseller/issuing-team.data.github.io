@@ -1484,6 +1484,73 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   .azki-seg-btn:hover { background: var(--accent-soft); }
   .azki-seg-btn.active { background: var(--accent-soft); color: var(--accent-deep); font-weight: 700; }
   main.sm-wide { max-width: 1500px; }
+
+  /* ---------- منوی کناری (سرپرست و بالاتر) ---------- */
+  .side-open, .side-close, .side-scrim { display: none; }
+  body.with-sidebar #app-screen { display: grid !important; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  body.with-sidebar .topbar-wrap { grid-column: 2; grid-row: 1; }
+  body.with-sidebar main { grid-column: 2; grid-row: 2; width: 100%; max-width: 1080px; }
+  body.with-sidebar main.sm-wide { max-width: 1500px; }
+  body.with-sidebar #supervisor-tabs, body.with-sidebar #supervisor-subtabs { display: none !important; }
+  .sidebar {
+    grid-column: 1; grid-row: 1 / span 2;
+    position: sticky; top: 0; height: 100vh; z-index: 20;
+    display: flex; flex-direction: column; gap: 18px;
+    padding: 20px 16px; overflow-y: auto;
+    background: var(--topbar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-inline-end: 1px solid var(--line);
+  }
+  .side-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+  .sidebar .brand { border: 0; padding: 0; margin: 0; }
+  .sidebar .brand img { height: 28px; }
+  .sidebar .unit-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-radius: 13px; width: 100%; box-shadow: none; }
+  .sidebar .unit-opt { text-align: center; border-radius: 10px; padding: 9px 6px; font-size: 13px; }
+  .side-units:empty { display: none; }
+  .side-nav { display: flex; flex-direction: column; gap: 4px; flex: 1 0 auto; }
+  .side-group-title { font-size: 12px; font-weight: 700; color: var(--ink-faint); padding: 10px 12px 6px; }
+  .side-group-title:first-child { padding-top: 0; }
+  .side-link {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px;
+    border: 0; border-radius: 12px; background: none; cursor: pointer;
+    font: 600 14px var(--font); color: var(--ink-soft); text-align: right;
+    transition: background .15s ease, color .15s ease;
+  }
+  .side-link svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .side-link:hover { background: var(--accent-soft); color: var(--ink); }
+  .side-link[aria-current="page"] { color: #fff; background: linear-gradient(135deg, var(--accent-deep), var(--accent)); box-shadow: 0 8px 18px -8px rgba(22,86,245,.55); }
+  .side-link:focus-visible, .side-open:focus-visible, .side-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .side-user {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px;
+    padding: 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+  }
+  .side-user .user-name { overflow-wrap: anywhere; }
+  .side-user #logout-btn { grid-column: 1 / -1; justify-self: start; min-height: 32px; margin-top: 4px; }
+  .page-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
+  @media (max-width: 900px) {
+    body.with-sidebar #app-screen { display: block !important; }
+    .sidebar {
+      position: fixed; top: 0; bottom: 0; right: 0; height: auto; width: min(300px, 86vw);
+      transform: translateX(105%); transition: transform .25s ease; z-index: 60;
+      background: var(--surface); box-shadow: -18px 0 40px rgba(15,27,51,.18);
+    }
+    html[data-theme="dark"] .sidebar { background: #0d1428; }
+    body.side-open-state .sidebar { transform: none; }
+    .side-open {
+      display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px;
+      border: 0; border-radius: 12px; cursor: pointer; color: #fff; font: 700 14px var(--font);
+      background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+    }
+    .side-open svg, .side-close svg { width: 18px; height: 18px; }
+    .side-close {
+      display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;
+      border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer;
+    }
+    body.side-open-state .side-scrim { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(5,10,25,.42); }
+    .page-title { font-size: 17px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sidebar, .side-link { transition: none; } }
   .sm-wrap { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 12px; height: min(82vh, 880px); min-height: 540px; }
   .sm-wrap:fullscreen { height: 100vh; padding: 12px; box-sizing: border-box; background: #eaf0f8; }
   .sm-wrap:-webkit-full-screen { height: 100vh; padding: 12px; box-sizing: border-box; background: #eaf0f8; }
@@ -2403,6 +2470,88 @@ function renderUnitSwitcher() {
     await sellerLogin;
     location.href = link.href;
   });
+}
+
+// منوی کناری برای نمای سرپرست (سرپرست، سرپرست ارشد، مدیر، مدیر ارشد): همان تب‌ها و زیرتب‌ها، به شکل منو
+function initCenterSidebar() {
+  if (document.getElementById('sidebar')) return;
+  const svgOf = (btn) => { const s = btn && btn.querySelector('svg'); return s ? s.outerHTML : ''; };
+  const top = (key) => document.querySelector('#supervisor-tabs [data-sup-tab="' + key + '"]');
+  const sub = (key) => document.querySelector('#supervisor-subtabs [data-sup-tab="' + key + '"]');
+  const GROUPS = [
+    ['عملکرد', [['targets', top], ['map', top]]],
+    ['گزارش', [['azki-period', sub], ['azki-centers', sub], ['azki-shifts', sub], ['azki-compare', sub], ['azki-chart', sub]]],
+    ['کارشناس‌ها', [['azki-active', top], ['azki-payroll', top]]],
+  ];
+  const links = [];
+  let navHtml = '';
+  GROUPS.forEach(([title, items]) => {
+    const btns = items.map(([key, find]) => [key, find(key)]).filter(([, b]) => b);
+    if (!btns.length) return;
+    navHtml += '<div class="side-group-title">' + title + '</div>';
+    btns.forEach(([key, b]) => {
+      links.push([key, b]);
+      navHtml += '<button type="button" class="side-link" data-go="' + key + '">' + svgOf(b) + '<span>' + b.textContent.trim() + '</span></button>';
+    });
+  });
+  const icon = (d) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  const aside = document.createElement('aside');
+  aside.className = 'sidebar';
+  aside.id = 'sidebar';
+  aside.setAttribute('aria-label', 'منوی داشبورد');
+  aside.innerHTML =
+    '<div class="side-head"><div class="side-brand"></div>' +
+    '<button type="button" class="side-close" id="side-close" aria-label="بستن منو">' + icon('<path d="M6 6l12 12M18 6L6 18"/>') + '</button></div>' +
+    '<div class="side-units"></div>' +
+    '<nav class="side-nav" aria-label="بخش‌ها">' + navHtml + '</nav>' +
+    '<div class="side-user"></div>';
+  const scrim = document.createElement('div');
+  scrim.className = 'side-scrim';
+  const app = document.getElementById('app-screen');
+  app.insertBefore(scrim, app.firstChild);
+  app.insertBefore(aside, app.firstChild);
+
+  // لوگو، انتخاب‌گر واحد، کارت کاربر و خروج از نوار بالا به منو منتقل می‌شوند
+  const left = document.querySelector('.topbar .topbar-left');
+  const brand = left.querySelector('.brand');
+  if (brand) aside.querySelector('.side-brand').appendChild(brand);
+  const units = left.querySelector('.unit-switch');
+  if (units) aside.querySelector('.side-units').appendChild(units);
+  const userBox = aside.querySelector('.side-user');
+  [...left.children].forEach((el) => userBox.appendChild(el));
+  userBox.appendChild(document.getElementById('logout-btn'));
+  left.innerHTML =
+    '<button type="button" class="side-open" id="side-open" aria-label="باز کردن منو" aria-controls="sidebar" aria-expanded="false">' +
+    icon('<path d="M4 7h16M4 12h16M4 17h16"/>') + '<span>منو</span></button>' +
+    '<h1 class="page-title" id="page-title"></h1>';
+  document.body.classList.add('with-sidebar');
+
+  const setOpen = (open) => {
+    document.body.classList.toggle('side-open-state', open);
+    document.getElementById('side-open').setAttribute('aria-expanded', String(open));
+  };
+  document.getElementById('side-open').addEventListener('click', () => setOpen(true));
+  document.getElementById('side-close').addEventListener('click', () => setOpen(false));
+  scrim.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+
+  const mark = (key) => {
+    aside.querySelectorAll('[data-go]').forEach((b) => {
+      if (b.getAttribute('data-go') === key) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
+    const hit = links.find(([k]) => k === key);
+    document.getElementById('page-title').textContent = hit ? hit[1].textContent.trim() : '';
+  };
+  aside.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
+    const key = b.getAttribute('data-go');
+    const hit = links.find(([k]) => k === key);
+    if (hit) hit[1].click(); // همان منطق تب‌ها (بارگذاری تنبل، فیلتر تاریخ، نقشه) اجرا می‌شود
+    mark(key);
+    setOpen(false);
+    window.scrollTo(0, 0);
+  }));
+  mark(window.supCurrentTab || 'targets');
 }
 
 const loginScreen = document.getElementById('login-screen');
@@ -5329,6 +5478,7 @@ async function enterApp(user) {
     document.getElementById('panel-admin').classList.remove('active');
     document.getElementById('panel-supervisor').classList.add('active');
     document.querySelector('main').classList.add('wide-nav');
+    initCenterSidebar();
     loadSupervisorView();
   } else {
     loadTargets(user.id);
