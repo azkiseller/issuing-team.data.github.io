@@ -1491,7 +1491,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   body.with-sidebar .topbar-wrap { grid-column: 2; grid-row: 1; }
   body.with-sidebar main { grid-column: 2; grid-row: 2; width: 100%; max-width: 1080px; }
   body.with-sidebar main.sm-wide { max-width: 1500px; }
-  body.with-sidebar #supervisor-tabs, body.with-sidebar #supervisor-subtabs { display: none !important; }
+  body.with-sidebar #supervisor-tabs, body.with-sidebar #supervisor-subtabs,
+  body.with-sidebar #team-tabs, body.with-sidebar #team-subtabs { display: none !important; }
   .sidebar {
     grid-column: 1; grid-row: 1 / span 2;
     position: sticky; top: 0; height: 100vh; z-index: 20;
@@ -2504,13 +2505,20 @@ function renderUnitSwitcher() {
   });
 }
 
-// منوی کناری برای نمای سرپرست (سرپرست، سرپرست ارشد، مدیر، مدیر ارشد): همان تب‌ها و زیرتب‌ها، به شکل منو
-function initCenterSidebar() {
+// منوی کناری برای نمای سرپرست (سرپرست، سرپرست ارشد، مدیر، مدیر ارشد) و نمای سرگروه:
+// همان تب‌ها و زیرتب‌ها، به شکل منو. mode: 'sup' یا 'team'
+function initCenterSidebar(mode) {
   if (document.getElementById('sidebar')) return;
+  const isTeam = mode === 'team';
   const svgOf = (btn) => { const s = btn && btn.querySelector('svg'); return s ? s.outerHTML : ''; };
-  const top = (key) => document.querySelector('#supervisor-tabs [data-sup-tab="' + key + '"]');
-  const sub = (key) => document.querySelector('#supervisor-subtabs [data-sup-tab="' + key + '"]');
-  const GROUPS = [
+  const attr = isTeam ? 'data-team-tab' : 'data-sup-tab';
+  const top = (key) => document.querySelector((isTeam ? '#team-tabs' : '#supervisor-tabs') + ' [' + attr + '="' + key + '"]');
+  const sub = (key) => document.querySelector((isTeam ? '#team-subtabs' : '#supervisor-subtabs') + ' [' + attr + '="' + key + '"]');
+  const GROUPS = isTeam ? [
+    ['عملکرد', [['team', top], ['team-bugs', top]]],
+    ['گزارش', [['azki-shifts', sub], ['azki-compare', sub], ['azki-chart', sub]]],
+    ['کارشناس‌ها', [['azki-active', top], ['azki-payroll', top]]],
+  ] : [
     ['عملکرد', [['targets', top], ['map', top]]],
     ['گزارش', [['azki-period', sub], ['azki-centers', sub], ['azki-shifts', sub], ['azki-compare', sub], ['azki-chart', sub]]],
     ['کارشناس‌ها', [['azki-active', top], ['azki-payroll', top]]],
@@ -2600,7 +2608,7 @@ function initCenterSidebar() {
     setOpen(false);
     window.scrollTo(0, 0);
   }));
-  mark(window.supCurrentTab || 'targets');
+  mark(isTeam ? (window.teamCurrentTab || 'team') : (window.supCurrentTab || 'targets'));
 }
 
 const loginScreen = document.getElementById('login-screen');
@@ -5511,6 +5519,7 @@ async function enterApp(user) {
       const compareHost = document.getElementById('panel-azki-compare');
       if (filterEl && compareHost && !compareHost.contains(filterEl)) compareHost.insertBefore(filterEl, compareHost.firstChild);
     })();
+    initCenterSidebar('team');
     loadTeamView(user.id);
   } else if (isSupervisor) {
     document.getElementById('main-tabs').style.display = 'none';
@@ -5527,7 +5536,7 @@ async function enterApp(user) {
     document.getElementById('panel-admin').classList.remove('active');
     document.getElementById('panel-supervisor').classList.add('active');
     document.querySelector('main').classList.add('wide-nav');
-    initCenterSidebar();
+    initCenterSidebar('sup');
     loadSupervisorView();
   } else {
     loadTargets(user.id);

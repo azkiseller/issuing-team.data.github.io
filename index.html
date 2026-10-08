@@ -918,7 +918,8 @@ body.with-sidebar .topbar-left { gap: 12px; }
 .page-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
 body.with-sidebar[data-view="overview"] [data-page]:not([data-page="overview"]),
 body.with-sidebar[data-view="team"] [data-page]:not([data-page="team"]),
-body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]) { display: none !important; }
+body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]),
+body.with-sidebar[data-view="kpi"] [data-page]:not([data-page="kpi"]) { display: none !important; }
 
 @media (max-width: 900px) {
   body.with-sidebar #app-screen { display: block; }
@@ -1519,15 +1520,18 @@ window.APP_CONFIG = Object.freeze({
     overview: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
     team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/>',
     companies: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+    kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
   };
   const SIDE_PAGES = [
     { id: 'overview', label: 'نمای کلی' },
     { id: 'team', label: 'تیم من' },
     { id: 'companies', label: 'شرکت‌ها' },
+    { id: 'kpi', label: 'شاخص‌های عملکرد', teamLeadOnly: true },
   ];
   const sideIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${name}</svg>`;
   function usesSidebar(profile) {
-    return SUPERVISOR_ROLES.includes(profile.role) && !(profile.role === 'supervisor' && profile.unit === 'center');
+    return (SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead')
+      && !(profile.role === 'supervisor' && profile.unit === 'center');
   }
   function initSidebar(profile) {
     state.sidebar = true;
@@ -1549,7 +1553,7 @@ window.APP_CONFIG = Object.freeze({
       <div class="side-units"></div>
       <nav class="side-nav" aria-label="بخش‌ها">
         <div class="side-group-title">ازکی سلر</div>
-        ${SIDE_PAGES.map((p) => `<button type="button" class="side-link" data-go="${p.id}" title="${esc(p.label)}">${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
+        ${SIDE_PAGES.filter((p) => !p.teamLeadOnly || profile.role === 'team_lead').map((p) => `<button type="button" class="side-link" data-go="${p.id}" title="${esc(p.label)}"${p.teamLeadOnly ? ' hidden' : ''}>${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
       </nav>`;
     const scrim = document.createElement('div');
     scrim.className = 'side-scrim';
@@ -1604,7 +1608,17 @@ window.APP_CONFIG = Object.freeze({
     }));
     let saved = null;
     try { saved = localStorage.getItem('azki-side-page'); } catch (e) {}
-    setSidePage(SIDE_PAGES.some((p) => p.id === saved) ? saved : 'overview');
+    setSidePage(SIDE_PAGES.some((p) => p.id === saved && !p.teamLeadOnly) ? saved : 'overview');
+    state.pendingSidePage = saved; // «شاخص‌ها» بعد از رسیدن داده معلوم می‌شود
+  }
+  // سرگروه: «شاخص‌های عملکرد» فقط وقتی داده دارد در منو دیده می‌شود
+  function syncKpiNav(has) {
+    const b = document.querySelector('#sidebar [data-go="kpi"]');
+    if (!b) return;
+    b.hidden = !has;
+    if (has && state.pendingSidePage === 'kpi') setSidePage('kpi');
+    state.pendingSidePage = null;
+    if (!has && document.body.dataset.view === 'kpi') setSidePage('overview');
   }
   // کارت‌های جمع‌شونده در حالت منوی کناری: همیشه باز، بدون نقش دکمه
   function flattenToggles() {
@@ -2548,8 +2562,8 @@ window.APP_CONFIG = Object.freeze({
     content.innerHTML = (hasHourly ? `
       <div class="hourly-drawer ${state.hourlyOpen ? 'open' : ''}" id="hourly-drawer" data-page="overview">
         <div class="hourly-drawer-inner">${renderHourlyActive(hourlyRes.data)}</div>
-      </div>` : '') + (showKpiTab ? renderViewTabs() : '') + `
-      <div id="tab-team" ${showKpiTab && state.activeTab === 'kpi' ? 'hidden' : ''}>
+      </div>` : '') + (showKpiTab && !state.sidebar ? renderViewTabs() : '') + `
+      <div id="tab-team" ${showKpiTab && !state.sidebar && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows)}</div>` : ''}
       ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}</div>` : ''}
@@ -2566,9 +2580,10 @@ window.APP_CONFIG = Object.freeze({
       <div id="tree-root"></div>
       </div>
       </div>
-      ${showKpiTab ? `<div id="tab-kpi" ${state.activeTab === 'kpi' ? '' : 'hidden'}>${renderKpiTab(kpiRows)}</div>` : ''}
+      ${showKpiTab ? `<div id="tab-kpi" data-page="kpi" ${state.sidebar || state.activeTab === 'kpi' ? '' : 'hidden'}>${renderKpiTab(kpiRows)}</div>` : ''}
     `;
-    if (showKpiTab) bindViewTabs();
+    if (showKpiTab && !state.sidebar) bindViewTabs();
+    if (state.sidebar) syncKpiNav(showKpiTab);
 
     renderTree(state.treeRootId);
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
