@@ -1487,7 +1487,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
   /* ---------- منوی کناری (سرپرست و بالاتر) ---------- */
   .side-open, .side-close, .side-scrim { display: none; }
-  body.with-sidebar #app-screen { display: grid !important; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  body.with-sidebar #app-screen { display: grid !important; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: auto 1fr; }
   body.with-sidebar .topbar-wrap { grid-column: 2; grid-row: 1; }
   body.with-sidebar main { grid-column: 2; grid-row: 2; width: 100%; max-width: 1080px; }
   body.with-sidebar main.sm-wide { max-width: 1500px; }
@@ -1551,6 +1551,30 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     .page-title { font-size: 17px; }
   }
   @media (prefers-reduced-motion: reduce) { .sidebar, .side-link { transition: none; } }
+  /* جمع‌شدن منو به ستون آیکون (فقط دسکتاپ) */
+  .side-collapse {
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 40px; height: 40px; border-radius: 11px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink-soft); cursor: pointer;
+  }
+  .side-collapse:hover { color: var(--ink); }
+  .side-collapse:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .side-collapse svg { width: 18px; height: 18px; transition: transform .2s ease; }
+  @media (min-width: 901px) {
+    body.with-sidebar.side-collapsed #app-screen { grid-template-columns: 76px minmax(0, 1fr); }
+    body.side-collapsed .sidebar { padding: 20px 12px; align-items: center; }
+    body.side-collapsed .side-head { justify-content: center; }
+    body.side-collapsed .side-collapse svg { transform: rotate(180deg); }
+    body.side-collapsed .side-brand,
+    body.side-collapsed .side-units,
+    body.side-collapsed .side-group-title,
+    body.side-collapsed .side-link span,
+    body.side-collapsed .side-user > :not(.avatar) { display: none !important; }
+    body.side-collapsed .side-nav { align-items: center; }
+    body.side-collapsed .side-link { width: 48px; padding: 0; justify-content: center; }
+    body.side-collapsed .side-user { display: flex; justify-content: center; padding: 0; background: none; border: 0; }
+  }
+  @media (max-width: 900px) { .side-collapse { display: none; } }
   .sm-wrap { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 12px; height: min(82vh, 880px); min-height: 540px; }
   .sm-wrap:fullscreen { height: 100vh; padding: 12px; box-sizing: border-box; background: #eaf0f8; }
   .sm-wrap:-webkit-full-screen { height: 100vh; padding: 12px; box-sizing: border-box; background: #eaf0f8; }
@@ -2491,7 +2515,8 @@ function initCenterSidebar() {
     navHtml += '<div class="side-group-title">' + title + '</div>';
     btns.forEach(([key, b]) => {
       links.push([key, b]);
-      navHtml += '<button type="button" class="side-link" data-go="' + key + '">' + svgOf(b) + '<span>' + b.textContent.trim() + '</span></button>';
+      const label = b.textContent.trim();
+      navHtml += '<button type="button" class="side-link" data-go="' + key + '" title="' + label + '">' + svgOf(b) + '<span>' + label + '</span></button>';
     });
   });
   const icon = (d) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
@@ -2501,6 +2526,7 @@ function initCenterSidebar() {
   aside.setAttribute('aria-label', 'منوی داشبورد');
   aside.innerHTML =
     '<div class="side-head"><div class="side-brand"></div>' +
+    '<button type="button" class="side-collapse" id="side-collapse" aria-pressed="false">' + icon('<path d="M9 6l6 6-6 6"/>') + '</button>' +
     '<button type="button" class="side-close" id="side-close" aria-label="بستن منو">' + icon('<path d="M6 6l12 12M18 6L6 18"/>') + '</button></div>' +
     '<div class="side-units"></div>' +
     '<nav class="side-nav" aria-label="بخش‌ها">' + navHtml + '</nav>' +
@@ -2530,6 +2556,19 @@ function initCenterSidebar() {
     document.body.classList.toggle('side-open-state', open);
     document.getElementById('side-open').setAttribute('aria-expanded', String(open));
   };
+  const applyCollapsed = (c) => {
+    document.body.classList.toggle('side-collapsed', c);
+    const b = document.getElementById('side-collapse');
+    const label = c ? 'باز کردن منو' : 'جمع کردن منو';
+    b.setAttribute('aria-pressed', String(c));
+    b.setAttribute('aria-label', label);
+    b.title = label;
+    try { localStorage.setItem('azki-side-collapsed', c ? '1' : '0'); } catch (e) {}
+  };
+  let collapsed = false;
+  try { collapsed = localStorage.getItem('azki-side-collapsed') === '1'; } catch (e) {}
+  applyCollapsed(collapsed);
+  document.getElementById('side-collapse').addEventListener('click', () => applyCollapsed(!document.body.classList.contains('side-collapsed')));
   document.getElementById('side-open').addEventListener('click', () => setOpen(true));
   document.getElementById('side-close').addEventListener('click', () => setOpen(false));
   scrim.addEventListener('click', () => setOpen(false));

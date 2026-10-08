@@ -877,7 +877,7 @@ a.unit-opt:hover { background: var(--accent-soft); color: var(--accent-strong); 
 
 /* ---------- منوی کناری (سرپرست و بالاتر) ---------- */
 .side-open, .side-close, .side-scrim { display: none; }
-body.with-sidebar #app-screen { display: grid; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+body.with-sidebar #app-screen { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: auto 1fr; }
 body.with-sidebar .topbar-wrap { grid-column: 2; grid-row: 1; }
 body.with-sidebar main { grid-column: 2; grid-row: 2; width: 100%; max-width: 1080px; }
 .sidebar {
@@ -945,6 +945,33 @@ body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]
   .page-title { font-size: 17px; }
 }
 @media (prefers-reduced-motion: reduce) { .sidebar, .side-link { transition: none; } }
+
+/* جمع‌شدن منو به ستون آیکون (فقط دسکتاپ) */
+.side-collapse {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 11px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-soft); cursor: pointer;
+}
+.side-collapse:hover { color: var(--ink); }
+.side-collapse:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.side-collapse svg { width: 18px; height: 18px; transition: transform .2s ease; }
+@media (min-width: 901px) {
+  body.with-sidebar.side-collapsed #app-screen { grid-template-columns: 76px minmax(0, 1fr); }
+  body.side-collapsed .sidebar { padding: 20px 12px; align-items: center; }
+  body.side-collapsed .side-head { justify-content: center; }
+  body.side-collapsed .side-collapse svg { transform: rotate(180deg); }
+  body.side-collapsed .side-brand,
+  body.side-collapsed .side-units,
+  body.side-collapsed .side-group-title,
+  body.side-collapsed .side-link span,
+  body.side-collapsed .side-user > :not(.avatar) { display: none !important; }
+  body.side-collapsed .side-nav { align-items: center; }
+  body.side-collapsed .side-link { width: 48px; padding: 0; justify-content: center; }
+  body.side-collapsed .side-user { display: flex; justify-content: center; padding: 0; background: none; border: 0; }
+}
+@media (max-width: 900px) { .side-collapse { display: none; } }
+body.with-sidebar .cg-toggle, body.with-sidebar .bot-toggle { cursor: default; }
+body.with-sidebar .cg-more, body.with-sidebar .bot-more { display: none; }
 
 </style>
 </head>
@@ -1496,7 +1523,10 @@ window.APP_CONFIG = Object.freeze({
   }
   function initSidebar(profile) {
     state.sidebar = true;
-    state.companiesOpen = true; // «شرکت‌ها» صفحه‌ی خودش را دارد؛ کارت باز شروع می‌شود
+    // هر بخش صفحه‌ی خودش را دارد، پس کارت‌های جمع‌شونده همیشه باز و بدون دکمه‌ی باز/بسته‌اند
+    state.companiesOpen = true;
+    state.hourlyOpen = true;
+    state.botOpen = true;
     document.body.classList.add('with-sidebar');
     const aside = document.createElement('aside');
     aside.className = 'sidebar';
@@ -1505,12 +1535,13 @@ window.APP_CONFIG = Object.freeze({
     aside.innerHTML = `
       <div class="side-head">
         <div class="side-brand"></div>
+        <button type="button" class="side-collapse" id="side-collapse" aria-pressed="false">${sideIcon('<path d="M9 6l6 6-6 6"/>')}</button>
         <button type="button" class="side-close" id="side-close" aria-label="بستن منو">${sideIcon('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
       </div>
       <div class="side-units"></div>
       <nav class="side-nav" aria-label="بخش‌ها">
         <div class="side-group-title">ازکی سلر</div>
-        ${SIDE_PAGES.map((p) => `<button type="button" class="side-link" data-go="${p.id}">${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
+        ${SIDE_PAGES.map((p) => `<button type="button" class="side-link" data-go="${p.id}" title="${esc(p.label)}">${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
       </nav>
       <div class="side-user"></div>`;
     const scrim = document.createElement('div');
@@ -1540,6 +1571,19 @@ window.APP_CONFIG = Object.freeze({
       document.body.classList.toggle('side-open-state', open);
       $('side-open').setAttribute('aria-expanded', String(open));
     };
+    const applyCollapsed = (c) => {
+      document.body.classList.toggle('side-collapsed', c);
+      const b = $('side-collapse');
+      const label = c ? 'باز کردن منو' : 'جمع کردن منو';
+      b.setAttribute('aria-pressed', String(c));
+      b.setAttribute('aria-label', label);
+      b.title = label;
+      try { localStorage.setItem('azki-side-collapsed', c ? '1' : '0'); } catch (e) {}
+    };
+    let collapsed = false;
+    try { collapsed = localStorage.getItem('azki-side-collapsed') === '1'; } catch (e) {}
+    applyCollapsed(collapsed);
+    $('side-collapse').addEventListener('click', () => applyCollapsed(!document.body.classList.contains('side-collapsed')));
     $('side-open').addEventListener('click', () => setOpen(true));
     $('side-close').addEventListener('click', () => setOpen(false));
     scrim.addEventListener('click', () => setOpen(false));
@@ -1552,6 +1596,16 @@ window.APP_CONFIG = Object.freeze({
     let saved = null;
     try { saved = localStorage.getItem('azki-side-page'); } catch (e) {}
     setSidePage(SIDE_PAGES.some((p) => p.id === saved) ? saved : 'overview');
+  }
+  // کارت‌های جمع‌شونده در حالت منوی کناری: همیشه باز، بدون نقش دکمه
+  function flattenToggles() {
+    ['cg-toggle', 'bot-toggle', 'active-card'].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      ['role', 'tabindex', 'aria-expanded', 'aria-controls', 'title'].forEach((a) => el.removeAttribute(a));
+    });
+    const card = $('active-card');
+    if (card) { card.classList.remove('expandable', 'open'); const hint = card.querySelector('.card-hint'); if (hint) hint.remove(); }
   }
   function setSidePage(id) {
     const page = SIDE_PAGES.find((p) => p.id === id) || SIDE_PAGES[0];
@@ -2189,7 +2243,7 @@ window.APP_CONFIG = Object.freeze({
   }
   function bindBotPanel() {
     const t = $('bot-toggle');
-    if (!t) return;
+    if (!t || state.sidebar) return;
     const flip = () => {
       state.botOpen = !state.botOpen;
       t.closest('.bot-panel').classList.toggle('open', state.botOpen);
@@ -2513,6 +2567,9 @@ window.APP_CONFIG = Object.freeze({
     bindCompanyGroups();
     if (hasHourly) {
       if (hourlyRes.data.length) bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', { unit: 'کاربر فعال' });
+    }
+    if (state.sidebar) flattenToggles();
+    else if (hasHourly) {
       const card = $('active-card');
       const drawer = $('hourly-drawer');
       const flipHourly = () => {
@@ -2572,7 +2629,7 @@ window.APP_CONFIG = Object.freeze({
   }
   function bindCompanyGroups() {
     const t = $('cg-toggle');
-    if (!t) return;
+    if (!t || state.sidebar) return;
     const flip = () => {
       state.companiesOpen = !state.companiesOpen;
       t.closest('.company-groups').classList.toggle('open', state.companiesOpen);
