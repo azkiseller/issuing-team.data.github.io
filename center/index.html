@@ -1575,6 +1575,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     body.side-collapsed .side-user { display: flex; justify-content: center; padding: 0; background: none; border: 0; }
   }
   @media (max-width: 900px) { .side-collapse { display: none; } }
+
+  /* اطلاعات کاربر در هدر بالا، سمت چپ (حالت منوی کناری) */
+  .top-user { display: flex; align-items: center; gap: 10px; padding-inline-start: 14px; border-inline-start: 1px solid var(--line); }
+  .top-user .role-badge { margin-top: 2px; }
+  .top-user #logout-btn { margin-inline-start: 6px; }
+  @media (max-width: 560px) {
+    .top-user { padding-inline-start: 0; border-inline-start: 0; }
+    .top-user > div:not(.avatar), .top-user #user-label { display: none !important; }
+  }
   .sm-wrap { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 12px; height: min(82vh, 880px); min-height: 540px; }
   .sm-wrap:fullscreen { height: 100vh; padding: 12px; box-sizing: border-box; background: #eaf0f8; }
   .sm-wrap:-webkit-full-screen { height: 100vh; padding: 12px; box-sizing: border-box; background: #eaf0f8; }
@@ -2529,23 +2538,25 @@ function initCenterSidebar() {
     '<button type="button" class="side-collapse" id="side-collapse" aria-pressed="false">' + icon('<path d="M9 6l6 6-6 6"/>') + '</button>' +
     '<button type="button" class="side-close" id="side-close" aria-label="بستن منو">' + icon('<path d="M6 6l12 12M18 6L6 18"/>') + '</button></div>' +
     '<div class="side-units"></div>' +
-    '<nav class="side-nav" aria-label="بخش‌ها">' + navHtml + '</nav>' +
-    '<div class="side-user"></div>';
+    '<nav class="side-nav" aria-label="بخش‌ها">' + navHtml + '</nav>';
   const scrim = document.createElement('div');
   scrim.className = 'side-scrim';
   const app = document.getElementById('app-screen');
   app.insertBefore(scrim, app.firstChild);
   app.insertBefore(aside, app.firstChild);
 
-  // لوگو، انتخاب‌گر واحد، کارت کاربر و خروج از نوار بالا به منو منتقل می‌شوند
+  // لوگو و انتخاب‌گر واحد از نوار بالا به منو منتقل می‌شوند
   const left = document.querySelector('.topbar .topbar-left');
   const brand = left.querySelector('.brand');
   if (brand) aside.querySelector('.side-brand').appendChild(brand);
   const units = left.querySelector('.unit-switch');
   if (units) aside.querySelector('.side-units').appendChild(units);
-  const userBox = aside.querySelector('.side-user');
+  // اطلاعات کاربر و خروج: سمت چپ هدر بالا
+  const userBox = document.createElement('div');
+  userBox.className = 'top-user';
   [...left.children].forEach((el) => userBox.appendChild(el));
   userBox.appendChild(document.getElementById('logout-btn'));
+  document.querySelector('.topbar .topbar-right').appendChild(userBox);
   left.innerHTML =
     '<button type="button" class="side-open" id="side-open" aria-label="باز کردن منو" aria-controls="sidebar" aria-expanded="false">' +
     icon('<path d="M4 7h16M4 12h16M4 17h16"/>') + '<span>منو</span></button>' +

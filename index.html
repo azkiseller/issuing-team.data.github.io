@@ -973,6 +973,15 @@ body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]
 body.with-sidebar .cg-toggle, body.with-sidebar .bot-toggle { cursor: default; }
 body.with-sidebar .cg-more, body.with-sidebar .bot-more { display: none; }
 
+/* اطلاعات کاربر در هدر بالا، سمت چپ (حالت منوی کناری) */
+.top-user { display: flex; align-items: center; gap: 10px; padding-inline-start: 14px; border-inline-start: 1px solid var(--line); }
+.top-user .role-badge { margin-top: 2px; }
+.top-user #logout-btn { margin-inline-start: 6px; }
+@media (max-width: 560px) {
+  .top-user { padding-inline-start: 0; border-inline-start: 0; }
+  .top-user > div:not(.avatar), .top-user #user-label { display: none !important; }
+}
+
 </style>
 </head>
 <body>
@@ -1542,8 +1551,7 @@ window.APP_CONFIG = Object.freeze({
       <nav class="side-nav" aria-label="بخش‌ها">
         <div class="side-group-title">ازکی سلر</div>
         ${SIDE_PAGES.map((p) => `<button type="button" class="side-link" data-go="${p.id}" title="${esc(p.label)}">${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
-      </nav>
-      <div class="side-user"></div>`;
+      </nav>`;
     const scrim = document.createElement('div');
     scrim.className = 'side-scrim';
     scrim.id = 'side-scrim';
@@ -1551,13 +1559,15 @@ window.APP_CONFIG = Object.freeze({
     app.insertBefore(scrim, app.firstChild);
     app.insertBefore(aside, app.firstChild);
 
-    // لوگو، کارت کاربر و دکمه‌ی خروج از نوار بالا به منو منتقل می‌شوند
+    // لوگو به منو می‌رود؛ اطلاعات کاربر و خروج به سمت چپ هدر بالا
     const brand = document.querySelector('.topbar-brand');
     if (brand) aside.querySelector('.side-brand').appendChild(brand);
     const left = document.querySelector('.topbar-left');
-    const userBox = aside.querySelector('.side-user');
+    const userBox = document.createElement('div');
+    userBox.className = 'top-user';
     [...left.children].forEach((el) => userBox.appendChild(el));
     userBox.appendChild($('logout-btn'));
+    document.querySelector('.topbar-right').appendChild(userBox);
     left.innerHTML = `
       <button type="button" class="side-open" id="side-open" aria-label="باز کردن منو" aria-controls="sidebar" aria-expanded="false">
         ${sideIcon('<path d="M4 7h16M4 12h16M4 17h16"/>')}<span>منو</span>
