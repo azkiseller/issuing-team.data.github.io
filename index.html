@@ -1746,8 +1746,8 @@ window.APP_CONFIG = Object.freeze({
     userBox.className = 'top-user';
     [...left.children].forEach((el) => userBox.appendChild(el));
     userBox.appendChild($('logout-btn'));
-    if (profile.role === 'operator') {
-      // اپراتور: کارت پروفایل پایین منوی کناری (پایین سمت راست صفحه)
+    if (['operator', 'team_lead', 'supervisor'].includes(profile.role)) {
+      // اپراتور، سرگروه و سرپرست: کارت پروفایل پایین منوی کناری (پایین سمت راست صفحه)
       userBox.className = 'side-user';
       aside.appendChild(userBox);
     } else {

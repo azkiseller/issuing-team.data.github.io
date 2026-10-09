@@ -2507,7 +2507,7 @@ function renderUnitSwitcher() {
 
 // منوی کناری برای نمای سرپرست (سرپرست، سرپرست ارشد، مدیر، مدیر ارشد) و نمای سرگروه:
 // همان تب‌ها و زیرتب‌ها، به شکل منو. mode: 'sup' یا 'team'
-function initCenterSidebar(mode) {
+function initCenterSidebar(mode, profileAtBottom) {
   if (document.getElementById('sidebar')) return;
   const isTeam = mode === 'team';
   const svgOf = (btn) => { const s = btn && btn.querySelector('svg'); return s ? s.outerHTML : ''; };
@@ -2558,12 +2558,13 @@ function initCenterSidebar(mode) {
   if (brand) aside.querySelector('.side-brand').appendChild(brand);
   const units = left.querySelector('.unit-switch');
   if (units) aside.querySelector('.side-units').appendChild(units);
-  // اطلاعات کاربر و خروج: سمت چپ هدر بالا
+  // اطلاعات کاربر و خروج: سرگروه و سرپرست پایین منوی کناری (پایین سمت راست)، بقیه سمت چپ هدر بالا
   const userBox = document.createElement('div');
-  userBox.className = 'top-user';
+  userBox.className = profileAtBottom ? 'side-user' : 'top-user';
   [...left.children].forEach((el) => userBox.appendChild(el));
   userBox.appendChild(document.getElementById('logout-btn'));
-  document.querySelector('.topbar .topbar-right').appendChild(userBox);
+  if (profileAtBottom) aside.appendChild(userBox);
+  else document.querySelector('.topbar .topbar-right').appendChild(userBox);
   left.innerHTML =
     '<button type="button" class="side-open" id="side-open" aria-label="باز کردن منو" aria-controls="sidebar" aria-expanded="false">' +
     icon('<path d="M4 7h16M4 12h16M4 17h16"/>') + '<span>منو</span></button>' +
@@ -5519,7 +5520,7 @@ async function enterApp(user) {
       const compareHost = document.getElementById('panel-azki-compare');
       if (filterEl && compareHost && !compareHost.contains(filterEl)) compareHost.insertBefore(filterEl, compareHost.firstChild);
     })();
-    initCenterSidebar('team');
+    initCenterSidebar('team', true);
     loadTeamView(user.id);
   } else if (isSupervisor) {
     document.getElementById('main-tabs').style.display = 'none';
@@ -5536,7 +5537,7 @@ async function enterApp(user) {
     document.getElementById('panel-admin').classList.remove('active');
     document.getElementById('panel-supervisor').classList.add('active');
     document.querySelector('main').classList.add('wide-nav');
-    initCenterSidebar('sup');
+    initCenterSidebar('sup', profile.role === 'supervisor');
     loadSupervisorView();
   } else {
     loadTargets(user.id);
