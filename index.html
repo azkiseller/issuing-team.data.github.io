@@ -1055,23 +1055,33 @@ html[data-theme="dark"] .df-pop { background: #18233a; }
 }
 
 /* ---------- «کارکرد روزانه»: کارت‌های دایره‌ای به هم وصل ---------- */
-.days-path-panel { padding: 22px 18px 16px; }
+.days-path-panel { padding: 22px 18px 16px; overflow: visible; }
 .days-path { position: relative; }
 .days-line { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
 .days-line path { fill: none; stroke: var(--accent-deep); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 7 6; opacity: .85; }
 html[data-theme="dark"] .days-line path { stroke: #5CC2FF; opacity: .9; }
 .days-bubbles { position: relative; list-style: none; margin: 0; padding: 0; display: grid; gap: 26px 20px; justify-content: center; }
 /* --p: صدور روز نسبت به بهترین روز (۰ تا ۱) — شدت رنگ و پر شدن حلقه */
+.day-cell { width: 104px; height: 104px; animation: bubble-in .35s ease both; animation-delay: calc(var(--i) * 16ms); }
 .day-bubble {
-  --tint: calc(12% + var(--p) * 58%);
-  position: relative; width: 104px; height: 104px; border-radius: 50%;
+  position: relative; width: 100%; height: 100%; border-radius: 50%; border: 0; padding: 0; cursor: pointer; font-family: var(--font);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; text-align: center;
-  background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.95) 0%, color-mix(in srgb, #4FB4FF var(--tint), #F2F8FF) 78%);
-  box-shadow: 0 10px 22px -10px rgba(15,72,150,.38), inset 0 1px 0 rgba(255,255,255,.8);
-  animation: bubble-in .35s ease both; animation-delay: calc(var(--i) * 16ms);
+  background: var(--heat, #EEF6FF);
+  box-shadow: 0 10px 22px -10px rgba(15,72,150,.38), inset 0 1px 0 rgba(255,255,255,.55);
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.day-bubble:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 16px 28px -12px rgba(15,72,150,.5); }
+.day-bubble:hover, .day-bubble.active { transform: translateY(-3px) scale(1.04); box-shadow: 0 16px 28px -12px rgba(15,72,150,.5); }
+.day-bubble:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
+/* نقشه‌ی گرمایی: ۵ پله‌ی آبی، از کم به زیاد */
+.day-bubble.lv0 { --heat: #EEF6FF; }
+.day-bubble.lv1 { --heat: #DCEEFF; }
+.day-bubble.lv2 { --heat: #B9DCFF; }
+.day-bubble.lv3 { --heat: #85C2FF; }
+.day-bubble.lv4 { --heat: #4A9BF0; }
+.day-bubble.lv5 { --heat: #1C6FD8; }
+.day-bubble.lv4 .db-date, .day-bubble.lv4 .db-count, .day-bubble.lv5 .db-date, .day-bubble.lv5 .db-count { color: #fff; }
+.day-bubble.lv4 .db-salary, .day-bubble.lv5 .db-salary { color: #D6FFE9; }
+.day-bubble.lv4 .db-ring .prg, .day-bubble.lv5 .db-ring .prg { stroke: #0B3E8A; }
 .db-ring { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); transform: rotate(-90deg); pointer-events: none; }
 .db-ring circle { fill: none; stroke-width: 4; }
 .db-ring .trk { stroke: rgba(0,180,255,.18); }
@@ -1094,8 +1104,13 @@ html[data-theme="dark"] .days-line path { stroke: #5CC2FF; opacity: .9; }
 /* امروز */
 .day-bubble.today::after { content: ''; position: absolute; inset: -11px; border-radius: 50%; border: 2px solid var(--accent); animation: today-pulse 1.8s ease-out infinite; pointer-events: none; }
 @keyframes today-pulse { 0% { opacity: .9; transform: scale(.94); } 100% { opacity: 0; transform: scale(1.12); } }
-html[data-theme="dark"] .day-bubble { background: radial-gradient(circle at 32% 26%, color-mix(in srgb, #2F7FD0 var(--tint), #1C2A45) 0%, color-mix(in srgb, #1A5FA8 var(--tint), #121C30) 80%); }
-html[data-theme="dark"] .db-count { color: #8ED0FF; }
+html[data-theme="dark"] .day-bubble.lv0 { --heat: #17233A; }
+html[data-theme="dark"] .day-bubble.lv1 { --heat: #19304F; }
+html[data-theme="dark"] .day-bubble.lv2 { --heat: #1B4069; }
+html[data-theme="dark"] .day-bubble.lv3 { --heat: #1D5590; }
+html[data-theme="dark"] .day-bubble.lv4 { --heat: #2270BE; }
+html[data-theme="dark"] .day-bubble.lv5 { --heat: #2E8CEB; }
+html[data-theme="dark"] .db-count, html[data-theme="dark"] .db-date { color: #E3F1FF; }
 html[data-theme="dark"] .db-ring .prg { stroke: #5CC2FF; }
 html[data-theme="dark"] .day-bubble.zero { background: radial-gradient(circle at 32% 26%, #44212A 0%, #2A151B 80%); }
 html[data-theme="dark"] .day-bubble.zero .db-count, html[data-theme="dark"] .day-bubble.zero .db-salary { color: #FF8A84; }
@@ -1103,7 +1118,11 @@ html[data-theme="dark"] .day-bubble.off { background: radial-gradient(circle at 
 html[data-theme="dark"] .day-bubble.off .db-count, html[data-theme="dark"] .day-bubble.off .db-salary, html[data-theme="dark"] .day-bubble.off .db-date { color: #8A94A8; }
 .days-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center; margin-top: 20px; font-size: 12.5px; color: var(--ink-soft); }
 .days-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.lg-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #CFE8FF, #4FB4FF); border: 2px solid var(--accent-deep); }
+.lg-dot { width: 12px; height: 12px; border-radius: 50%; background: #B9DCFF; border: 2px solid var(--accent-deep); }
+.lg-heat { gap: 4px !important; }
+.lg-sw { width: 16px; height: 16px; border-radius: 50%; background: var(--heat); }
+.lg-sw.lv1 { --heat: #DCEEFF; } .lg-sw.lv2 { --heat: #B9DCFF; } .lg-sw.lv3 { --heat: #85C2FF; } .lg-sw.lv4 { --heat: #4A9BF0; } .lg-sw.lv5 { --heat: #1C6FD8; }
+html[data-theme="dark"] .lg-sw.lv1 { --heat: #19304F; } html[data-theme="dark"] .lg-sw.lv2 { --heat: #1B4069; } html[data-theme="dark"] .lg-sw.lv3 { --heat: #1D5590; } html[data-theme="dark"] .lg-sw.lv4 { --heat: #2270BE; } html[data-theme="dark"] .lg-sw.lv5 { --heat: #2E8CEB; }
 .lg-dot.zero { background: #FFD9D5; border-color: var(--danger); }
 .lg-dot.off { background: #E4E9F0; border-color: #9AA5B8; }
 .lg-dot.today { background: transparent; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -1113,11 +1132,44 @@ html[data-theme="dark"] .day-bubble.off .db-count, html[data-theme="dark"] .day-
 @media (max-width: 560px) {
   .days-path-panel { padding: 18px 8px 14px; }
   .days-bubbles { gap: 24px 16px; }
-  .day-bubble { width: 92px; height: 92px; }
+  .day-cell { width: 92px; height: 92px; }
   .db-count { font-size: 21px; }
   .db-salary { font-size: 10px; }
 }
-@media (prefers-reduced-motion: reduce) { .day-bubble { animation: none; transition: none; } .day-bubble.today::after { animation: none; opacity: .8; } }
+@media (prefers-reduced-motion: reduce) { .day-cell { animation: none; } .day-bubble { transition: none; } .day-bubble.today::after { animation: none; opacity: .8; } }
+
+/* جزئیات روز (با کلیک روی دایره) */
+.day-pop {
+  position: absolute; z-index: 30; width: 300px; max-width: calc(100% - 4px);
+  padding: 14px; border-radius: 16px; border: 1px solid var(--line);
+  background: #fff; color: var(--ink); box-shadow: 0 18px 40px -12px rgba(15,72,150,.35);
+  animation: df-in .16s ease-out;
+}
+html[data-theme="dark"] .day-pop { background: #18233a; }
+.dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 14px; }
+.dp-tag { display: inline-block; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent-strong); }
+.dp-tag.gold { background: #FFF1C7; color: #8A6200; }
+.dp-close { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.dp-close svg { width: 15px; height: 15px; }
+.dp-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dp-stats > div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--accent-soft); }
+.dp-stats span { font-size: 11.5px; color: var(--ink-soft); }
+.dp-stats b { font-size: 18px; font-weight: 800; }
+.dp-stats b.salary { color: var(--good); font-size: 15px; }
+.dp-stats small { font-size: 11px; color: var(--ink-faint); }
+.dp-sec { margin: 12px 0 6px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.dp-split { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--accent-soft); }
+.dp-split i.t, .dp-split-legend i.t { background: var(--cat-1); }
+.dp-split i.n, .dp-split-legend i.n { background: var(--cat-2); }
+.dp-split-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12px; color: var(--ink-soft); }
+.dp-split-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.dp-split-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.dp-split-legend b { color: var(--ink); }
+.dp-companies { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
+.dp-companies li { display: grid; grid-template-columns: minmax(70px, auto) minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12.5px; }
+.dp-cbar { height: 7px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+.dp-cbar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.dp-muted, .dp-loading { font-size: 12px; color: var(--ink-faint); }
 
 </style>
 </head>
@@ -2081,7 +2133,7 @@ window.APP_CONFIG = Object.freeze({
   function layoutDaysPath() {
     const box = $('days-path');
     if (!box) return;
-    const items = [...box.querySelectorAll('.day-bubble')];
+    const items = [...box.querySelectorAll('.day-cell')];
     if (!items.length) return;
     const size = items[0].offsetWidth || 104;
     const gap = parseFloat(getComputedStyle(box.querySelector('.days-bubbles')).columnGap) || 28;
@@ -2123,6 +2175,106 @@ window.APP_CONFIG = Object.freeze({
     if (document.readyState !== 'loading') { const m = document.querySelector('main'); if (m) ro.observe(m); }
   }
 
+  // نقشه‌ی گرمایی: ۵ پله بر اساس صدور روز (مبنای ۳۰: هر پله ۶ صدور)
+  const HEAT_LABELS = ['۱ تا ۶ صدور', '۷ تا ۱۲ صدور', '۱۳ تا ۱۸ صدور', '۱۹ تا ۲۴ صدور', '۲۵ صدور و بیشتر'];
+  const heatLevel = (n) => Math.max(1, Math.min(5, Math.ceil(n / (DAY_GOAL / 5))));
+
+  // جزئیات هر روز با کلیک روی دایره: صدور، حقوق، انتقالی/غیرانتقالی، صدور به تفکیک شرکت
+  function bindDayPop(profile) {
+    const box = $('days-path'), pop = $('day-pop');
+    if (!box || !pop) return;
+    state.dayCompanies = state.dayCompanies || {};
+    let openBtn = null;
+    const close = () => {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      if (openBtn) { openBtn.setAttribute('aria-expanded', 'false'); openBtn.classList.remove('active'); }
+      openBtn = null;
+    };
+    const place = (btn) => {
+      const c = box.getBoundingClientRect(), b = btn.getBoundingClientRect();
+      pop.style.left = '0px'; pop.style.top = '0px';
+      const w = pop.offsetWidth, h = pop.offsetHeight;
+      let left = b.left - c.left + b.width / 2 - w / 2;
+      left = Math.max(0, Math.min(left, c.width - w));
+      let top = b.bottom - c.top + 12;
+      if (b.bottom + h + 20 > window.innerHeight && b.top - c.top - h - 12 > 0) top = b.top - c.top - h - 12;
+      pop.style.left = `${left}px`; pop.style.top = `${top}px`;
+    };
+    const companiesHtml = (list) => {
+      if (!list) return '<div class="dp-loading">در حال بارگذاری شرکت‌ها...</div>';
+      if (!list.length) return '<div class="dp-muted">صدوری به تفکیک شرکت ثبت نشده است</div>';
+      const max = Math.max(...list.map((c) => c.n), 1);
+      return `<ul class="dp-companies">${list.map((c) => `
+        <li><span class="dp-cname">${esc(c.company)}</span><span class="dp-cbar"><i style="width:${Math.round((c.n / max) * 100)}%"></i></span><b>${formatNum(c.n)}</b></li>`).join('')}</ul>`;
+    };
+    const render = (d, sort) => {
+      const tr = d.hasTransfer ? d.transfer + d.nonTransfer : 0;
+      const pct = (x) => (tr ? Math.round((x / tr) * 100) : 0);
+      pop.innerHTML = `
+        <div class="dp-head">
+          <div><b>${d.wd} ${faDigits(d.t[2])} ${PERSIAN_MONTHS[d.t[1] - 1]}</b>${d.isToday ? '<span class="dp-tag">امروز</span>' : ''}${d.isBest ? '<span class="dp-tag gold">بهترین روز</span>' : ''}</div>
+          <button type="button" class="dp-close" aria-label="بستن"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="dp-stats">
+          <div><span>صدور</span><b>${formatNum(d.count)}</b><small>${formatNum(Math.round(d.p * 100))}٪ از ${formatNum(DAY_GOAL)}</small></div>
+          <div><span>حقوق روز</span><b class="salary">${formatNum(d.salary)}</b><small>ریال</small></div>
+        </div>
+        <div class="dp-sec">فراوانی سفارشات</div>
+        ${d.hasTransfer && tr ? `
+          <div class="dp-split" role="img" aria-label="انتقالی ${formatNum(d.transfer)}، غیرانتقالی ${formatNum(d.nonTransfer)}">
+            <i class="t" style="width:${pct(d.transfer)}%"></i><i class="n" style="width:${pct(d.nonTransfer)}%"></i>
+          </div>
+          <div class="dp-split-legend">
+            <span><i class="t"></i>انتقالی <b>${formatNum(d.transfer)}</b> (${formatNum(pct(d.transfer))}٪)</span>
+            <span><i class="n"></i>غیرانتقالی <b>${formatNum(d.nonTransfer)}</b> (${formatNum(pct(d.nonTransfer))}٪)</span>
+          </div>` : `<div class="dp-muted">${d.count ? 'تفکیک انتقالی/غیرانتقالی برای این روز ثبت نشده است' : 'صدوری ثبت نشده است'}</div>`}
+        ${d.count ? `<div class="dp-sec">صدور به تفکیک شرکت</div><div id="dp-comp">${companiesHtml(state.dayCompanies[sort])}</div>` : ''}`;
+      pop.querySelector('.dp-close').addEventListener('click', () => { const b = openBtn; close(); if (b) b.focus(); });
+    };
+    const open = async (btn) => {
+      const sort = Number(btn.dataset.sort), d = state.daysData[sort];
+      if (!d) return;
+      if (openBtn === btn) { close(); return; }
+      close();
+      openBtn = btn;
+      btn.setAttribute('aria-expanded', 'true');
+      btn.classList.add('active');
+      pop.setAttribute('aria-label', `جزئیات ${d.wd} ${faDigits(d.t[2])} ${PERSIAN_MONTHS[d.t[1] - 1]}`);
+      render(d, sort);
+      pop.hidden = false;
+      place(btn);
+      if (d.count && !state.dayCompanies[sort]) {
+        const { data } = await sb.from('daily_company_targets')
+          .select('company, issue_count')
+          .eq('operator_id', profile.id)
+          .eq('report_date_sort', String(sort))
+          .limit(200);
+        const agg = {};
+        (data || []).forEach((r) => { const c = (r.company || '').trim() || 'نامشخص'; agg[c] = (agg[c] || 0) + (Number(r.issue_count) || 0); });
+        state.dayCompanies[sort] = Object.entries(agg).map(([company, n]) => ({ company, n })).filter((c) => c.n > 0).sort((a, b) => b.n - a.n);
+        if (openBtn === btn && $('dp-comp')) { $('dp-comp').innerHTML = companiesHtml(state.dayCompanies[sort]); place(btn); }
+      }
+    };
+    box.querySelectorAll('.day-bubble').forEach((btn) => {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-controls', 'day-pop');
+      btn.addEventListener('click', () => open(btn));
+    });
+    if (!state.dayPopGlobal) {
+      state.dayPopGlobal = true;
+      document.addEventListener('click', (e) => {
+        const p = $('day-pop');
+        if (p && !p.hidden && e.target.isConnected && !e.target.closest('#day-pop, .day-bubble')) p.querySelector('.dp-close').click();
+      });
+      document.addEventListener('keydown', (e) => {
+        const p = $('day-pop');
+        if (e.key === 'Escape' && p && !p.hidden) p.querySelector('.dp-close').click();
+      });
+    }
+    state.closeDayPop = close;
+  }
+
   function renderDaysPage() {
     if (!state.daysRange) state.daysRange = { from: sortToJ(CURRENT_PERIOD.startSort), to: TODAY.slice() };
     const fld = (key, label) => `
@@ -2154,13 +2306,19 @@ window.APP_CONFIG = Object.freeze({
       const bySort = {};
       rows.forEach((r) => {
         const k = Number(r.report_date_sort);
-        const b = bySort[k] || (bySort[k] = { count: 0, salary: 0 });
+        const b = bySort[k] || (bySort[k] = { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false });
         b.count += Number(r.target_count) || 0;
         b.salary += Number(r.daily_salary) || 0;
+        if (r.transfer_count != null || r.non_transfer_count != null) {
+          b.hasTransfer = true;
+          b.transfer += Number(r.transfer_count) || 0;
+          b.nonTransfer += Number(r.non_transfer_count) || 0;
+        }
       });
       const days = jalaliDaysBetween(from, to);
       const best = Math.max(0, ...days.map((t) => (bySort[jSort(t)] || {}).count || 0));
       const active = days.filter((t) => (bySort[jSort(t)] || {}).count > 0).length;
+      state.daysData = {};
       $('days-result').innerHTML = `
         <div class="days-summary">
           <span>بازه: <b>${jLabel(from)}</b> تا <b>${jLabel(to)}</b></span>
@@ -2172,37 +2330,46 @@ window.APP_CONFIG = Object.freeze({
         <div class="panel days-path-panel">
           <div class="days-path" id="days-path">
             <svg class="days-line" id="days-line" aria-hidden="true"><path/></svg>
-            <ol class="days-bubbles" aria-label="کارکرد روز به روز">
+            <ol class="days-bubbles" aria-label="کارکرد روز به روز؛ برای جزئیات هر روز روی آن بزنید">
               ${days.map((t, i) => {
-                const b = bySort[jSort(t)] || { count: 0, salary: 0 };
-                const isToday = jSort(t) === TODAY_SORT, isFri = jalaliWeekday(...t) === 6;
+                const sort = jSort(t);
+                const b = bySort[sort] || { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false };
+                const isToday = sort === TODAY_SORT, isFri = jalaliWeekday(...t) === 6;
                 // صفرِ جمعه = تعطیل (خاکستری)؛ صفرِ امروز هنوز قطعی نیست؛ بقیه‌ی صفرها قرمز
-                const kind = b.count ? '' : (isFri ? ' off' : (isToday ? '' : ' zero'));
+                const kind = b.count ? ` lv${heatLevel(b.count)}` : (isFri ? ' off' : (isToday ? ' lv0' : ' zero'));
                 const p = Math.min(b.count / DAY_GOAL, 1); // نسبت به ۳۰ صدور؛ ۳۰ و بیشتر = کامل
                 const isBest = best > 0 && b.count === best;
                 const wd = WEEKDAYS_FA[jalaliWeekday(...t)];
+                const dateTxt = `${faDigits(t[2])} ${PERSIAN_MONTHS[t[1] - 1]}`;
+                state.daysData[sort] = { t, wd, isToday, isBest, isFri, p, ...b };
                 return `
-                <li class="day-bubble${kind}${isToday ? ' today' : ''}${isBest ? ' best' : ''}" style="--i:${i};--p:${p.toFixed(3)}"
-                    title="${wd} ${faDigits(t[2])} ${PERSIAN_MONTHS[t[1] - 1]}${isBest ? ' — بهترین روز' : ''}${isToday ? ' — امروز' : ''}">
-                  <svg class="db-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="46" pathLength="100"/>${p > 0 ? `<circle class="prg" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="${(p * 100).toFixed(1)} 100"/>` : ''}</svg>
-                  ${isBest ? '<span class="db-best" aria-label="بهترین روز"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2-4.6-4.4 6.3-.9z"/></svg></span>' : ''}
-                  <span class="db-date">${isToday ? 'امروز' : `${faDigits(t[2])} ${PERSIAN_MONTHS[t[1] - 1]}`}</span>
-                  <span class="db-count">${formatNum(b.count)}</span>
-                  <span class="db-salary">${b.salary ? formatNum(b.salary) : '۰'}</span>
+                <li class="day-cell" style="--i:${i}">
+                  <button type="button" class="day-bubble${kind}${isToday ? ' today' : ''}${isBest ? ' best' : ''}" data-sort="${sort}"
+                      aria-haspopup="dialog" aria-label="${wd} ${dateTxt}: ${formatNum(b.count)} صدور${isBest ? '، بهترین روز' : ''}${isToday ? '، امروز' : ''}">
+                    <svg class="db-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="46" pathLength="100"/>${p > 0 ? `<circle class="prg" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="${(p * 100).toFixed(1)} 100"/>` : ''}</svg>
+                    ${isBest ? '<span class="db-best" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2-4.6-4.4 6.3-.9z"/></svg></span>' : ''}
+                    <span class="db-date">${isToday ? 'امروز' : dateTxt}</span>
+                    <span class="db-count">${formatNum(b.count)}</span>
+                    <span class="db-salary">${b.salary ? formatNum(b.salary) : '۰'}</span>
+                  </button>
                 </li>`;
               }).join('')}
             </ol>
+            <div class="day-pop" id="day-pop" role="dialog" aria-modal="false" hidden></div>
           </div>
           <div class="days-legend">
-            <span><i class="lg-dot"></i>روز با صدور (پررنگ‌تر = صدور بیشتر)</span>
+            <span class="lg-heat" aria-label="شدت رنگ: صدور بیشتر، آبی پررنگ‌تر">کم
+              ${[1, 2, 3, 4, 5].map((l) => `<i class="lg-sw lv${l}" title="${HEAT_LABELS[l - 1]}"></i>`).join('')}
+            زیاد</span>
             <span><i class="lg-dot zero"></i>روز کاری بدون صدور</span>
             <span><i class="lg-dot off"></i>جمعه</span>
             <span><i class="lg-star"></i>بهترین روز</span>
             <span><i class="lg-dot today"></i>امروز</span>
-            <span class="lg-note">حلقه‌ی دور هر روز: صدور آن روز نسبت به ${formatNum(DAY_GOAL)} صدور (${formatNum(DAY_GOAL)} و بیشتر = حلقه‌ی کامل)</span>
+            <span class="lg-note">حلقه‌ی دور هر روز: صدور آن روز نسبت به ${formatNum(DAY_GOAL)} صدور (${formatNum(DAY_GOAL)} و بیشتر = حلقه‌ی کامل). برای جزئیات روی هر روز بزنید.</span>
           </div>
         </div>` : '<div class="panel"><div class="empty-state">بازه‌ی انتخاب‌شده روزی ندارد</div></div>'}`;
       layoutDaysPath();
+      bindDayPop(profile);
     };
     const load = async () => {
       const { from, to } = state.daysRange;
@@ -2210,7 +2377,7 @@ window.APP_CONFIG = Object.freeze({
       if (a === Number(CURRENT_PERIOD.startSort) && b === TODAY_SORT) { showResult(periodRows); return; }
       $('days-result').innerHTML = '<div class="loading">در حال بارگذاری...</div>';
       const { data, error } = await sb.from('daily_targets')
-        .select('report_date_jalali, report_date_sort, target_count, daily_salary')
+        .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
         .eq('operator_id', profile.id)
         .gte('report_date_sort', String(a))
         .lte('report_date_sort', String(b))
