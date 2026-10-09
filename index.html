@@ -985,6 +985,75 @@ body.with-sidebar .cg-more, body.with-sidebar .bot-more { display: none; }
   .top-user > div:not(.avatar), .top-user #user-label { display: none !important; }
 }
 
+/* ---------- مدال ساده (بیرون از سه نفر اول) ---------- */
+.medal.plain .ribbon-l { fill: #8FA7C9; } .medal.plain .ribbon-r { fill: #B5C6DD; }
+.medal.plain .disc { fill: #DCE6F2; } .medal.plain .ring { fill: none; stroke: #F4F8FC; stroke-width: 1.5; }
+.medal.plain .star { fill: #7D93B5; }
+
+/* ---------- «کارکرد روزانه»: فیلتر بازه‌ی تاریخ ---------- */
+.date-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 14px 16px; margin-bottom: 14px; overflow: visible; position: relative; z-index: 5; }
+.df-field { display: flex; flex-direction: column; gap: 5px; position: relative; }
+.df-label { font-size: 12px; color: var(--ink-soft); }
+.df-btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 168px; min-height: 44px;
+  padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink); font: 600 14px var(--font); cursor: pointer;
+}
+.df-btn:hover { background: var(--accent-soft); }
+.df-btn svg { width: 17px; height: 17px; opacity: .7; flex: none; }
+.df-btn:focus-visible, .df-reset:focus-visible, .df-day:focus-visible, .df-nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.df-reset { min-height: 44px; padding: 0 16px; border: 0; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent-strong); font: 700 13px var(--font); cursor: pointer; }
+.df-pop {
+  position: absolute; top: calc(100% + 6px); inset-inline-start: 0; z-index: 70; width: 292px; max-width: calc(100vw - 32px);
+  padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+  box-shadow: 0 12px 34px rgba(15,72,150,.25); animation: df-in .16s ease-out;
+}
+html[data-theme="dark"] .df-pop { background: #18233a; }
+@keyframes df-in { from { opacity: 0; transform: translateY(-4px); } }
+.df-head { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.df-head select { flex: 1; min-width: 0; min-height: 34px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: inherit; font: 13px var(--font); }
+.df-head select option { color: #0F1B33; }
+.df-nav { flex: none; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: inherit; cursor: pointer; }
+.df-nav svg { width: 16px; height: 16px; display: block; margin: auto; }
+.df-nav:hover { background: var(--accent-soft); }
+.df-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
+.df-wd { font-size: 11.5px; color: var(--ink-soft); padding: 4px 0; }
+.df-day { min-height: 34px; border: 0; border-radius: 8px; background: none; color: inherit; font: 13px var(--font); cursor: pointer; }
+.df-day:hover:not(:disabled) { background: var(--accent-soft); }
+.df-day.today { outline: 1px solid var(--accent); }
+.df-day.sel { background: var(--accent-deep); color: #fff; font-weight: 700; }
+.df-day:disabled { opacity: .35; cursor: default; }
+.df-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.df-small { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: inherit; font: 600 12.5px var(--font); cursor: pointer; }
+.df-small:hover { background: var(--accent-soft); }
+.days-summary { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 4px 12px; font-size: 13px; color: var(--ink-soft); }
+.days-summary b { color: var(--ink); }
+.days-summary b.salary { color: var(--good); }
+.days-table { padding: 0; overflow: hidden; }
+@media (max-width: 560px) { .df-field { flex: 1 1 140px; } .df-btn { min-width: 0; width: 100%; } .df-reset { flex: 1 1 100%; } }
+
+/* ---------- افکت باز و بسته شدن منوی کناری ---------- */
+@media (min-width: 901px) {
+  body.with-sidebar #app-screen { transition: grid-template-columns .28s cubic-bezier(.4, 0, .2, 1); }
+  .side-link span, .side-brand, .side-units, .side-group-title, .side-user > :not(.avatar) { animation: side-in .28s ease both; }
+  .side-link, .side-collapse { transition: background .15s ease, color .15s ease, width .28s ease, padding .28s ease; }
+}
+@keyframes side-in { from { opacity: 0; transform: translateX(10px); } }
+@media (prefers-reduced-motion: reduce) {
+  body.with-sidebar #app-screen { transition: none; }
+  .side-link span, .side-brand, .side-units, .side-group-title, .side-user > *, .df-pop { animation: none; }
+}
+
+/* اپراتور با دو کارت رتبه: ۴ + ۳ */
+.summary-row.op-cards { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.summary-row.op-cards > * { grid-column: span 3; }
+.summary-row.op-cards > :nth-child(n+5) { grid-column: span 4; }
+@media (max-width: 700px) {
+  .summary-row.op-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-row.op-cards > *, .summary-row.op-cards > :nth-child(n+5) { grid-column: span 1; }
+  .summary-row.op-cards > :last-child { grid-column: span 2; }
+}
+
 </style>
 </head>
 <body>
@@ -1770,7 +1839,7 @@ window.APP_CONFIG = Object.freeze({
   // نمای اپراتور
   // ---------------------------------------------------------------
   async function renderOperatorView(profile, { keepMonthOpen = false } = {}) {
-    const [{ data, error }, { data: ownStatus, error: statusError }, { data: scopeRows }, { data: companyRows }, { data: rankRows }] = await Promise.all([
+    const [{ data, error }, { data: ownStatus, error: statusError }, { data: scopeRows }, { data: companyRows }, { data: rankRows }, rankAllRes] = await Promise.all([
       sb.from('daily_targets')
         .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
         .eq('operator_id', profile.id)
@@ -1796,8 +1865,11 @@ window.APP_CONFIG = Object.freeze({
         .limit(5000),
       // رتبه‌ی امروز در تیم سرگروه (تابع امن: فقط رتبه‌ی خودم و تعداد اعضای تیم)
       sb.rpc('my_today_rank', { p_date_sort: String(TODAY_SORT) }),
+      // رتبه‌ی امروز بین همه‌ی اپراتورها (تابع امن: فقط رتبه‌ی خودم و تعداد کل)
+      sb.rpc('my_today_rank_all', { p_date_sort: String(TODAY_SORT) }),
     ]);
     const rank = Array.isArray(rankRows) ? rankRows[0] : rankRows;
+    const rankAll = Array.isArray(rankAllRes.data) ? rankAllRes.data[0] : rankAllRes.data;
     const groupCompanies = (scopeRows || []).map((r) => (r.company || '').trim()).filter(Boolean);
 
     if (statusError) console.error('issuer_active_status query failed', statusError);
@@ -1818,6 +1890,8 @@ window.APP_CONFIG = Object.freeze({
       .filter((r) => Number(r.report_date_sort) === TODAY_SORT)
       .reduce((s, r) => s + (Number(r.target_count) || 0), 0);
 
+    // ۷ کارت (با دو کارت رتبه): ردیف اول ۴ کارت، ردیف دوم ۳ کارت پهن‌تر
+    $('summary-row').classList.toggle('op-cards', !!(rank && rank.team_size && rankAll && rankAll.all_size));
     $('summary-row').innerHTML = `
       <div class="summary-card"><div class="label">جمع کل حقوق <span class="unit">(ریال)</span></div><div class="value salary">${formatNum(totalSalary)}</div></div>
       <div class="summary-card"><div class="label">جمع کل ثبت‌شده</div><div class="value">${formatNum(total)}</div></div>
@@ -1825,6 +1899,7 @@ window.APP_CONFIG = Object.freeze({
       <div class="summary-card"><div class="label">روزهای فعالیت</div><div class="value">${formatNum(rows.length)}</div></div>
       <div class="summary-card"><div class="label">آخرین روز فعالیت</div><div class="value date">${last ? esc(faDigits(last.report_date_jalali)) : '—'}</div></div>
       ${renderRankCard(rank)}
+      ${renderRankCard(rankAll, 'all')}
     `;
 
     bindShareDonutHover();
@@ -1834,12 +1909,20 @@ window.APP_CONFIG = Object.freeze({
       + sharePairHtml(renderCompanyShareDonut(companyRows), renderTransferShareDonut(rows)) + '</div>';
 
     if (rows.length === 0) {
-      content.innerHTML = topHtml + '<div class="panel" data-page="overview days"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>';
+      content.innerHTML = topHtml + '<div class="panel" data-page="overview"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>'
+        + (state.sidebar ? renderDaysPage() : '');
+      if (state.sidebar) bindDaysPage(profile, rows);
       return;
     }
 
     const asc = sortAsc(rows);
     const series = dailySeries(rows);
+    if (state.sidebar) {
+      content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + renderDaysPage();
+      bindTrendChart(series);
+      bindDaysPage(profile, rows);
+      return;
+    }
     content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + `
       <div class="tree-node" data-page="days">
         <div class="tree-row role-team_lead" id="month-card-toggle" tabindex="0" role="button" aria-expanded="false">
@@ -1875,26 +1958,217 @@ window.APP_CONFIG = Object.freeze({
     if (keepMonthOpen) flip();
   }
 
+  // ---------------------------------------------------------------
+  // «کارکرد روزانه» (اپراتور): فیلتر بازه‌ی تاریخ با تقویم شمسی
+  // ---------------------------------------------------------------
+  function jalaliToGregorian(jy, jm, jd) {
+    jy += 1595;
+    let days = -355668 + (365 * jy) + (Math.floor(jy / 33) * 8) + Math.floor(((jy % 33) + 3) / 4) + jd
+      + ((jm < 7) ? (jm - 1) * 31 : (((jm - 7) * 30) + 186));
+    let gy = 400 * Math.floor(days / 146097);
+    days %= 146097;
+    if (days > 36524) { gy += 100 * Math.floor(--days / 36524); days %= 36524; if (days >= 365) days++; }
+    gy += 4 * Math.floor(days / 1461);
+    days %= 1461;
+    if (days > 365) { gy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+    let gd = days + 1;
+    const leap = (gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0;
+    const md = [0, 31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let gm;
+    for (gm = 1; gm <= 12 && gd > md[gm]; gm++) gd -= md[gm];
+    return [gy, gm, gd];
+  }
+  function jalaliMonthLength(jy, jm) {
+    if (jm <= 6) return 31;
+    if (jm <= 11) return 30;
+    const back = gregorianToJalali(...jalaliToGregorian(jy, 12, 30));
+    return (back[0] === jy && back[1] === 12 && back[2] === 30) ? 30 : 29;
+  }
+  // ستون شنبه = ۰
+  function jalaliWeekday(jy, jm, jd) {
+    const [gy, gm, gd] = jalaliToGregorian(jy, jm, jd);
+    return (new Date(Date.UTC(gy, gm - 1, gd)).getUTCDay() + 1) % 7;
+  }
+  const jSort = (t) => t[0] * 10000 + t[1] * 100 + t[2];
+  const jLabel = (t) => faDigits(`${t[0]}/${String(t[1]).padStart(2, '0')}/${String(t[2]).padStart(2, '0')}`);
+  const sortToJ = (s) => { const n = Number(s); return [Math.floor(n / 10000), Math.floor(n / 100) % 100, n % 100]; };
+  const CAL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
+
+  function renderDaysPage() {
+    if (!state.daysRange) state.daysRange = { from: sortToJ(CURRENT_PERIOD.startSort), to: TODAY.slice() };
+    const fld = (key, label) => `
+      <div class="df-field">
+        <span class="df-label" id="df-${key}-label">${label}</span>
+        <button type="button" class="df-btn" id="df-${key}-btn" aria-haspopup="dialog" aria-expanded="false" aria-describedby="df-${key}-label">
+          <span id="df-${key}-text">${jLabel(state.daysRange[key])}</span>${CAL_ICON}
+        </button>
+        <div class="df-pop" id="df-${key}-pop" role="dialog" aria-label="${label}" hidden></div>
+      </div>`;
+    return `
+      <div data-page="days">
+        <div class="date-filter panel">
+          ${fld('from', 'از تاریخ')}
+          ${fld('to', 'تا تاریخ')}
+          <button type="button" class="df-reset" id="df-reset">دوره‌ی جاری</button>
+        </div>
+        <div id="days-result"><div class="loading">در حال بارگذاری...</div></div>
+      </div>`;
+  }
+
+  function bindDaysPage(profile, periodRows) {
+    const view = {};
+    const showResult = (rows) => {
+      const asc = sortAsc(rows);
+      const total = rows.reduce((s, r) => s + (Number(r.target_count) || 0), 0);
+      const salary = rows.reduce((s, r) => s + (Number(r.daily_salary) || 0), 0);
+      const { from, to } = state.daysRange;
+      $('days-result').innerHTML = `
+        <div class="days-summary">
+          <span>بازه: <b>${jLabel(from)}</b> تا <b>${jLabel(to)}</b></span>
+          <span>${formatNum(rows.length)} روز فعالیت</span>
+          <span>جمع عملکرد: <b>${formatNum(total)}</b></span>
+          <span>جمع حقوق: <b class="salary">${formatNum(salary)}</b> ریال</span>
+        </div>
+        ${rows.length
+          ? `<div class="panel days-table">${rowsTableHtml(asc, 'حقوق روز (ریال)')}</div>`
+          : '<div class="panel"><div class="empty-state">در این بازه رکوردی ثبت نشده است</div></div>'}`;
+    };
+    const load = async () => {
+      const { from, to } = state.daysRange;
+      const a = jSort(from), b = jSort(to);
+      if (a === Number(CURRENT_PERIOD.startSort) && b === TODAY_SORT) { showResult(periodRows); return; }
+      $('days-result').innerHTML = '<div class="loading">در حال بارگذاری...</div>';
+      const { data, error } = await sb.from('daily_targets')
+        .select('report_date_jalali, report_date_sort, target_count, daily_salary')
+        .eq('operator_id', profile.id)
+        .gte('report_date_sort', String(a))
+        .lte('report_date_sort', String(b))
+        .order('report_date_sort', { ascending: false })
+        .limit(1000);
+      if (error) { $('days-result').innerHTML = '<div class="panel"><div class="empty-state">خطا در دریافت اطلاعات</div></div>'; return; }
+      showResult(data || []);
+    };
+    const closeAll = () => ['from', 'to'].forEach((k) => { $(`df-${k}-pop`).hidden = true; $(`df-${k}-btn`).setAttribute('aria-expanded', 'false'); });
+    const render = (key) => {
+      const [vy, vm] = view[key];
+      const sel = state.daysRange[key];
+      const len = jalaliMonthLength(vy, vm), offset = jalaliWeekday(vy, vm, 1);
+      let years = '';
+      for (let y = TODAY[0] - 3; y <= TODAY[0]; y++) years += `<option value="${y}"${y === vy ? ' selected' : ''}>${faDigits(y)}</option>`;
+      const months = PERSIAN_MONTHS.map((n, i) => `<option value="${i + 1}"${i + 1 === vm ? ' selected' : ''}>${n}</option>`).join('');
+      let cells = '';
+      for (let i = 0; i < offset; i++) cells += '<span></span>';
+      for (let d = 1; d <= len; d++) {
+        const t = [vy, vm, d];
+        const isSel = jSort(sel) === jSort(t), isToday = jSort(t) === TODAY_SORT, future = jSort(t) > TODAY_SORT;
+        cells += `<button type="button" class="df-day${isSel ? ' sel' : ''}${isToday ? ' today' : ''}" data-day="${d}"${future ? ' disabled' : ''}>${faDigits(d)}</button>`;
+      }
+      const chev = (pts) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="${pts}"/></svg>`;
+      $(`df-${key}-pop`).innerHTML = `
+        <div class="df-head">
+          <button type="button" class="df-nav" data-nav="-1" aria-label="ماه قبل">${chev('9 6 15 12 9 18')}</button>
+          <select data-role="m" aria-label="ماه">${months}</select>
+          <select data-role="y" aria-label="سال">${years}</select>
+          <button type="button" class="df-nav" data-nav="1" aria-label="ماه بعد">${chev('15 6 9 12 15 18')}</button>
+        </div>
+        <div class="df-grid">${['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map((w) => `<span class="df-wd">${w}</span>`).join('')}${cells}</div>
+        <div class="df-foot">
+          <button type="button" class="df-small" data-today="1">امروز</button>
+          <button type="button" class="df-small" data-close="1">بستن</button>
+        </div>`;
+    };
+    const pick = (key, t) => {
+      state.daysRange[key] = t;
+      // «از» بعد از «تا» نباشد
+      if (jSort(state.daysRange.from) > jSort(state.daysRange.to)) {
+        if (key === 'from') state.daysRange.to = t.slice(); else state.daysRange.from = t.slice();
+      }
+      ['from', 'to'].forEach((k) => { $(`df-${k}-text`).textContent = jLabel(state.daysRange[k]); });
+      closeAll();
+      load();
+    };
+    ['from', 'to'].forEach((key) => {
+      const btn = $(`df-${key}-btn`), pop = $(`df-${key}-pop`);
+      btn.addEventListener('click', () => {
+        const open = pop.hidden;
+        closeAll();
+        if (!open) return;
+        const cur = state.daysRange[key];
+        view[key] = [cur[0], cur[1]];
+        render(key);
+        pop.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        // داخل صفحه بماند (روی موبایل از لبه بیرون نزند)
+        pop.style.transform = '';
+        const r = pop.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+        const dx = r.left < 8 ? 8 - r.left : (r.right > vw - 8 ? vw - 8 - r.right : 0);
+        if (dx) pop.style.transform = `translateX(${dx}px)`;
+      });
+      pop.addEventListener('click', (e) => {
+        const nav = e.target.closest('[data-nav]'), day = e.target.closest('[data-day]');
+        if (nav) {
+          let [vy, vm] = view[key];
+          vm += Number(nav.dataset.nav);
+          if (vm < 1) { vm = 12; vy--; } else if (vm > 12) { vm = 1; vy++; }
+          view[key] = [vy, vm];
+          render(key);
+        } else if (day && !day.disabled) {
+          pick(key, [view[key][0], view[key][1], Number(day.dataset.day)]);
+        } else if (e.target.closest('[data-today]')) {
+          pick(key, TODAY.slice());
+        } else if (e.target.closest('[data-close]')) {
+          closeAll();
+        }
+      });
+      pop.addEventListener('change', (e) => {
+        const sel = e.target.closest('select');
+        if (!sel) return;
+        if (sel.dataset.role === 'm') view[key][1] = Number(sel.value); else view[key][0] = Number(sel.value);
+        render(key);
+      });
+    });
+    $('df-reset').addEventListener('click', () => {
+      state.daysRange = { from: sortToJ(CURRENT_PERIOD.startSort), to: TODAY.slice() };
+      ['from', 'to'].forEach((k) => { $(`df-${k}-text`).textContent = jLabel(state.daysRange[k]); });
+      closeAll();
+      load();
+    });
+    if (!state.daysOutsideBound) {
+      state.daysOutsideBound = true;
+      // کلیک بیرون از فیلدها تقویم را می‌بندد (دکمه‌ای که با رسم دوباره‌ی تقویم جدا شده، «بیرون» حساب نمی‌شود)
+      document.addEventListener('click', (e) => {
+        if (e.target.isConnected && !e.target.closest('.df-field') && $('df-from-pop')) closeAll();
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('df-from-pop')) closeAll(); });
+    }
+    load();
+  }
+
   // کارت «رتبه‌ی امروز در تیم»: «۵ از ۳۶»؛ نفرات ۱ تا ۳ (با صدور بیشتر از صفر) مدال طلا/نقره/برنز می‌گیرند
   const MEDALS = {
     1: { cls: 'gold', label: 'مدال طلا' },
     2: { cls: 'silver', label: 'مدال نقره' },
     3: { cls: 'bronze', label: 'مدال برنز' },
   };
+  // n = ۰: مدال ساده (بیرون از سه نفر اول یا بدون صدور امروز)
   function medalSvg(n) {
-    const m = MEDALS[n];
+    const m = MEDALS[n] || { cls: 'plain', label: 'مدال' };
     return `<svg class="medal ${m.cls}" viewBox="0 0 32 40" role="img" aria-label="${m.label}">
       <path class="ribbon-l" d="M8 0h7l-4 15H4z"/><path class="ribbon-r" d="M17 0h7l4 15h-7z"/>
       <circle class="disc" cx="16" cy="25" r="12"/><circle class="ring" cx="16" cy="25" r="8.5"/>
-      <text x="16" y="29.5" text-anchor="middle">${n}</text></svg>`;
+      ${MEDALS[n] ? `<text x="16" y="29.5" text-anchor="middle">${n}</text>` : '<path class="star" d="M16 18.5l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>'}</svg>`;
   }
-  function renderRankCard(rank) {
-    if (!rank || !rank.team_size) return '';
-    const r = Number(rank.team_rank), size = Number(rank.team_size), mine = Number(rank.today_count) || 0;
-    const medal = (mine > 0 && r <= 3) ? medalSvg(r) : '';
+  // scope: 'team' (تیم سرگروه) یا 'all' (همه‌ی اپراتورها). همیشه یک مدال دارد:
+  // نفرات ۱ تا ۳ (با صدور بیشتر از صفر) طلا/نقره/برنز، بقیه مدال ساده
+  function renderRankCard(rank, scope = 'team') {
+    const all = scope === 'all';
+    const size = Number(rank && (all ? rank.all_size : rank.team_size));
+    if (!size) return '';
+    const r = Number(all ? rank.all_rank : rank.team_rank), mine = Number(rank.today_count) || 0;
+    const medal = medalSvg(mine > 0 && r <= 3 ? r : 0);
     return `
-      <div class="summary-card rank-card ${medal ? 'has-medal' : ''}" title="رتبه بر اساس تعداد صدور امروز در تیم سرگروه شما">
-        <div class="label">رتبه‌ی امروز در تیم</div>
+      <div class="summary-card rank-card has-medal" title="${all ? 'رتبه بر اساس تعداد صدور امروز بین همه‌ی اپراتورها' : 'رتبه بر اساس تعداد صدور امروز در تیم سرگروه شما'}">
+        <div class="label">${all ? 'رتبه‌ی امروز بین کل کاربرها' : 'رتبه‌ی امروز در تیم'}</div>
         <div class="value">${medal}<span>${formatNum(r)} <small>از ${formatNum(size)}</small></span></div>
       </div>`;
   }
