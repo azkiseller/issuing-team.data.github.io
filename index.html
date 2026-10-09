@@ -1066,22 +1066,13 @@ html[data-theme="dark"] .days-line path { stroke: #5CC2FF; opacity: .9; }
 .day-bubble {
   position: relative; width: 100%; height: 100%; border-radius: 50%; border: 0; padding: 0; cursor: pointer; font-family: var(--font);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; text-align: center;
-  background: var(--heat, #EEF6FF);
-  box-shadow: 0 10px 22px -10px rgba(15,72,150,.38), inset 0 1px 0 rgba(255,255,255,.55);
+  --tint: calc(12% + var(--p, 0) * 58%);
+  background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.95) 0%, color-mix(in srgb, #4FB4FF var(--tint), #F2F8FF) 78%);
+  box-shadow: 0 10px 22px -10px rgba(15,72,150,.38), inset 0 1px 0 rgba(255,255,255,.8);
   transition: transform .15s ease, box-shadow .15s ease;
 }
 .day-bubble:hover, .day-bubble.active { transform: translateY(-3px) scale(1.04); box-shadow: 0 16px 28px -12px rgba(15,72,150,.5); }
 .day-bubble:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; }
-/* نقشه‌ی گرمایی: ۵ پله‌ی آبی، از کم به زیاد */
-.day-bubble.lv0 { --heat: #EEF6FF; }
-.day-bubble.lv1 { --heat: #DCEEFF; }
-.day-bubble.lv2 { --heat: #B9DCFF; }
-.day-bubble.lv3 { --heat: #85C2FF; }
-.day-bubble.lv4 { --heat: #4A9BF0; }
-.day-bubble.lv5 { --heat: #1C6FD8; }
-.day-bubble.lv4 .db-date, .day-bubble.lv4 .db-count, .day-bubble.lv5 .db-date, .day-bubble.lv5 .db-count { color: #fff; }
-.day-bubble.lv4 .db-salary, .day-bubble.lv5 .db-salary { color: #D6FFE9; }
-.day-bubble.lv4 .db-ring .prg, .day-bubble.lv5 .db-ring .prg { stroke: #0B3E8A; }
 .db-ring { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); transform: rotate(-90deg); pointer-events: none; }
 .db-ring circle { fill: none; stroke-width: 4; }
 .db-ring .trk { stroke: rgba(0,180,255,.18); }
@@ -1104,13 +1095,8 @@ html[data-theme="dark"] .days-line path { stroke: #5CC2FF; opacity: .9; }
 /* امروز */
 .day-bubble.today::after { content: ''; position: absolute; inset: -11px; border-radius: 50%; border: 2px solid var(--accent); animation: today-pulse 1.8s ease-out infinite; pointer-events: none; }
 @keyframes today-pulse { 0% { opacity: .9; transform: scale(.94); } 100% { opacity: 0; transform: scale(1.12); } }
-html[data-theme="dark"] .day-bubble.lv0 { --heat: #17233A; }
-html[data-theme="dark"] .day-bubble.lv1 { --heat: #19304F; }
-html[data-theme="dark"] .day-bubble.lv2 { --heat: #1B4069; }
-html[data-theme="dark"] .day-bubble.lv3 { --heat: #1D5590; }
-html[data-theme="dark"] .day-bubble.lv4 { --heat: #2270BE; }
-html[data-theme="dark"] .day-bubble.lv5 { --heat: #2E8CEB; }
-html[data-theme="dark"] .db-count, html[data-theme="dark"] .db-date { color: #E3F1FF; }
+html[data-theme="dark"] .day-bubble { background: radial-gradient(circle at 32% 26%, color-mix(in srgb, #2F7FD0 var(--tint), #1C2A45) 0%, color-mix(in srgb, #1A5FA8 var(--tint), #121C30) 80%); }
+html[data-theme="dark"] .db-count { color: #8ED0FF; }
 html[data-theme="dark"] .db-ring .prg { stroke: #5CC2FF; }
 html[data-theme="dark"] .day-bubble.zero { background: radial-gradient(circle at 32% 26%, #44212A 0%, #2A151B 80%); }
 html[data-theme="dark"] .day-bubble.zero .db-count, html[data-theme="dark"] .day-bubble.zero .db-salary { color: #FF8A84; }
@@ -1118,11 +1104,7 @@ html[data-theme="dark"] .day-bubble.off { background: radial-gradient(circle at 
 html[data-theme="dark"] .day-bubble.off .db-count, html[data-theme="dark"] .day-bubble.off .db-salary, html[data-theme="dark"] .day-bubble.off .db-date { color: #8A94A8; }
 .days-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center; margin-top: 20px; font-size: 12.5px; color: var(--ink-soft); }
 .days-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.lg-dot { width: 12px; height: 12px; border-radius: 50%; background: #B9DCFF; border: 2px solid var(--accent-deep); }
-.lg-heat { gap: 4px !important; }
-.lg-sw { width: 16px; height: 16px; border-radius: 50%; background: var(--heat); }
-.lg-sw.lv1 { --heat: #DCEEFF; } .lg-sw.lv2 { --heat: #B9DCFF; } .lg-sw.lv3 { --heat: #85C2FF; } .lg-sw.lv4 { --heat: #4A9BF0; } .lg-sw.lv5 { --heat: #1C6FD8; }
-html[data-theme="dark"] .lg-sw.lv1 { --heat: #19304F; } html[data-theme="dark"] .lg-sw.lv2 { --heat: #1B4069; } html[data-theme="dark"] .lg-sw.lv3 { --heat: #1D5590; } html[data-theme="dark"] .lg-sw.lv4 { --heat: #2270BE; } html[data-theme="dark"] .lg-sw.lv5 { --heat: #2E8CEB; }
+.lg-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #CFE8FF, #4FB4FF); border: 2px solid var(--accent-deep); }
 .lg-dot.zero { background: #FFD9D5; border-color: var(--danger); }
 .lg-dot.off { background: #E4E9F0; border-color: #9AA5B8; }
 .lg-dot.today { background: transparent; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -2175,9 +2157,6 @@ window.APP_CONFIG = Object.freeze({
     if (document.readyState !== 'loading') { const m = document.querySelector('main'); if (m) ro.observe(m); }
   }
 
-  // نقشه‌ی گرمایی: ۵ پله بر اساس صدور روز (مبنای ۳۰: هر پله ۶ صدور)
-  const HEAT_LABELS = ['۱ تا ۶ صدور', '۷ تا ۱۲ صدور', '۱۳ تا ۱۸ صدور', '۱۹ تا ۲۴ صدور', '۲۵ صدور و بیشتر'];
-  const heatLevel = (n) => Math.max(1, Math.min(5, Math.ceil(n / (DAY_GOAL / 5))));
 
   // جزئیات هر روز با کلیک روی دایره: صدور، حقوق، انتقالی/غیرانتقالی، صدور به تفکیک شرکت
   function bindDayPop(profile) {
@@ -2336,7 +2315,7 @@ window.APP_CONFIG = Object.freeze({
                 const b = bySort[sort] || { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false };
                 const isToday = sort === TODAY_SORT, isFri = jalaliWeekday(...t) === 6;
                 // صفرِ جمعه = تعطیل (خاکستری)؛ صفرِ امروز هنوز قطعی نیست؛ بقیه‌ی صفرها قرمز
-                const kind = b.count ? ` lv${heatLevel(b.count)}` : (isFri ? ' off' : (isToday ? ' lv0' : ' zero'));
+                const kind = b.count ? '' : (isFri ? ' off' : (isToday ? '' : ' zero'));
                 const p = Math.min(b.count / DAY_GOAL, 1); // نسبت به ۳۰ صدور؛ ۳۰ و بیشتر = کامل
                 const isBest = best > 0 && b.count === best;
                 const wd = WEEKDAYS_FA[jalaliWeekday(...t)];
@@ -2344,7 +2323,7 @@ window.APP_CONFIG = Object.freeze({
                 state.daysData[sort] = { t, wd, isToday, isBest, isFri, p, ...b };
                 return `
                 <li class="day-cell" style="--i:${i}">
-                  <button type="button" class="day-bubble${kind}${isToday ? ' today' : ''}${isBest ? ' best' : ''}" data-sort="${sort}"
+                  <button type="button" class="day-bubble${kind}${isToday ? ' today' : ''}${isBest ? ' best' : ''}" data-sort="${sort}" style="--p:${p.toFixed(3)}"
                       aria-haspopup="dialog" aria-label="${wd} ${dateTxt}: ${formatNum(b.count)} صدور${isBest ? '، بهترین روز' : ''}${isToday ? '، امروز' : ''}">
                     <svg class="db-ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="46" pathLength="100"/>${p > 0 ? `<circle class="prg" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="${(p * 100).toFixed(1)} 100"/>` : ''}</svg>
                     ${isBest ? '<span class="db-best" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.7 6.3.9-4.6 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2-4.6-4.4 6.3-.9z"/></svg></span>' : ''}
@@ -2358,9 +2337,7 @@ window.APP_CONFIG = Object.freeze({
             <div class="day-pop" id="day-pop" role="dialog" aria-modal="false" hidden></div>
           </div>
           <div class="days-legend">
-            <span class="lg-heat" aria-label="شدت رنگ: صدور بیشتر، آبی پررنگ‌تر">کم
-              ${[1, 2, 3, 4, 5].map((l) => `<i class="lg-sw lv${l}" title="${HEAT_LABELS[l - 1]}"></i>`).join('')}
-            زیاد</span>
+            <span><i class="lg-dot"></i>روز با صدور (پررنگ‌تر = صدور بیشتر)</span>
             <span><i class="lg-dot zero"></i>روز کاری بدون صدور</span>
             <span><i class="lg-dot off"></i>جمعه</span>
             <span><i class="lg-star"></i>بهترین روز</span>
