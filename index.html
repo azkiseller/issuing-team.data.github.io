@@ -916,10 +916,13 @@ body.with-sidebar main { grid-column: 2; grid-row: 2; width: 100%; max-width: 10
 .side-user #logout-btn { grid-column: 1 / -1; justify-self: start; min-height: 32px; margin-top: 4px; }
 body.with-sidebar .topbar-left { gap: 12px; }
 .page-title { margin: 0; font-size: 20px; font-weight: 800; color: var(--ink); }
-body.with-sidebar[data-view="overview"] [data-page]:not([data-page="overview"]),
+body.with-sidebar[data-view="overview"] [data-page]:not([data-page~="overview"]),
 body.with-sidebar[data-view="team"] [data-page]:not([data-page="team"]),
 body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]),
-body.with-sidebar[data-view="kpi"] [data-page]:not([data-page="kpi"]) { display: none !important; }
+body.with-sidebar[data-view="kpi"] [data-page]:not([data-page="kpi"]),
+body.with-sidebar[data-view="days"] [data-page]:not([data-page~="days"]) { display: none !important; }
+body.with-sidebar #month-card-toggle { cursor: default; }
+body.with-sidebar #month-card-toggle .chevron { display: none; }
 
 @media (max-width: 900px) {
   body.with-sidebar #app-screen { display: block; }
@@ -1521,20 +1524,25 @@ window.APP_CONFIG = Object.freeze({
     team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/>',
     companies: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
     kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
+    days: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/>',
   };
+  // roles: کدام نقش‌ها این بخش را دارند (خالی = همه)
   const SIDE_PAGES = [
     { id: 'overview', label: 'نمای کلی' },
-    { id: 'team', label: 'تیم من' },
+    { id: 'team', label: 'تیم من', notFor: ['operator'] },
     { id: 'companies', label: 'شرکت‌ها' },
-    { id: 'kpi', label: 'شاخص‌های عملکرد', teamLeadOnly: true },
+    { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
+    { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
   ];
+  const sidePagesFor = (role) => SIDE_PAGES.filter((p) => (!p.only || p.only.includes(role)) && !(p.notFor || []).includes(role));
   const sideIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${name}</svg>`;
   function usesSidebar(profile) {
-    return (SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead')
+    return (SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead' || profile.role === 'operator')
       && !(profile.role === 'supervisor' && profile.unit === 'center');
   }
   function initSidebar(profile) {
     state.sidebar = true;
+    state.sidePages = sidePagesFor(profile.role);
     // هر بخش صفحه‌ی خودش را دارد، پس کارت‌های جمع‌شونده همیشه باز و بدون دکمه‌ی باز/بسته‌اند
     state.companiesOpen = true;
     state.hourlyOpen = true;
@@ -1553,7 +1561,7 @@ window.APP_CONFIG = Object.freeze({
       <div class="side-units"></div>
       <nav class="side-nav" aria-label="بخش‌ها">
         <div class="side-group-title">ازکی سلر</div>
-        ${SIDE_PAGES.filter((p) => !p.teamLeadOnly || profile.role === 'team_lead').map((p) => `<button type="button" class="side-link" data-go="${p.id}" title="${esc(p.label)}"${p.teamLeadOnly ? ' hidden' : ''}>${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
+        ${state.sidePages.map((p) => `<button type="button" class="side-link" data-go="${p.id}" title="${esc(p.label)}"${p.needsData ? ' hidden' : ''}>${sideIcon(SIDE_ICONS[p.id])}<span>${esc(p.label)}</span></button>`).join('')}
       </nav>`;
     const scrim = document.createElement('div');
     scrim.className = 'side-scrim';
@@ -1608,7 +1616,7 @@ window.APP_CONFIG = Object.freeze({
     }));
     let saved = null;
     try { saved = localStorage.getItem('azki-side-page'); } catch (e) {}
-    setSidePage(SIDE_PAGES.some((p) => p.id === saved && !p.teamLeadOnly) ? saved : 'overview');
+    setSidePage(state.sidePages.some((p) => p.id === saved && !p.needsData) ? saved : 'overview');
     state.pendingSidePage = saved; // «شاخص‌ها» بعد از رسیدن داده معلوم می‌شود
   }
   // سرگروه: «شاخص‌های عملکرد» فقط وقتی داده دارد در منو دیده می‌شود
@@ -1631,7 +1639,7 @@ window.APP_CONFIG = Object.freeze({
     if (card) { card.classList.remove('expandable', 'open'); const hint = card.querySelector('.card-hint'); if (hint) hint.remove(); }
   }
   function setSidePage(id) {
-    const page = SIDE_PAGES.find((p) => p.id === id) || SIDE_PAGES[0];
+    const page = state.sidePages.find((p) => p.id === id) || state.sidePages[0];
     document.body.dataset.view = page.id;
     document.querySelectorAll('#sidebar [data-go]').forEach((b) => {
       if (b.getAttribute('data-go') === page.id) b.setAttribute('aria-current', 'page');
@@ -1814,20 +1822,20 @@ window.APP_CONFIG = Object.freeze({
     `;
 
     bindShareDonutHover();
-    const topHtml = (groupCompanies.length
+    const topHtml = '<div data-page="companies">' + (groupCompanies.length
       ? renderGroupCompanies(ownStatus, groupCompanies)
       : renderCompaniesRow(ownStatus) + renderCompanyDonut(ownStatus))
-      + sharePairHtml(renderCompanyShareDonut(companyRows), renderTransferShareDonut(rows));
+      + sharePairHtml(renderCompanyShareDonut(companyRows), renderTransferShareDonut(rows)) + '</div>';
 
     if (rows.length === 0) {
-      content.innerHTML = topHtml + '<div class="panel"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>';
+      content.innerHTML = topHtml + '<div class="panel" data-page="overview days"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>';
       return;
     }
 
     const asc = sortAsc(rows);
     const series = dailySeries(rows);
-    content.innerHTML = topHtml + renderDailyTrendChart(series) + `
-      <div class="tree-node">
+    content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + `
+      <div class="tree-node" data-page="days">
         <div class="tree-row role-team_lead" id="month-card-toggle" tabindex="0" role="button" aria-expanded="false">
           <span class="chevron">◀</span>
           <span class="name">${esc(CURRENT_PERIOD.label)}</span>
@@ -1850,6 +1858,12 @@ window.APP_CONFIG = Object.freeze({
       detail.classList.toggle('open', open);
       toggle.setAttribute('aria-expanded', String(open));
     };
+    if (state.sidebar) {
+      // «کارکرد روزانه» صفحه‌ی خودش را دارد: جدول همیشه باز، بدون دکمه‌ی باز/بسته
+      flip();
+      ['role', 'tabindex', 'aria-expanded'].forEach((a) => toggle.removeAttribute(a));
+      return;
+    }
     toggle.addEventListener('click', flip);
     toggle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
     if (keepMonthOpen) flip();
