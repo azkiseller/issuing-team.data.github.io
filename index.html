@@ -1153,6 +1153,56 @@ html[data-theme="dark"] .day-pop { background: #18233a; }
 .dp-cbar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
 .dp-muted, .dp-loading { font-size: 12px; color: var(--ink-faint); }
 
+/* ---------- زمان صدور ---------- */
+.clk { width: 13px; height: 13px; flex: none; }
+.time-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  background: rgba(124,92,224,.12); color: #5B3FC4; border: 1px solid rgba(124,92,224,.25);
+}
+html[data-theme="dark"] .time-badge { background: rgba(156,135,240,.16); color: #C9BBFF; border-color: rgba(156,135,240,.3); }
+.summary-card.time-card .value small { font-size: .45em; font-weight: 700; opacity: .85; }
+.pill.time { background: rgba(124,92,224,.12); color: #5B3FC4; }
+html[data-theme="dark"] .pill.time { background: rgba(156,135,240,.16); color: #C9BBFF; }
+.co-time { display: inline-flex; align-items: center; gap: 3px; margin-inline-start: 6px; font-size: 11px; font-weight: 700; color: #6A4FD6; }
+html[data-theme="dark"] .co-time { color: #C9BBFF; }
+.db-time { display: inline-flex; align-items: center; gap: 2px; margin-top: 1px; font-size: 10px; font-weight: 700; color: #6A4FD6; }
+.db-time .clk { width: 10px; height: 10px; }
+.day-bubble.zero .db-time, .day-bubble.off .db-time { display: none; }
+html[data-theme="dark"] .db-time { color: #C9BBFF; }
+.dp-stats .dp-wide { grid-column: 1 / -1; background: rgba(124,92,224,.12); }
+.dp-stats .dp-wide b { color: #5B3FC4; font-size: 16px; }
+html[data-theme="dark"] .dp-stats .dp-wide b { color: #C9BBFF; }
+/* اپراتور: ۸ کارت = دو ردیف ۴تایی */
+.summary-row.op-cards-8 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 700px) { .summary-row.op-cards-8 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* نمودار مقایسه‌ی زمان صدور شرکت‌ها */
+.co-time-chart { padding: 18px 20px; margin-top: 16px; }
+.ctc-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 14px; }
+.ctc-head h3 { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink); }
+.ctc-head span { font-size: 12px; color: var(--ink-faint); }
+.ctc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ctc-list li { display: grid; grid-template-columns: minmax(84px, 140px) minmax(0, 1fr) 82px; align-items: center; gap: 10px; font-size: 13px; }
+.ctc-name { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctc-track { height: 14px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
+.ctc-track i { display: block; height: 100%; border-radius: 999px; background: #7C5CE0; }
+.ctc-track i.slow { background: #E08A17; }
+.ctc-list b { font-size: 12.5px; color: var(--ink-soft); text-align: left; white-space: nowrap; }
+.ctc-foot { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; font-size: 12px; color: var(--ink-soft); }
+.ctc-foot span { display: inline-flex; align-items: center; gap: 6px; }
+.ctc-foot i { width: 11px; height: 11px; border-radius: 3px; background: #7C5CE0; }
+.ctc-foot i.slow { background: #E08A17; }
+@media (max-width: 560px) { .ctc-list li { grid-template-columns: 76px minmax(0, 1fr) 70px; gap: 8px; } }
+/* چیپ شرکت‌ها با زمان صدور جای بیشتری می‌خواهند */
+.cg-chips { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.cg-chip .co-time { margin-inline-start: 0; }
+.share-pair .cg-chips, .leaf-detail .cg-chips { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+/* کارت‌های شرکت سرگروه با زمان صدور: پهن‌تر، اسم کامل */
+.company-stats-row .company-pill { width: auto; min-width: 150px; gap: 6px; }
+.company-stats-row .company-pill .company-name { max-width: 110px; }
+.company-stats-row .company-pill .co-time { margin-inline-start: 4px; }
+
 </style>
 </head>
 <body>
@@ -1443,6 +1493,28 @@ window.APP_CONFIG = Object.freeze({
   // تاریخ‌ها صعودی (قدیمی‌ترین اول) — برای جدول‌ها و نمودار
   function sortAsc(rows) {
     return (rows || []).slice().sort((a, b) => (Number(a.report_date_sort) || 0) - (Number(b.report_date_sort) || 0));
+  }
+
+  // زمان صدور (دقیقه): میانگین وزنی با تعداد صدور هر روز (روزهای بدون زمان یا بدون صدور حساب نمی‌شوند)
+  function timeOfRows(rows) {
+    let w = 0, c = 0, plain = 0, pn = 0;
+    (rows || []).forEach((r) => {
+      const t = r.avg_issuance_minutes;
+      if (t == null || t === '') return;
+      const n = Number(r.target_count) || 0;
+      if (n > 0) { w += Number(t) * n; c += n; }
+      plain += Number(t); pn += 1;
+    });
+    return c ? w / c : (pn ? plain / pn : null);
+  }
+  const CLOCK_ICON = '<svg class="clk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+  function fmtMinutes(m) { return m == null ? '—' : `${formatNum(Math.round(m))} دقیقه`; }
+  function timeBadge(m, title = 'میانگین زمان صدور در دوره‌ی جاری') {
+    return m == null ? '' : `<span class="time-badge" title="${title}">${CLOCK_ICON}${fmtMinutes(m)}</span>`;
+  }
+  function timeCardHtml(m, label) {
+    return `<div class="summary-card time-card" title="میانگین وزنی زمان صدور (دقیقه) در دوره‌ی جاری، از کارت 20516"><div class="label">${label}</div>
+      <div class="value">${m == null ? '—' : `${formatNum(Math.round(m))}<small> دقیقه</small>`}</div></div>`;
   }
 
   function formatNum(n) {
@@ -1941,7 +2013,7 @@ window.APP_CONFIG = Object.freeze({
   async function renderOperatorView(profile, { keepMonthOpen = false } = {}) {
     const [{ data, error }, { data: ownStatus, error: statusError }, { data: scopeRows }, { data: companyRows }, { data: rankRows }, rankAllRes] = await Promise.all([
       sb.from('daily_targets')
-        .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
+        .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes')
         .eq('operator_id', profile.id)
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
         .lte('report_date_sort', CURRENT_PERIOD.endSort)
@@ -1990,14 +2062,17 @@ window.APP_CONFIG = Object.freeze({
       .filter((r) => Number(r.report_date_sort) === TODAY_SORT)
       .reduce((s, r) => s + (Number(r.target_count) || 0), 0);
 
-    // ۷ کارت (با دو کارت رتبه): ردیف اول ۴ کارت، ردیف دوم ۳ کارت پهن‌تر
-    $('summary-row').classList.toggle('op-cards', !!(rank && rank.team_size && rankAll && rankAll.all_size));
+    // ۸ کارت (با دو کارت رتبه و زمان صدور): دو ردیف ۴تایی؛ ۷ کارت: ۴ + ۳
+    const nCards = 6 + (rank && rank.team_size ? 1 : 0) + (rankAll && rankAll.all_size ? 1 : 0);
+    $('summary-row').classList.toggle('op-cards', nCards === 7);
+    $('summary-row').classList.toggle('op-cards-8', nCards === 8);
     $('summary-row').innerHTML = `
       <div class="summary-card"><div class="label">جمع کل حقوق <span class="unit">(ریال)</span></div><div class="value salary">${formatNum(totalSalary)}</div></div>
       <div class="summary-card"><div class="label">جمع کل ثبت‌شده</div><div class="value">${formatNum(total)}</div></div>
       <div class="summary-card"><div class="label">صدور امروز</div><div class="value">${formatNum(todayCount)}</div></div>
       <div class="summary-card"><div class="label">روزهای فعالیت</div><div class="value">${formatNum(rows.length)}</div></div>
       <div class="summary-card"><div class="label">آخرین روز فعالیت</div><div class="value date">${last ? esc(faDigits(last.report_date_jalali)) : '—'}</div></div>
+      ${timeCardHtml(timeOfRows(rows), 'میانگین زمان صدور')}
       ${renderRankCard(rank)}
       ${renderRankCard(rankAll, 'all')}
     `;
@@ -2198,6 +2273,7 @@ window.APP_CONFIG = Object.freeze({
         <div class="dp-stats">
           <div><span>صدور</span><b>${formatNum(d.count)}</b><small>${formatNum(Math.round(d.p * 100))}٪ از ${formatNum(DAY_GOAL)}</small></div>
           <div><span>حقوق روز</span><b class="salary">${formatNum(d.salary)}</b><small>ریال</small></div>
+          <div class="dp-wide"><span>میانگین زمان صدور</span><b>${d.time != null && d.count ? fmtMinutes(d.time) : '—'}</b>${d.time == null && d.count ? '<small>برای این روز ثبت نشده است</small>' : ''}</div>
         </div>
         <div class="dp-sec">فراوانی سفارشات</div>
         ${d.hasTransfer && tr ? `
@@ -2285,8 +2361,9 @@ window.APP_CONFIG = Object.freeze({
       const bySort = {};
       rows.forEach((r) => {
         const k = Number(r.report_date_sort);
-        const b = bySort[k] || (bySort[k] = { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false });
+        const b = bySort[k] || (bySort[k] = { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false, time: null });
         b.count += Number(r.target_count) || 0;
+        if (r.avg_issuance_minutes != null) b.time = Number(r.avg_issuance_minutes);
         b.salary += Number(r.daily_salary) || 0;
         if (r.transfer_count != null || r.non_transfer_count != null) {
           b.hasTransfer = true;
@@ -2304,6 +2381,7 @@ window.APP_CONFIG = Object.freeze({
           <span>${formatNum(active)} روز فعالیت از ${formatNum(days.length)} روز</span>
           <span>جمع عملکرد: <b>${formatNum(total)}</b></span>
           <span>جمع حقوق: <b class="salary">${formatNum(salary)}</b> ریال</span>
+          <span>میانگین زمان صدور: <b>${fmtMinutes(timeOfRows(rows))}</b></span>
         </div>
         ${days.length ? `
         <div class="panel days-path-panel">
@@ -2312,7 +2390,7 @@ window.APP_CONFIG = Object.freeze({
             <ol class="days-bubbles" aria-label="کارکرد روز به روز؛ برای جزئیات هر روز روی آن بزنید">
               ${days.map((t, i) => {
                 const sort = jSort(t);
-                const b = bySort[sort] || { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false };
+                const b = bySort[sort] || { count: 0, salary: 0, transfer: 0, nonTransfer: 0, hasTransfer: false, time: null };
                 const isToday = sort === TODAY_SORT, isFri = jalaliWeekday(...t) === 6;
                 // صفرِ جمعه = تعطیل (خاکستری)؛ صفرِ امروز هنوز قطعی نیست؛ بقیه‌ی صفرها قرمز
                 const kind = b.count ? '' : (isFri ? ' off' : (isToday ? '' : ' zero'));
@@ -2330,6 +2408,7 @@ window.APP_CONFIG = Object.freeze({
                     <span class="db-date">${isToday ? 'امروز' : dateTxt}</span>
                     <span class="db-count">${formatNum(b.count)}</span>
                     <span class="db-salary">${b.salary ? formatNum(b.salary) : '۰'}</span>
+                    ${b.time != null && b.count ? `<span class="db-time" title="زمان صدور">${CLOCK_ICON}${formatNum(Math.round(b.time))}′</span>` : ''}
                   </button>
                 </li>`;
               }).join('')}
@@ -2354,7 +2433,7 @@ window.APP_CONFIG = Object.freeze({
       if (a === Number(CURRENT_PERIOD.startSort) && b === TODAY_SORT) { showResult(periodRows); return; }
       $('days-result').innerHTML = '<div class="loading">در حال بارگذاری...</div>';
       const { data, error } = await sb.from('daily_targets')
-        .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
+        .select('report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes')
         .eq('operator_id', profile.id)
         .gte('report_date_sort', String(a))
         .lte('report_date_sort', String(b))
@@ -2489,14 +2568,16 @@ window.APP_CONFIG = Object.freeze({
   }
 
   function rowsTableHtml(rows, salaryHeader = 'حقوق روز') {
+    const hasTime = rows.some((r) => r.avg_issuance_minutes != null);
     return `
       <table class="rows">
-        <thead><tr><th>تاریخ</th><th class="num">عملکرد</th><th class="num">${salaryHeader}</th></tr></thead>
+        <thead><tr><th>تاریخ</th><th class="num">عملکرد</th>${hasTime ? '<th class="num">زمان صدور</th>' : ''}<th class="num">${salaryHeader}</th></tr></thead>
         <tbody>
         ${rows.map((r, i) => `
           <tr style="--i:${i}">
             <td class="date">${esc(faDigits(r.report_date_jalali))}</td>
             <td class="num"><span class="pill">${r.target_count != null ? formatNum(r.target_count) : '—'}</span></td>
+            ${hasTime ? `<td class="num"><span class="pill time">${r.avg_issuance_minutes != null ? fmtMinutes(Number(r.avg_issuance_minutes)) : '—'}</span></td>` : ''}
             <td class="num"><span class="pill salary">${r.daily_salary != null ? formatNum(r.daily_salary) : '—'}</span></td>
           </tr>
         `).join('')}
@@ -2993,10 +3074,10 @@ window.APP_CONFIG = Object.freeze({
     if (!silent) content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
-    const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes] = await Promise.all([
+    const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes] = await Promise.all([
       sb.from('profiles').select('id, full_name, role, reports_to, unit'),
       sb.from('daily_targets')
-        .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count')
+        .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes')
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
         .lte('report_date_sort', CURRENT_PERIOD.endSort)
         .order('report_date_sort', { ascending: false })
@@ -3018,7 +3099,13 @@ window.APP_CONFIG = Object.freeze({
       profile.role === 'team_lead'
         ? sb.from('kpi_values').select('kpi, scope_type, scope_key, value, sample_size, updated_at').eq('period_start_sort', CURRENT_PERIOD.startSort)
         : Promise.resolve({ data: [] }),
+      // زمان صدور هر شرکت در دوره‌ی جاری (RLS: فقط زیرمجموعه‌ی خود کاربر)
+      sb.rpc('company_issuance_time', { p_start: CURRENT_PERIOD.startSort, p_end: CURRENT_PERIOD.endSort }),
     ]);
+    state.companyTime = {};
+    ((companyTimeRes && companyTimeRes.data) || []).forEach((c) => {
+      if (c.avg_minutes != null) state.companyTime[(c.company || '').trim()] = Number(c.avg_minutes);
+    });
 
     if (profilesRes.error || targetsRes.error) {
       content.innerHTML = '<div class="empty-state">خطا در دریافت اطلاعات. صفحه را دوباره بارگذاری کنید.</div>';
@@ -3109,7 +3196,11 @@ window.APP_CONFIG = Object.freeze({
     state.rawTargetsByOperator = {};
     (targetsRes.data || []).forEach((r) => {
       if (bot && r.operator_id === bot.id) return;
-      const b = (state.targetsByOperator[r.operator_id] = state.targetsByOperator[r.operator_id] || { total: 0, totalSalary: 0, count: 0, lastDate: null, lastDateSort: 0, todayCount: 0 });
+      const b = (state.targetsByOperator[r.operator_id] = state.targetsByOperator[r.operator_id] || { total: 0, totalSalary: 0, count: 0, lastDate: null, lastDateSort: 0, todayCount: 0, timeW: 0, timeC: 0 });
+      if (r.avg_issuance_minutes != null && Number(r.target_count) > 0) {
+        b.timeW += Number(r.avg_issuance_minutes) * Number(r.target_count);
+        b.timeC += Number(r.target_count);
+      }
       const sortNum = Number(r.report_date_sort) || 0;
       b.total += Number(r.target_count) || 0;
       b.totalSalary += Number(r.daily_salary) || 0;
@@ -3140,6 +3231,7 @@ window.APP_CONFIG = Object.freeze({
         ${hasHourly ? '<div class="card-hint"><span class="card-chevron">▾</span> نمودار ساعتی</div>' : ''}
       </div>
       <div class="summary-card"><div class="label">کل زیرمجموعه</div><div class="value">${formatNum(totalTeam)}</div></div>
+      ${timeCardHtml(state.subtreeTime[summaryId], 'میانگین زمان صدور زیرمجموعه')}
     `;
 
     // --- ردیف آمار شرکت‌ها
@@ -3175,7 +3267,7 @@ window.APP_CONFIG = Object.freeze({
       <div id="tab-team" ${showKpiTab && !state.sidebar && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows)}</div>` : ''}
-      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}</div>` : ''}
+      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
       <div data-page="team">
       <div class="filters">
         <input type="search" class="tree-search" id="tree-search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
@@ -3254,7 +3346,7 @@ window.APP_CONFIG = Object.freeze({
             <div class="cg-row">
               <div class="cg-row-head"><span>${esc(g.label)}</span><b>${formatNum(g.total)} فعال</b></div>
               <div class="cg-chips">
-                ${g.items.map((c) => `<span class="cg-chip ${c.active_count ? '' : 'zero'}"><span class="pulse-dot sm"></span>${esc(c.company)}<b>${formatNum(c.active_count)}</b></span>`).join('')}
+                ${g.items.map((c) => `<span class="cg-chip ${c.active_count ? '' : 'zero'}"><span class="pulse-dot sm"></span>${esc(c.company)}<b>${formatNum(c.active_count)}</b>${companyTimeTag(c.company)}</span>`).join('')}
               </div>
             </div>`).join('')}
         </div></div>
@@ -3272,12 +3364,37 @@ window.APP_CONFIG = Object.freeze({
     t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
   }
 
+  function companyTimeTag(company) {
+    const t = (state.companyTime || {})[(company || '').trim()];
+    return t == null ? '' : `<span class="co-time" title="میانگین زمان صدور این شرکت در دوره‌ی جاری">${CLOCK_ICON}${formatNum(Math.round(t))}′</span>`;
+  }
+  // نمودار میله‌ای: مقایسه‌ی زمان صدور شرکت‌ها (کم‌ترین زمان بالا)
+  function renderCompanyTimeChart() {
+    const list = Object.entries(state.companyTime || {}).map(([company, t]) => ({ company, t })).sort((a, b) => a.t - b.t);
+    if (!list.length) return '';
+    const max = Math.max(...list.map((x) => x.t), 1);
+    const avg = list.reduce((s, x) => s + x.t, 0) / list.length;
+    return `
+      <section class="panel co-time-chart" aria-label="مقایسه‌ی زمان صدور شرکت‌ها">
+        <div class="ctc-head"><h3>مقایسه‌ی زمان صدور شرکت‌ها</h3><span>میانگین هر شرکت در ${esc(CURRENT_PERIOD.label)} — کم‌تر بهتر</span></div>
+        <ul class="ctc-list">
+          ${list.map((x) => `
+            <li>
+              <span class="ctc-name">${esc(x.company)}</span>
+              <span class="ctc-track"><i class="${x.t > avg ? 'slow' : ''}" style="width:${Math.max(4, Math.round((x.t / max) * 100))}%"></i></span>
+              <b>${fmtMinutes(x.t)}</b>
+            </li>`).join('')}
+        </ul>
+        <div class="ctc-foot"><span><i></i>کم‌تر از میانگین (${fmtMinutes(avg)})</span><span><i class="slow"></i>بیشتر از میانگین</span></div>
+      </section>`;
+  }
   function companyPillsHtml(list) {
     return `
       <div class="company-stats-row">
         ${list.map((c) => `
           <div class="company-pill" title="${esc(c.company)}">
             <span class="pulse-dot sm"></span><span class="company-name">${esc(c.company)}</span><b>${formatNum(c.active_count)}</b>
+            ${companyTimeTag(c.company)}
           </div>`).join('')}
       </div>
     `;
@@ -3285,18 +3402,19 @@ window.APP_CONFIG = Object.freeze({
 
   // جمع عملکرد، حقوق و تعداد فعال برای هر زیردرخت (یک‌بار محاسبه)
   function computeAggregates() {
-    const tot = {}, sal = {}, act = {};
+    const tot = {}, sal = {}, act = {}, tw = {}, tc = {};
     const visiting = new Set();
     function walk(id) {
       if (tot[id] !== undefined) return;
-      if (visiting.has(id)) { tot[id] = 0; sal[id] = 0; act[id] = 0; return; } // محافظ حلقه
+      if (visiting.has(id)) { tot[id] = 0; sal[id] = 0; act[id] = 0; tw[id] = 0; tc[id] = 0; return; } // محافظ حلقه
       visiting.add(id);
       const own = state.targetsByOperator[id];
       let t = own ? own.total : 0;
       let s = own ? own.totalSalary : 0;
       let a = isFullyActive(state.statusByOperator[id]) ? 1 : 0;
-      (state.childrenOf[id] || []).forEach((cid) => { walk(cid); t += tot[cid]; s += sal[cid]; a += act[cid]; });
-      tot[id] = t; sal[id] = s; act[id] = a;
+      let w = own ? own.timeW : 0, c = own ? own.timeC : 0;
+      (state.childrenOf[id] || []).forEach((cid) => { walk(cid); t += tot[cid]; s += sal[cid]; a += act[cid]; w += tw[cid]; c += tc[cid]; });
+      tot[id] = t; sal[id] = s; act[id] = a; tw[id] = w; tc[id] = c;
       visiting.delete(id);
     }
     Object.keys(state.profileById).forEach(walk);
@@ -3304,6 +3422,8 @@ window.APP_CONFIG = Object.freeze({
     state.subtreeTotal = tot;
     state.subtreeSalary = sal;
     state.activeCountBySubtree = act;
+    state.subtreeTime = {};
+    Object.keys(tw).forEach((id) => { state.subtreeTime[id] = tc[id] ? tw[id] / tc[id] : null; });
   }
 
   function updateTreeFilter() {
@@ -3415,7 +3535,7 @@ window.APP_CONFIG = Object.freeze({
           <span class="name">${esc(p.full_name || '—')}</span>
           <span class="tree-role">${esc(ROLE_LABELS[p.role] || p.role)}</span>
           ${opts && opts.team ? `<span class="team-badge" title="تیم">${esc(opts.team)}</span>` : ''}
-          <span class="tree-badges">${activeBadge}${companiesBadge}${todayBadge}${lastBadge}</span>
+          <span class="tree-badges">${timeBadge(state.subtreeTime[id], isLeaf ? 'میانگین زمان صدور این کاربر در دوره‌ی جاری' : 'میانگین زمان صدور زیرمجموعه در دوره‌ی جاری')}${activeBadge}${companiesBadge}${todayBadge}${lastBadge}</span>
           <span class="tree-count">${countLabel}</span>
           <div class="tree-total-group">
             <span class="tree-total">${totalLabel}</span>
