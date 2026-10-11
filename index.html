@@ -1229,6 +1229,12 @@ table.perf-table td.tm { color: var(--ink-faint); font-size: 12px; }
 .perf-pill.bad { color: var(--danger); background: var(--danger-soft); }
 .perf-pill.none { color: var(--ink-faint); background: var(--surface-tint); font-weight: 600; }
 tr.perf-idle td.nm { color: var(--ink-faint); font-weight: 600; }
+.perf-bar .perf-range { margin-inline-start: auto; }
+.perf-export { display: inline-flex; align-items: center; gap: 8px; font: 700 13px var(--font); color: #fff; border: 0; cursor: pointer;
+  padding: 9px 18px; border-radius: 999px; background: linear-gradient(135deg, #12915F, var(--good)); box-shadow: 0 2px 8px rgba(31,169,113,.35); transition: transform .15s, filter .15s; }
+.perf-export:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.perf-export:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.perf-export svg { width: 16px; height: 16px; }
 </style>
 </head>
 <body>
@@ -3134,15 +3140,17 @@ window.APP_CONFIG = Object.freeze({
     const b = perfBounds(range);
     const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id));
     const list = ops.map((p) => {
-      let count = 0, tw = 0, tc = 0;
+      let count = 0, tw = 0, tc = 0, salary = 0, days = 0;
       (state.rawTargetsByOperator[p.id] || []).forEach((r) => {
         const sort = Number(r.report_date_sort) || 0;
         if (sort < b.from || sort > b.to) return;
         const c = Number(r.target_count) || 0;
         count += c;
+        salary += Number(r.daily_salary) || 0;
+        if (c > 0) days += 1;
         if (r.avg_issuance_minutes != null && c > 0) { tw += Number(r.avg_issuance_minutes) * c; tc += c; }
       });
-      return { id: p.id, name: p.full_name || '—', team: teamLabelOf(p.id), count, time: tc > 0 ? tw / tc : null };
+      return { id: p.id, name: p.full_name || '—', team: teamLabelOf(p.id), count, salary, days, time: tc > 0 ? tw / tc : null };
     });
     const active = list.filter((x) => x.count > 0);
     const idle = list.filter((x) => x.count <= 0).sort((a, c) => a.name.localeCompare(c.name, 'fa'));
@@ -3180,6 +3188,7 @@ window.APP_CONFIG = Object.freeze({
           ${PERF_RANGES.map((r) => `<button type="button" role="tab" data-perf="${r.id}" aria-selected="${r.id === range}">${r.label}</button>`).join('')}
         </div>
         <div class="perf-range">${esc(bounds.text)}</div>
+        ${SUPERVISOR_ROLES.includes(state.viewerRole) ? `<button type="button" class="perf-export" id="perf-export" title="دانلود عملکرد و حقوق بازه‌ی انتخاب‌شده">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>خروجی اکسل</span></button>` : ''}
       </div>
       <div class="perf-legend" aria-hidden="true">
         <span><i class="good"></i>بهتر (تعداد بیشتر / زمان کمتر)</span><span><i class="warn"></i>متوسط</span><span><i class="bad"></i>ضعیف‌تر</span>
@@ -3193,10 +3202,110 @@ window.APP_CONFIG = Object.freeze({
         </table>` : '<div class="empty-state">اپراتوری برای نمایش وجود ندارد</div>'}
       </div>
       ${active.length ? '' : '<div class="trend-foot">در این بازه هنوز صدوری ثبت نشده است.</div>'}`;
+    const xb = $('perf-export');
+    if (xb) xb.addEventListener('click', () => { try { exportPerfXlsx(range); } catch (e) { console.error(e); alert('ساخت فایل اکسل ناموفق بود. صفحه را دوباره بارگذاری کنید.'); } });
     root.querySelectorAll('[data-perf]').forEach((btn) => btn.addEventListener('click', () => {
       state.perfRange = btn.getAttribute('data-perf');
       renderPerf();
     }));
+  }
+
+
+  // ---------------------------------------------------------------
+  // خروجی اکسل (بدون کتابخانه‌ی بیرونی): فایل xlsx واقعی با زیپ بدون فشرده‌سازی
+  // ---------------------------------------------------------------
+  const CRC_TABLE = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(buf) { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zipStore(files) {
+    const enc = new TextEncoder();
+    const parts = [], central = [];
+    let offset = 0;
+    const u16 = (v) => [v & 255, (v >>> 8) & 255];
+    const u32 = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255];
+    const DOS_TIME = 0, DOS_DATE = ((2025 - 1980) << 9) | (1 << 5) | 1;
+    files.forEach((f) => {
+      const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      const head = [0x50, 0x4B, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(DOS_TIME), ...u16(DOS_DATE), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0)];
+      parts.push(new Uint8Array(head), name, data);
+      central.push({ name, crc, size: data.length, offset });
+      offset += head.length + name.length + data.length;
+    });
+    const cdStart = offset;
+    central.forEach((c) => {
+      const h = [0x50, 0x4B, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(DOS_TIME), ...u16(DOS_DATE), ...u32(c.crc), ...u32(c.size), ...u32(c.size), ...u16(c.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(c.offset)];
+      parts.push(new Uint8Array(h), c.name);
+      offset += h.length + c.name.length;
+    });
+    parts.push(new Uint8Array([0x50, 0x4B, 5, 6, 0, 0, 0, 0, ...u16(central.length), ...u16(central.length), ...u32(offset - cdStart), ...u32(cdStart), 0, 0]));
+    return new Blob(parts, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+  const xmlEsc = (v) => String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const xlCol = (i) => String.fromCharCode(65 + i);
+  // سلول: متن | عدد | {f: فرمول, v: مقدار} ؛ s = شناسه‌ی سبک (1 سرستون، 2 عدد، 3 اعشار، 4 جمع‌ها، 5 جمع عدد، 6 جمع اعشار)
+  function sheetXml(rows, widths) {
+    const body = rows.map((row, ri) => `<row r="${ri + 1}">${row.map((cell, ci) => {
+      if (cell == null || cell === '') return '';
+      const c = typeof cell === 'object' ? cell : { v: cell };
+      const ref = `${xlCol(ci)}${ri + 1}`, st = c.s ? ` s="${c.s}"` : '';
+      if (c.f) return `<c r="${ref}"${st}><f>${xmlEsc(c.f)}</f><v>${Number(c.v) || 0}</v></c>`;
+      if (typeof c.v === 'number' && isFinite(c.v)) return `<c r="${ref}"${st}><v>${c.v}</v></c>`;
+      return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(c.v)}</t></is></c>`;
+    }).join('')}</row>`).join('');
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${body}</sheetData></worksheet>`;
+  }
+  const XLSX_STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.0"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Tahoma"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Tahoma"/></font><font><b/><sz val="11"/><name val="Tahoma"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1656F5"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6F0FF"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="3" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="2" fillId="3" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  function buildXlsx(sheets) {
+    const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>';
+    const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+    const wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+      + sheets.map((sh, i) => `<sheet name="${xmlEsc(sh.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>';
+    const wbRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')
+      + `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+    return zipStore([
+      { name: '[Content_Types].xml', data: ct }, { name: '_rels/.rels', data: rels },
+      { name: 'xl/workbook.xml', data: wb }, { name: 'xl/_rels/workbook.xml.rels', data: wbRels }, { name: 'xl/styles.xml', data: XLSX_STYLES },
+      ...sheets.map((sh, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(sh.rows, sh.widths) })),
+    ]);
+  }
+  // عملکرد و حقوق هر اپراتور در بازه‌ی انتخاب‌شده؛ حقوق همان daily_salary روزانه‌ی محاسبه‌شده توسط سامانه است (همان مبنای «تیم من»)
+  function exportPerfXlsx(range) {
+    const { bounds, active, idle } = perfRows(range);
+    const all = active.concat(idle);
+    const H = (t) => ({ v: t, s: 1 });
+    const round1 = (n) => Math.round(n * 10) / 10;
+    // برگه ۱: خلاصه
+    const sum = [[H('رتبه'), H('اپراتور'), H('تیم'), H('تعداد صدور'), H('میانگین زمان صدور (دقیقه)'), H('روزهای دارای صدور'), H('جمع حقوق (ریال)')]];
+    all.forEach((x) => sum.push([x.pos != null ? x.pos : '', x.name, x.team, { v: x.count, s: 2 }, x.time != null ? { v: round1(x.time), s: 3 } : '', { v: x.days, s: 2 }, { v: x.salary, s: 2 }]));
+    const last = all.length + 1;
+    const tc = all.reduce((a, x) => a + x.count, 0), ts = all.reduce((a, x) => a + x.salary, 0);
+    const tw = active.filter((x) => x.time != null).reduce((a, x) => ({ w: a.w + x.time * x.count, c: a.c + x.count }), { w: 0, c: 0 });
+    sum.push([{ v: 'جمع کل', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { f: `SUM(D2:D${last})`, v: tc, s: 5 }, { v: tw.c ? round1(tw.w / tw.c) : '', s: 6 }, { v: '', s: 4 }, { f: `SUM(G2:G${last})`, v: ts, s: 5 }]);
+    sum.push([]);
+    sum.push([{ v: `بازه: ${bounds.text}`, s: 0 }]);
+    sum.push([{ v: 'حقوق = جمع حقوق روزانه‌ی محاسبه‌شده برای هر اپراتور در همین بازه (همان مبنای «تیم من»). میانگین زمان = میانگین وزنی با وزن تعداد صدور هر روز.', s: 0 }]);
+    // برگه ۲: جزئیات روزانه
+    const det = [[H('تاریخ'), H('اپراتور'), H('تیم'), H('تعداد صدور'), H('زمان صدور (دقیقه)'), H('حقوق روز (ریال)')]];
+    all.slice().sort((a, c) => a.name.localeCompare(c.name, 'fa')).forEach((x) => {
+      (state.rawTargetsByOperator[x.id] || [])
+        .filter((r) => { const k = Number(r.report_date_sort) || 0; return k >= bounds.from && k <= bounds.to; })
+        .sort((a, c) => Number(a.report_date_sort) - Number(c.report_date_sort))
+        .forEach((r) => det.push([String(r.report_date_jalali || ''), x.name, x.team, { v: Number(r.target_count) || 0, s: 2 },
+          r.avg_issuance_minutes != null ? { v: round1(Number(r.avg_issuance_minutes)), s: 3 } : '', { v: Number(r.daily_salary) || 0, s: 2 }]));
+    });
+    const dl = det.length;
+    det.push([{ v: 'جمع کل', s: 4 }, { v: '', s: 4 }, { v: '', s: 4 }, { f: `SUM(D2:D${dl})`, v: tc, s: 5 }, { v: '', s: 4 }, { f: `SUM(F2:F${dl})`, v: ts, s: 5 }]);
+    const blob = buildXlsx([
+      { name: 'عملکرد و حقوق', rows: sum, widths: [8, 26, 28, 14, 22, 18, 20] },
+      { name: 'جزئیات روزانه', rows: det, widths: [14, 26, 28, 14, 18, 18] },
+    ]);
+    const label = PERF_RANGES.find((r) => r.id === range).label;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `عملکرد-و-حقوق-${label}-${jLabel(TODAY).replace(/\//g, '-')}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
   async function renderManagerialView(profile, { silent = false } = {}) {
