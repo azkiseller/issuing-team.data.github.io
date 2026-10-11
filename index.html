@@ -919,6 +919,7 @@ body.with-sidebar .topbar-left { gap: 12px; }
 body.with-sidebar[data-view="overview"] [data-page]:not([data-page~="overview"]),
 body.with-sidebar[data-view="team"] [data-page]:not([data-page="team"]),
 body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]),
+body.with-sidebar[data-view="perf"] [data-page]:not([data-page="perf"]),
 body.with-sidebar[data-view="kpi"] [data-page]:not([data-page="kpi"]),
 body.with-sidebar[data-view="days"] [data-page]:not([data-page~="days"]) { display: none !important; }
 body.with-sidebar #month-card-toggle { cursor: default; }
@@ -1203,6 +1204,31 @@ html[data-theme="dark"] .dp-stats .dp-wide b { color: #C9BBFF; }
 .company-stats-row .company-pill .company-name { max-width: 110px; }
 .company-stats-row .company-pill .co-time { margin-inline-start: 4px; }
 
+
+/* ===== تب «عملکرد تیم»: رتبه‌بندی بر اساس تعداد و زمان صدور ===== */
+.perf-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.perf-bar .view-tabs { margin-bottom: 0; }
+.perf-range { font-size: 12.5px; color: var(--ink-soft); }
+.perf-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-soft); margin: 0 0 12px; }
+.perf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 6px; vertical-align: -1px; }
+.perf-legend i.good { background: var(--good); } .perf-legend i.warn { background: var(--warn); } .perf-legend i.bad { background: var(--danger); }
+.perf-wrap { overflow-x: auto; }
+table.perf-table { width: 100%; border-collapse: collapse; min-width: 520px; }
+table.perf-table th { font-size: 12px; font-weight: 700; color: var(--ink-soft); text-align: right; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.perf-table td { padding: 8px 14px; font-size: 13.5px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.perf-table tbody tr:last-child td { border-bottom: none; }
+table.perf-table tbody tr:hover { background: var(--surface-tint); }
+table.perf-table th.num, table.perf-table td.num { text-align: center; }
+table.perf-table td.rk { width: 56px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+table.perf-table td.rk .medal { width: 22px; height: 28px; vertical-align: middle; }
+table.perf-table td.nm { font-weight: 700; color: var(--ink); }
+table.perf-table td.tm { color: var(--ink-faint); font-size: 12px; }
+.perf-pill { display: inline-block; min-width: 76px; padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
+.perf-pill.good { color: var(--good); background: var(--good-soft); }
+.perf-pill.warn { color: var(--warn); background: rgba(224,138,23,.16); }
+.perf-pill.bad { color: var(--danger); background: var(--danger-soft); }
+.perf-pill.none { color: var(--ink-faint); background: var(--surface-tint); font-weight: 600; }
+tr.perf-idle td.nm { color: var(--ink-faint); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1763,6 +1789,7 @@ window.APP_CONFIG = Object.freeze({
     overview: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
     team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/>',
     companies: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
+    perf: '<path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/>',
     kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
     days: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/>',
   };
@@ -1771,6 +1798,7 @@ window.APP_CONFIG = Object.freeze({
     { id: 'overview', label: 'نمای کلی' },
     { id: 'team', label: 'تیم من', notFor: ['operator'] },
     { id: 'companies', label: 'شرکت‌ها' },
+    { id: 'perf', label: 'عملکرد تیم', notFor: ['operator'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
   ];
@@ -3069,6 +3097,108 @@ window.APP_CONFIG = Object.freeze({
       <div class="kpi-grid">${cards}</div>`;
   }
 
+
+  // ---------------------------------------------------------------
+  // تب «عملکرد تیم»: رتبه‌بندی اپراتورها بر اساس تعداد و زمان صدور
+  // (سرگروه: اپراتورهای تیم/تیم‌های خودش؛ سرپرست و بالاتر: همه‌ی اپراتورهای قابل‌مشاهده)
+  // ---------------------------------------------------------------
+  const PERF_RANGES = [
+    { id: 'day', label: 'روزانه' },
+    { id: 'week', label: 'هفتگی' },
+    { id: 'month', label: 'ماهانه' },
+  ];
+  function perfBounds(range) {
+    if (range === 'day') return { from: TODAY_SORT, to: TODAY_SORT, text: `امروز ${jLabel(TODAY)}` };
+    if (range === 'week') {
+      const wd = jalaliWeekday(...TODAY); // شنبه = ۰
+      const days = periodDaysUntilToday();
+      const from = (days.slice(-(wd + 1))[0] || { sort: Number(CURRENT_PERIOD.startSort) }).sort;
+      return { from, to: TODAY_SORT, text: `از ${jLabel(sortToJ(from))} تا امروز (هفته از شنبه)` };
+    }
+    const from = Number(CURRENT_PERIOD.startSort);
+    return { from, to: TODAY_SORT, text: `از ${jLabel(sortToJ(from))} تا امروز (${CURRENT_PERIOD.label})` };
+  }
+  // رتبه‌ی «رقابتی»: مقدار برابر ← رتبه‌ی برابر. dir: 1 = کمتر بهتر، -1 = بیشتر بهتر
+  function competitionRanks(items, key, dir) {
+    const sorted = items.slice().sort((a, b) => dir * (a[key] - b[key]));
+    const out = new Map();
+    sorted.forEach((it, i) => { out.set(it, i > 0 && sorted[i - 1][key] === it[key] ? out.get(sorted[i - 1]) : i + 1); });
+    return out;
+  }
+  function perfClass(rank, n) {
+    if (rank == null) return 'none';
+    const pos = n <= 1 ? 0 : (rank - 1) / (n - 1);
+    return pos <= 1 / 3 ? 'good' : pos <= 2 / 3 ? 'warn' : 'bad';
+  }
+  function perfRows(range) {
+    const b = perfBounds(range);
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id));
+    const list = ops.map((p) => {
+      let count = 0, tw = 0, tc = 0;
+      (state.rawTargetsByOperator[p.id] || []).forEach((r) => {
+        const sort = Number(r.report_date_sort) || 0;
+        if (sort < b.from || sort > b.to) return;
+        const c = Number(r.target_count) || 0;
+        count += c;
+        if (r.avg_issuance_minutes != null && c > 0) { tw += Number(r.avg_issuance_minutes) * c; tc += c; }
+      });
+      return { id: p.id, name: p.full_name || '—', team: teamLabelOf(p.id), count, time: tc > 0 ? tw / tc : null };
+    });
+    const active = list.filter((x) => x.count > 0);
+    const idle = list.filter((x) => x.count <= 0).sort((a, c) => a.name.localeCompare(c.name, 'fa'));
+    // هر دو شاخص رتبه می‌گیرند (تعداد بیشتر = بهتر، زمان کمتر = بهتر؛ بدون زمان = آخر) و جمع دو رتبه ترتیب نهایی را می‌سازد
+    const withT = active.filter((x) => x.time != null);
+    const cRank = competitionRanks(active, 'count', -1);
+    const tRank = competitionRanks(withT, 'time', 1);
+    active.forEach((x) => {
+      x.cRank = cRank.get(x);
+      x.tRank = x.time != null ? tRank.get(x) : null;
+      x.score = x.cRank + (x.tRank != null ? x.tRank : active.length + 1);
+    });
+    active.sort((x, y) => x.score - y.score || y.count - x.count || (x.time ?? 1e9) - (y.time ?? 1e9) || x.name.localeCompare(y.name, 'fa'));
+    active.forEach((x, i) => { x.pos = i > 0 && active[i - 1].score === x.score && active[i - 1].count === x.count && active[i - 1].time === x.time ? active[i - 1].pos : i + 1; });
+    return { bounds: b, active, idle, withTimeN: withT.length };
+  }
+  function renderPerf() {
+    const root = $('perf-root');
+    if (!root) return;
+    const range = state.perfRange || 'day';
+    const { bounds, active, idle, withTimeN } = perfRows(range);
+    const showTeam = state.viewerRole !== 'team_lead' || !!(state.partnerOf && state.partnerOf[state.profile && state.profile.id]);
+    const cell = (x) => `
+      <tr style="--i:${x.i}">
+        <td class="rk">${x.pos != null ? (x.pos <= 3 ? medalSvg(x.pos) : formatNum(x.pos)) : '—'}</td>
+        <td class="nm">${esc(x.name)}</td>
+        ${showTeam ? `<td class="tm">${esc(x.team)}</td>` : ''}
+        <td class="num"><span class="perf-pill ${x.count > 0 ? perfClass(x.cRank, active.length) : 'none'}">${x.count > 0 ? formatNum(x.count) : '—'}</span></td>
+        <td class="num"><span class="perf-pill ${x.time != null ? perfClass(x.tRank, withTimeN) : 'none'}">${x.time != null ? fmtMinutes(x.time) : '—'}</span></td>
+      </tr>`;
+    const rows = active.concat(idle).map((x, i) => cell(Object.assign(x, { i }))).join('');
+    root.innerHTML = `
+      <div class="perf-bar">
+        <div class="view-tabs" role="tablist" aria-label="بازه">
+          ${PERF_RANGES.map((r) => `<button type="button" role="tab" data-perf="${r.id}" aria-selected="${r.id === range}">${r.label}</button>`).join('')}
+        </div>
+        <div class="perf-range">${esc(bounds.text)}</div>
+      </div>
+      <div class="perf-legend" aria-hidden="true">
+        <span><i class="good"></i>بهتر (تعداد بیشتر / زمان کمتر)</span><span><i class="warn"></i>متوسط</span><span><i class="bad"></i>ضعیف‌تر</span>
+        <span>ترتیب: مجموع رتبه‌ی تعداد صدور و زمان صدور</span>
+      </div>
+      <div class="panel perf-wrap">
+        ${active.length + idle.length ? `
+        <table class="perf-table">
+          <thead><tr><th class="num">رتبه</th><th>اپراتور</th>${showTeam ? '<th>تیم</th>' : ''}<th class="num">تعداد صدور</th><th class="num">زمان صدور</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : '<div class="empty-state">اپراتوری برای نمایش وجود ندارد</div>'}
+      </div>
+      ${active.length ? '' : '<div class="trend-foot">در این بازه هنوز صدوری ثبت نشده است.</div>'}`;
+    root.querySelectorAll('[data-perf]').forEach((btn) => btn.addEventListener('click', () => {
+      state.perfRange = btn.getAttribute('data-perf');
+      renderPerf();
+    }));
+  }
+
   async function renderManagerialView(profile, { silent = false } = {}) {
     const content = $('content-area');
     if (!silent) content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
@@ -3268,6 +3398,7 @@ window.APP_CONFIG = Object.freeze({
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows)}</div>` : ''}
       ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
+      ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
       <div data-page="team">
       <div class="filters">
         <input type="search" class="tree-search" id="tree-search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
@@ -3287,6 +3418,7 @@ window.APP_CONFIG = Object.freeze({
     if (state.sidebar) syncKpiNav(showKpiTab);
 
     renderTree(state.treeRootId);
+    if (state.sidebar) renderPerf();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
     bindCompanyGroups();
