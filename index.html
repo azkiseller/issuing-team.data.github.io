@@ -920,6 +920,7 @@ body.with-sidebar[data-view="overview"] [data-page]:not([data-page~="overview"])
 body.with-sidebar[data-view="team"] [data-page]:not([data-page="team"]),
 body.with-sidebar[data-view="companies"] [data-page]:not([data-page="companies"]),
 body.with-sidebar[data-view="perf"] [data-page]:not([data-page="perf"]),
+body.with-sidebar[data-view="bugs"] [data-page]:not([data-page="bugs"]),
 body.with-sidebar[data-view="kpi"] [data-page]:not([data-page="kpi"]),
 body.with-sidebar[data-view="days"] [data-page]:not([data-page~="days"]) { display: none !important; }
 body.with-sidebar #month-card-toggle { cursor: default; }
@@ -1235,6 +1236,40 @@ tr.perf-idle td.nm { color: var(--ink-faint); font-weight: 600; }
 .perf-export:hover { transform: translateY(-1px); filter: brightness(1.05); }
 .perf-export:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .perf-export svg { width: 16px; height: 16px; }
+
+/* ===== باگ‌های عملکردی ===== */
+.bug-chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+.bug-chip.free { color: #fff; background: linear-gradient(135deg, #7C5CE0, #5B3FC4); }
+.bug-chip.perf { color: var(--warn); background: rgba(224,138,23,.16); }
+.bug-chip.none { color: var(--good); background: var(--good-soft); }
+.bug-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.bug-meter { display: flex; gap: 4px; direction: rtl; min-width: 110px; }
+.bug-meter i { flex: 1; height: 8px; border-radius: 4px; background: var(--surface-tint); border: 1px solid var(--line); }
+.bug-meter i.on { background: var(--warn); border-color: var(--warn); }
+.bug-meter-note { font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
+.bug-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; padding: 18px 20px; }
+.bug-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-soft); align-content: start; }
+.bug-form .tree-search { margin-bottom: 0; }
+.bug-form textarea.tree-search { resize: vertical; min-height: 70px; line-height: 1.8; }
+.bug-form .full { grid-column: 1 / -1; }
+.bug-form .opt { font-weight: 500; color: var(--ink-faint); }
+.bug-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.bug-submit { font: 700 13.5px var(--font); color: #fff; border: 0; cursor: pointer; padding: 10px 26px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-deep), var(--accent)); box-shadow: 0 2px 8px rgba(22,86,245,.3); }
+.bug-submit:disabled { opacity: .6; cursor: progress; }
+.bug-msg { font-size: 12.5px; font-weight: 700; }
+.bug-msg.ok { color: var(--good); } .bug-msg.err { color: var(--danger); }
+.bug-hero { padding: 20px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  background: linear-gradient(135deg, rgba(124,92,224,.14), rgba(0,180,255,.10)); }
+.bug-hero .label { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 8px; }
+.bug-hint { white-space: pre-wrap; line-height: 1.8; color: var(--ink); font-size: 13px; }
+.bug-hint.empty { color: var(--ink-faint); }
+td.bug-order { direction: ltr; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
+.bug-del { font: 600 12px var(--font); color: var(--danger); background: var(--danger-soft); border: 0; border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.bug-del:hover { filter: brightness(1.1); }
+table.bug-table td, table.bug-table th { vertical-align: top; }
+table.bug-table { min-width: 640px; }
+.bug-sub { margin: 18px 0 10px; font-size: 14px; font-weight: 800; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -1796,6 +1831,7 @@ window.APP_CONFIG = Object.freeze({
     team: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/>',
     companies: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10 21v-3h4v3"/>',
     perf: '<path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/>',
+    bugs: '<path d="M9 9h6v7a3 3 0 0 1-6 0V9z"/><path d="M10 9V7a2 2 0 0 1 4 0v2M5 12h4M15 12h4M6 7l3 2M18 7l-3 2M6 19l3-2.5M18 19l-3-2.5"/>',
     kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
     days: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/>',
   };
@@ -1805,10 +1841,12 @@ window.APP_CONFIG = Object.freeze({
     { id: 'team', label: 'تیم من', notFor: ['operator'] },
     { id: 'companies', label: 'شرکت‌ها' },
     { id: 'perf', label: 'عملکرد تیم', notFor: ['operator'] },
+    { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator'], labels: { operator: 'باگ‌های من' } },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
   ];
-  const sidePagesFor = (role) => SIDE_PAGES.filter((p) => (!p.only || p.only.includes(role)) && !(p.notFor || []).includes(role));
+  const sidePagesFor = (role) => SIDE_PAGES.filter((p) => (!p.only || p.only.includes(role)) && !(p.notFor || []).includes(role))
+    .map((p) => (p.labels && p.labels[role] ? Object.assign({}, p, { label: p.labels[role] }) : p));
   const sideIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${name}</svg>`;
   function usesSidebar(profile) {
     return (SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead' || profile.role === 'operator')
@@ -2119,17 +2157,18 @@ window.APP_CONFIG = Object.freeze({
 
     if (rows.length === 0) {
       content.innerHTML = topHtml + '<div class="panel" data-page="overview"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>'
-        + (state.sidebar ? renderDaysPage() : '');
-      if (state.sidebar) bindDaysPage(profile, rows);
+        + (state.sidebar ? renderDaysPage() + '<div data-page="bugs" id="bugs-root"></div>' : '');
+      if (state.sidebar) { bindDaysPage(profile, rows); loadBugsPage(); }
       return;
     }
 
     const asc = sortAsc(rows);
     const series = dailySeries(rows);
     if (state.sidebar) {
-      content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + renderDaysPage();
+      content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + renderDaysPage() + '<div data-page="bugs" id="bugs-root"></div>';
       bindTrendChart(series);
       bindDaysPage(profile, rows);
+      loadBugsPage();
       return;
     }
     content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + `
@@ -3308,6 +3347,226 @@ window.APP_CONFIG = Object.freeze({
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
+
+  // ---------------------------------------------------------------
+  // باگ‌های عملکردی: سرگروه برای اپراتورهای زیرمجموعه ثبت می‌کند، اپراتور باگ‌های خودش را می‌بیند.
+  // هر ۵ باگ عملکردی در یک دوره (۲۱ام تا ۲۰ام) = ۱ «باگ بدون بارمالی»؛ مازاد همچنان «باگ عملکردی» می‌ماند.
+  // شمارش از روی تعداد محاسبه می‌شود (چیزی جداگانه ذخیره نمی‌شود)، پس با شروع دوره‌ی بعد صفر می‌شود.
+  // ---------------------------------------------------------------
+  const BUG_CATEGORIES = ['مشکل آموزشی', 'چک نکردن یک جای همه اطلاعات', 'بی دقتی در بررسی'];
+  const BUG_GROUP = 5;
+  const toEnDigits = (v) => String(v == null ? '' : v).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  function bugSplit(n) { return { free: Math.floor(n / BUG_GROUP), rem: n % BUG_GROUP }; }
+  function bugChipsHtml(n) {
+    const { free, rem } = bugSplit(n);
+    const parts = [];
+    if (free) parts.push(`<span class="bug-chip free">${formatNum(free)} باگ بدون بارمالی</span>`);
+    if (rem) parts.push(`<span class="bug-chip perf">${formatNum(rem)} باگ عملکردی</span>`);
+    if (!parts.length) parts.push('<span class="bug-chip none">بدون باگ</span>');
+    return `<div class="bug-chips">${parts.join('')}</div>`;
+  }
+  function bugMeterHtml(n) {
+    const { rem } = bugSplit(n);
+    return `<div class="bug-meter" role="img" aria-label="${rem} از ${BUG_GROUP}">${Array.from({ length: BUG_GROUP }, (_, i) => `<i class="${i < rem ? 'on' : ''}"></i>`).join('')}</div>`
+      + `<div class="bug-meter-note">${formatNum(rem)} از ${formatNum(BUG_GROUP)} تا باگ بدون بارمالی بعدی</div>`;
+  }
+  async function fetchBugs() {
+    const { data, error } = await sb.from('performance_bugs')
+      .select('id, operator_id, reported_by, bug_date_sort, bug_date_jalali, category, order_number, company, hint, created_at')
+      .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    return { data: data || [], error };
+  }
+  async function loadBugsPage() {
+    const root = $('bugs-root');
+    if (!root || !state.profile) return;
+    const { data, error } = await fetchBugs();
+    const live = $('bugs-root');
+    if (!live) return;
+    if (error) {
+      console.error('performance_bugs query failed', error);
+      live.innerHTML = '<div class="panel"><div class="empty-state">بخش باگ‌ها هنوز راه‌اندازی نشده است. با مدیر سیستم تماس بگیرید.</div></div>';
+      return;
+    }
+    state.bugs = data;
+    if (state.profile.role === 'operator') live.innerHTML = renderBugsOperator(data);
+    else renderBugsLead(live, data);
+  }
+  function renderBugsOperator(rows) {
+    const n = rows.length;
+    const body = rows.slice().sort((a, b) => (Number(b.bug_date_sort) - Number(a.bug_date_sort)) || (a.created_at < b.created_at ? 1 : -1)).map((r) => `
+      <tr>
+        <td>${esc(faDigits(r.bug_date_jalali))}</td>
+        <td>${esc(r.category)}</td>
+        <td class="bug-order">${esc(r.order_number)}</td>
+        <td>${esc(r.company)}</td>
+        <td><div class="bug-hint ${r.hint ? '' : 'empty'}">${r.hint ? esc(r.hint) : '—'}</div></td>
+      </tr>`).join('');
+    return `
+      <div class="panel bug-hero">
+        <div>
+          <div class="label">وضعیت باگ‌های شما در ${esc(CURRENT_PERIOD.label)}</div>
+          ${bugChipsHtml(n)}
+        </div>
+        <div>${bugMeterHtml(n)}</div>
+      </div>
+      <div class="bug-sub">باگ‌های ثبت‌شده برای شما</div>
+      <div class="panel perf-wrap">
+        ${n ? `<table class="perf-table bug-table">
+          <thead><tr><th>تاریخ</th><th>دسته</th><th class="num">شماره سفارش</th><th>شرکت</th><th>راهنمایی سرگروه</th></tr></thead>
+          <tbody>${body}</tbody></table>` : '<div class="empty-state">در این دوره باگی برای شما ثبت نشده است 👏</div>'}
+      </div>
+      <div class="trend-foot">هر ${formatNum(BUG_GROUP)} باگ عملکردی در یک دوره، یک «باگ بدون بارمالی» حساب می‌شود. شمارش با شروع هر دوره (۲۱ام) از صفر شروع می‌شود.</div>`;
+  }
+  function bugCompanyOptions(profile) {
+    const mine = state.scopeByLead[profile.id] || [];
+    const set = new Set(mine);
+    state.visibleProfiles.forEach((p) => {
+      const st = state.statusByOperator[p.id];
+      if (st) splitCompanies(st.all_companies || st.companies).forEach((c) => set.add(c));
+    });
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, 'fa'));
+  }
+  function renderBugsLead(root, rows) {
+    const profile = state.profile;
+    const d = state.bugDraft || (state.bugDraft = { operator: '', day: String(TODAY_SORT), category: BUG_CATEGORIES[0], order: '', company: '', hint: '' });
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id))
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const days = periodDaysUntilToday().slice().reverse();
+    const companies = bugCompanyOptions(profile);
+    const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
+    const byOp = {};
+    rows.forEach((r) => { byOp[r.operator_id] = (byOp[r.operator_id] || 0) + 1; });
+    const sel = (v, cur) => (String(v) === String(cur) ? ' selected' : '');
+    const summary = Object.keys(byOp).sort((a, b) => byOp[b] - byOp[a] || nameOf(a).localeCompare(nameOf(b), 'fa')).map((id) => `
+      <tr>
+        <td class="nm">${esc(nameOf(id))}</td>
+        <td class="tm">${esc(teamLabelOf(id))}</td>
+        <td class="num">${formatNum(byOp[id])}</td>
+        <td>${bugChipsHtml(byOp[id])}</td>
+        <td>${bugMeterHtml(byOp[id])}</td>
+      </tr>`).join('');
+    const recent = rows.slice(0, 60).map((r) => `
+      <tr>
+        <td>${esc(faDigits(r.bug_date_jalali))}</td>
+        <td class="nm">${esc(nameOf(r.operator_id))}</td>
+        <td>${esc(r.category)}</td>
+        <td class="bug-order">${esc(r.order_number)}</td>
+        <td>${esc(r.company)}</td>
+        <td><div class="bug-hint ${r.hint ? '' : 'empty'}">${r.hint ? esc(r.hint) : '—'}</div></td>
+        <td>${r.reported_by === profile.id ? `<button type="button" class="bug-del" data-del="${esc(r.id)}">حذف</button>` : ''}</td>
+      </tr>`).join('');
+    root.innerHTML = `
+      <div class="panel">
+        <form class="bug-form" id="bug-form" autocomplete="off" novalidate>
+          <label>اپراتور
+            <select class="tree-search" id="bug-operator" required>
+              <option value="">انتخاب اپراتور...</option>
+              ${ops.map((p) => `<option value="${esc(p.id)}"${sel(p.id, d.operator)}>${esc(p.full_name || '—')}</option>`).join('')}
+            </select>
+          </label>
+          <label>تاریخ باگ
+            <select class="tree-search" id="bug-day">
+              ${days.map((x) => `<option value="${x.sort}"${sel(x.sort, d.day)}>${esc(faDigits(x.jalali))}${x.sort === TODAY_SORT ? ' (امروز)' : ''}</option>`).join('')}
+            </select>
+          </label>
+          <label>نوع باگ
+            <select class="tree-search" id="bug-category">
+              ${BUG_CATEGORIES.map((c) => `<option value="${esc(c)}"${sel(c, d.category)}>${esc(c)}</option>`).join('')}
+            </select>
+          </label>
+          <label>شماره سفارش
+            <input class="tree-search" id="bug-order" type="text" inputmode="numeric" maxlength="40" dir="ltr" placeholder="مثلاً 123456" value="${esc(d.order)}">
+          </label>
+          <label>شرکت
+            <input class="tree-search" id="bug-company" type="text" list="bug-companies" maxlength="80" placeholder="نام شرکت" value="${esc(d.company)}">
+            <datalist id="bug-companies">${companies.map((c) => `<option value="${esc(c)}"></option>`).join('')}</datalist>
+          </label>
+          <label class="full">توضیحات <span class="opt">(اختیاری، به‌عنوان راهنمایی برای اپراتور نمایش داده می‌شود)</span>
+            <textarea class="tree-search" id="bug-hint" maxlength="500" placeholder="مثلاً: قبل از صدور، شماره ملی و کد بیمه‌نامه‌ی قبلی را با هم چک کن">${esc(d.hint)}</textarea>
+          </label>
+          <div class="full bug-actions">
+            <button type="submit" class="bug-submit" id="bug-submit">ثبت باگ</button>
+            <span class="bug-msg" id="bug-msg" role="status" aria-live="polite">${state.bugMsg ? esc(state.bugMsg.text) : ''}</span>
+          </div>
+        </form>
+      </div>
+      <div class="bug-sub">وضعیت اپراتورها در ${esc(CURRENT_PERIOD.label)}</div>
+      <div class="panel perf-wrap">
+        ${summary ? `<table class="perf-table">
+          <thead><tr><th>اپراتور</th><th>تیم</th><th class="num">کل باگ‌ها</th><th>وضعیت</th><th>تا باگ بدون بارمالی بعدی</th></tr></thead>
+          <tbody>${summary}</tbody></table>` : '<div class="empty-state">در این دوره هنوز باگی ثبت نشده است</div>'}
+      </div>
+      <div class="bug-sub">آخرین باگ‌های ثبت‌شده</div>
+      <div class="panel perf-wrap">
+        ${recent ? `<table class="perf-table bug-table">
+          <thead><tr><th>تاریخ</th><th>اپراتور</th><th>نوع باگ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th></th></tr></thead>
+          <tbody>${recent}</tbody></table>` : '<div class="empty-state">—</div>'}
+      </div>
+      <div class="trend-foot">هر ${formatNum(BUG_GROUP)} باگ عملکردی یک اپراتور در یک دوره، یک «باگ بدون بارمالی» حساب می‌شود و باگ‌های مازاد همچنان عملکردی می‌مانند. شمارش با شروع هر دوره (۲۱ام) صفر می‌شود.</div>`;
+    bindBugsLead(root);
+  }
+  function bindBugsLead(root) {
+    const d = state.bugDraft;
+    const map = { 'bug-operator': 'operator', 'bug-day': 'day', 'bug-category': 'category', 'bug-order': 'order', 'bug-company': 'company', 'bug-hint': 'hint' };
+    const setMsg = (text, kind) => { const m = $('bug-msg'); if (m) { m.textContent = text; m.className = 'bug-msg ' + (kind || ''); } state.bugMsg = text ? { text, kind } : null; };
+    Object.keys(map).forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      const sync = () => { d[map[id]] = el.value; if (state.bugMsg && state.bugMsg.kind === 'ok') setMsg('', ''); };
+      el.addEventListener('input', sync);
+      el.addEventListener('change', sync);
+      el.addEventListener('focus', () => { state.bugFocus = id; });
+    });
+    // به‌روزرسانی خودکار صفحه را از نو می‌سازد؛ فوکوس را برگردان تا تایپ قطع نشود
+    if (state.bugFocus && document.activeElement === document.body) {
+      const el = $(state.bugFocus);
+      if (el && el.tagName !== 'SELECT') { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {} }
+    }
+    $('bug-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const order = toEnDigits(d.order).trim();
+      const company = String(d.company || '').trim();
+      if (!d.operator) return setMsg('اپراتور را انتخاب کنید.', 'err');
+      if (!order) return setMsg('شماره سفارش را وارد کنید.', 'err');
+      if (!company) return setMsg('شرکت را وارد کنید.', 'err');
+      const day = Number(d.day);
+      const btn = $('bug-submit');
+      btn.disabled = true;
+      setMsg('در حال ثبت...', '');
+      const { error } = await sb.from('performance_bugs').insert({
+        operator_id: d.operator,
+        bug_date_sort: day,
+        bug_date_jalali: jLabel(sortToJ(day)).replace(/[۰-۹]/g, (c) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c)),
+        category: d.category,
+        order_number: order,
+        company,
+        hint: String(d.hint || '').trim() || null,
+      });
+      if (error) {
+        console.error('performance_bugs insert failed', error);
+        btn.disabled = false;
+        return setMsg(error.code === '42501' ? 'اجازه‌ی ثبت برای این اپراتور را ندارید.' : `ثبت ناموفق بود. (کد خطا: ${error.code || error.status || 'نامشخص'})`, 'err');
+      }
+      const who = state.profileById[d.operator];
+      d.order = ''; d.hint = '';
+      state.bugMsg = { text: `باگ برای ${(who && who.full_name) || 'اپراتور'} ثبت شد.`, kind: 'ok' };
+      await loadBugsPage();
+      const m = $('bug-msg'); if (m) m.className = 'bug-msg ok';
+    });
+    root.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('این باگ حذف شود؟')) return;
+      b.disabled = true;
+      const { error } = await sb.from('performance_bugs').delete().eq('id', b.getAttribute('data-del'));
+      if (error) { console.error(error); b.disabled = false; return setMsg('حذف ناموفق بود.', 'err'); }
+      state.bugMsg = { text: 'باگ حذف شد.', kind: 'ok' };
+      await loadBugsPage();
+      const m = $('bug-msg'); if (m) m.className = 'bug-msg ok';
+    }));
+    if (state.bugMsg && $('bug-msg')) $('bug-msg').className = 'bug-msg ' + (state.bugMsg.kind || '');
+  }
+
   async function renderManagerialView(profile, { silent = false } = {}) {
     const content = $('content-area');
     if (!silent) content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
@@ -3508,6 +3767,7 @@ window.APP_CONFIG = Object.freeze({
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows)}</div>` : ''}
       ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
+      ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
       <div data-page="team">
       <div class="filters">
         <input type="search" class="tree-search" id="tree-search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
@@ -3528,6 +3788,7 @@ window.APP_CONFIG = Object.freeze({
 
     renderTree(state.treeRootId);
     if (state.sidebar) renderPerf();
+    if (state.sidebar && profile.role === 'team_lead') loadBugsPage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
     bindCompanyGroups();
