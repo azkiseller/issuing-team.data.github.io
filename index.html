@@ -1236,6 +1236,9 @@ tr.perf-idle td.nm { color: var(--ink-faint); font-weight: 600; }
 .perf-export:hover { transform: translateY(-1px); filter: brightness(1.05); }
 .perf-export:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .perf-export svg { width: 16px; height: 16px; }
+.perf-export.alt { background: linear-gradient(135deg, #5B6B8A, #3F4C66); box-shadow: 0 2px 8px rgba(63,76,102,.35); }
+.perf-export:disabled { opacity: .65; cursor: progress; transform: none; }
+.perf-bar { row-gap: 10px; }
 
 /* ===== باگ‌های عملکردی ===== */
 .bug-chip { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
@@ -3175,12 +3178,13 @@ window.APP_CONFIG = Object.freeze({
     const pos = n <= 1 ? 0 : (rank - 1) / (n - 1);
     return pos <= 1 / 3 ? 'good' : pos <= 2 / 3 ? 'warn' : 'bad';
   }
-  function perfRows(range) {
-    const b = perfBounds(range);
+  function perfRows(range, opts) {
+    const b = (opts && opts.bounds) || perfBounds(range);
+    const rawBy = (opts && opts.raw) || state.rawTargetsByOperator;
     const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id));
     const list = ops.map((p) => {
       let count = 0, tw = 0, tc = 0, salary = 0, days = 0;
-      (state.rawTargetsByOperator[p.id] || []).forEach((r) => {
+      (rawBy[p.id] || []).forEach((r) => {
         const sort = Number(r.report_date_sort) || 0;
         if (sort < b.from || sort > b.to) return;
         const c = Number(r.target_count) || 0;
@@ -3227,7 +3231,7 @@ window.APP_CONFIG = Object.freeze({
           ${PERF_RANGES.map((r) => `<button type="button" role="tab" data-perf="${r.id}" aria-selected="${r.id === range}">${r.label}</button>`).join('')}
         </div>
         <div class="perf-range">${esc(bounds.text)}</div>
-        ${SUPERVISOR_ROLES.includes(state.viewerRole) ? `<button type="button" class="perf-export" id="perf-export" title="دانلود عملکرد و حقوق بازه‌ی انتخاب‌شده">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>خروجی اکسل</span></button>` : ''}
+        ${SUPERVISOR_ROLES.includes(state.viewerRole) ? `<button type="button" class="perf-export" id="perf-export" title="دانلود عملکرد و حقوق بازه‌ی انتخاب‌شده">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>خروجی اکسل</span></button><button type="button" class="perf-export alt" id="perf-export-prev" title="دانلود عملکرد و حقوق کل دوره‌ی قبل">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>اکسل دوره‌ی قبل (${esc(prevPeriodInfo().label)})</span></button>` : ''}
       </div>
       <div class="perf-legend" aria-hidden="true">
         <span><i class="good"></i>بهتر (تعداد بیشتر / زمان کمتر)</span><span><i class="warn"></i>متوسط</span><span><i class="bad"></i>ضعیف‌تر</span>
@@ -3243,6 +3247,8 @@ window.APP_CONFIG = Object.freeze({
       ${active.length ? '' : '<div class="trend-foot">در این بازه هنوز صدوری ثبت نشده است.</div>'}`;
     const xb = $('perf-export');
     if (xb) xb.addEventListener('click', () => { try { exportPerfXlsx(range); } catch (e) { console.error(e); alert('ساخت فایل اکسل ناموفق بود. صفحه را دوباره بارگذاری کنید.'); } });
+    const xp = $('perf-export-prev');
+    if (xp) xp.addEventListener('click', () => exportPrevPeriod(xp));
     root.querySelectorAll('[data-perf]').forEach((btn) => btn.addEventListener('click', () => {
       state.perfRange = btn.getAttribute('data-perf');
       renderPerf();
@@ -3308,9 +3314,57 @@ window.APP_CONFIG = Object.freeze({
       ...sheets.map((sh, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(sh.rows, sh.widths) })),
     ]);
   }
+
+  // ---------------------------------------------------------------
+  // اکسل «دوره‌ی قبل» (۲۱ام ماه قبلِ قبل تا ۲۰ام ماه قبل). داده از Supabase خوانده می‌شود (RLS همان محدوده‌ی کاربر).
+  // ---------------------------------------------------------------
+  function prevPeriodInfo() {
+    const cs = Number(CURRENT_PERIOD.startSort);
+    const y = Math.floor(cs / 10000), m = Math.floor(cs / 100) % 100;
+    return {
+      startSort: m > 1 ? y * 10000 + (m - 1) * 100 + 21 : (y - 1) * 10000 + 1221,
+      endSort: cs - 1,                       // ۲۰ام ماه جاری شروع دوره
+      label: `${PERSIAN_MONTHS[m - 1]} ماه`, // ماه پایان دوره‌ی قبل
+    };
+  }
+  async function fetchPeriodTargets(from, to) {
+    const out = [];
+    const PAGE = 1000;
+    for (let off = 0; off < 200000; off += PAGE) {
+      const { data, error } = await sb.from('daily_targets')
+        .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, avg_issuance_minutes')
+        .gte('report_date_sort', String(from)).lte('report_date_sort', String(to))
+        .order('report_date_sort', { ascending: true }).order('operator_id', { ascending: true })
+        .range(off, off + PAGE - 1);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
+    return out;
+  }
+  async function exportPrevPeriod(btn) {
+    const pp = prevPeriodInfo();
+    const labelEl = btn.querySelector('span');
+    const old = labelEl.textContent;
+    btn.disabled = true; labelEl.textContent = 'در حال دریافت...';
+    try {
+      const rows = await fetchPeriodTargets(pp.startSort, pp.endSort);
+      const raw = {};
+      rows.forEach((r) => { (raw[r.operator_id] = raw[r.operator_id] || []).push(r); });
+      exportPerfXlsx('month', {
+        raw,
+        bounds: { from: pp.startSort, to: pp.endSort, text: `دوره‌ی ${pp.label}: از ${jLabel(sortToJ(pp.startSort))} تا ${jLabel(sortToJ(pp.endSort))}` },
+        label: `دوره-${pp.label.replace(/\s+/g, '-')}`,
+      });
+    } catch (e) {
+      console.error('prev period export failed', e);
+      alert('دریافت اطلاعات دوره‌ی قبل ناموفق بود. دوباره تلاش کنید.');
+    } finally { btn.disabled = false; labelEl.textContent = old; }
+  }
   // عملکرد و حقوق هر اپراتور در بازه‌ی انتخاب‌شده؛ حقوق همان daily_salary روزانه‌ی محاسبه‌شده توسط سامانه است (همان مبنای «تیم من»)
-  function exportPerfXlsx(range) {
-    const { bounds, active, idle } = perfRows(range);
+  function exportPerfXlsx(range, opts) {
+    const { bounds, active, idle } = perfRows(range, opts);
+    const rawBy = (opts && opts.raw) || state.rawTargetsByOperator;
     const all = active.concat(idle);
     const H = (t) => ({ v: t, s: 1 });
     const round1 = (n) => Math.round(n * 10) / 10;
@@ -3327,7 +3381,7 @@ window.APP_CONFIG = Object.freeze({
     // برگه ۲: جزئیات روزانه
     const det = [[H('تاریخ'), H('اپراتور'), H('تیم'), H('تعداد صدور'), H('زمان صدور (دقیقه)'), H('حقوق روز (ریال)')]];
     all.slice().sort((a, c) => a.name.localeCompare(c.name, 'fa')).forEach((x) => {
-      (state.rawTargetsByOperator[x.id] || [])
+      (rawBy[x.id] || [])
         .filter((r) => { const k = Number(r.report_date_sort) || 0; return k >= bounds.from && k <= bounds.to; })
         .sort((a, c) => Number(a.report_date_sort) - Number(c.report_date_sort))
         .forEach((r) => det.push([String(r.report_date_jalali || ''), x.name, x.team, { v: Number(r.target_count) || 0, s: 2 },
@@ -3339,7 +3393,7 @@ window.APP_CONFIG = Object.freeze({
       { name: 'عملکرد و حقوق', rows: sum, widths: [8, 26, 28, 14, 22, 18, 20] },
       { name: 'جزئیات روزانه', rows: det, widths: [14, 26, 28, 14, 18, 18] },
     ]);
-    const label = PERF_RANGES.find((r) => r.id === range).label;
+    const label = (opts && opts.label) || PERF_RANGES.find((r) => r.id === range).label;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `عملکرد-و-حقوق-${label}-${jLabel(TODAY).replace(/\//g, '-')}.xlsx`;
