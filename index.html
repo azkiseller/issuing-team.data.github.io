@@ -3178,8 +3178,10 @@ window.APP_CONFIG = Object.freeze({
     const pos = n <= 1 ? 0 : (rank - 1) / (n - 1);
     return pos <= 1 / 3 ? 'good' : pos <= 2 / 3 ? 'warn' : 'bad';
   }
-  // وزن تعداد صدور در رتبه‌بندی (۰٫۵ = تعداد و زمان هم‌وزن)
-  const PERF_W_COUNT = 0.5;
+  // وزن تعداد صدور در رتبه‌بندی (۰٫۷۵ = وزن تعداد ۳ و وزن زمان ۱)
+  const PERF_W_COUNT = 0.75;
+  // اعتماد به زمان با تعداد کم: هر چه K بزرگ‌تر، زمانِ افراد کم‌صدور بیشتر به میانگین گروه نزدیک می‌شود
+  const PERF_TIME_K = 10;
   function perfRows(range, opts) {
     const b = (opts && opts.bounds) || perfBounds(range);
     const rawBy = (opts && opts.raw) || state.rawTargetsByOperator;
@@ -3203,15 +3205,20 @@ window.APP_CONFIG = Object.freeze({
     const withT = active.filter((x) => x.time != null);
     const cRank = competitionRanks(active, 'count', -1);
     const tRank = competitionRanks(withT, 'time', 1);
-    // امتیاز = ۵۰٪ نسبت تعداد به بیشترین تعداد + ۵۰٪ نسبت بهترین (کمترین) زمان به زمان خود فرد (هر دو بین ۰ و ۱؛ بدون زمان = ۰).
-    // برخلاف جمع رتبه‌ها، اندازه‌ی اختلاف هم اثر دارد: ۲۲ سفارش بیشتر با ۲ دقیقه زمان بیشتر پایین نمی‌افتد.
+    // امتیاز = ۷۵٪ (تعداد ÷ بیشترین تعداد) + ۲۵٪ (بهترین زمانِ تعدیل‌شده ÷ زمانِ تعدیل‌شده‌ی فرد)؛ بدون زمان = بخش زمان ۰.
+    // زمانِ تعدیل‌شده: میانگین زمان با «میانگین گروه» به‌اندازه‌ی PERF_TIME_K سفارش‌ِ فرضی ترکیب می‌شود
+    // (t·c + K·میانگین گروه) ÷ (c + K) تا زمان خوبِ حاصل از چند سفارش معدود، رتبه را بالا نبرد.
     const maxC = Math.max(1, ...active.map((x) => x.count));
-    const minT = withT.length ? Math.max(0.1, Math.min(...withT.map((x) => x.time))) : null;
+    let gw = 0, gc = 0;
+    withT.forEach((x) => { gw += x.time * x.count; gc += x.count; });
+    const groupT = gc > 0 ? gw / gc : 0;
+    withT.forEach((x) => { x.tAdj = Math.max(0.1, (x.time * x.count + PERF_TIME_K * groupT) / (x.count + PERF_TIME_K)); });
+    const minT = withT.length ? Math.min(...withT.map((x) => x.tAdj)) : null;
     active.forEach((x) => {
       x.cRank = cRank.get(x);
       x.tRank = x.time != null ? tRank.get(x) : null;
       const cs = x.count / maxC;
-      const ts = x.time != null ? minT / Math.max(0.1, x.time) : 0;
+      const ts = x.time != null ? minT / x.tAdj : 0;
       x.score = Math.round((PERF_W_COUNT * cs + (1 - PERF_W_COUNT) * ts) * 1e4) / 1e4;
     });
     active.sort((x, y) => y.score - x.score || y.count - x.count || (x.time ?? 1e9) - (y.time ?? 1e9) || x.name.localeCompare(y.name, 'fa'));
@@ -3243,7 +3250,7 @@ window.APP_CONFIG = Object.freeze({
       </div>
       <div class="perf-legend" aria-hidden="true">
         <span><i class="good"></i>بهتر (تعداد بیشتر / زمان کمتر)</span><span><i class="warn"></i>متوسط</span><span><i class="bad"></i>ضعیف‌تر</span>
-        <span>ترتیب: ۵۰٪ تعداد صدور + ۵۰٪ زمان صدور (هر دو نسبت به بهترین)</span>
+        <span>ترتیب: ۷۵٪ تعداد صدور + ۲۵٪ زمان صدور (زمانِ کم‌صدورها به میانگین گروه نزدیک می‌شود)</span>
       </div>
       <div class="panel perf-wrap">
         ${active.length + idle.length ? `
