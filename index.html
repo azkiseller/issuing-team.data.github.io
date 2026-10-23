@@ -1260,6 +1260,40 @@ table.bug-table { min-width: 640px; }
 .stale-banner svg { width: 20px; height: 20px; flex: none; margin-top: 3px; }
 html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,107,100,.5); }
 
+/* ---------- اسکلت بارگذاری ---------- */
+.sk { position: relative; overflow: hidden; background: var(--surface-tint); border: 1px solid var(--line); }
+.sk::after { content: ""; position: absolute; inset: 0; transform: translateX(100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: sk-wave 1.3s ease-in-out infinite; }
+[data-theme="dark"] .sk::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent); }
+@keyframes sk-wave { to { transform: translateX(-100%); } }
+.sk-card { min-height: 104px; border-radius: var(--radius-lg); }
+.sk-list { display: grid; gap: 6px; }
+.sk-row { height: 52px; width: var(--w, 100%); border-radius: var(--radius); }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; } }
+
+/* ---------- نشانه‌ی تغییر بعد از تازه‌سازی ---------- */
+.chg-up, .chg-down { animation: chg-flash 2.4s ease-out; border-radius: 8px; }
+.chg-up { --chg: var(--good); } .chg-down { --chg: var(--danger); }
+@keyframes chg-flash { 0%, 35% { color: var(--chg); text-shadow: 0 0 14px color-mix(in srgb, var(--chg) 55%, transparent); } }
+.summary-card .chg-up, .summary-card .chg-down { animation-name: chg-flash-card; }
+@keyframes chg-flash-card { 0%, 35% { color: #fff; text-shadow: 0 0 18px #fff, 0 0 4px var(--chg); } }
+.chg-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 999px; font: 800 11px var(--font);
+  white-space: nowrap; font-variant-numeric: tabular-nums; animation: chg-in .35s ease-out, chg-out .6s ease-in 7.4s forwards; }
+.chg-tag.up { color: var(--good); background: var(--good-soft); }
+.chg-tag.down { color: var(--danger); background: var(--danger-soft); }
+.summary-card .chg-tag { position: absolute; bottom: 5px; left: 50%; translate: -50% 0; z-index: 1; color: #fff; padding: 1px 8px; font-size: 10.5px; }
+.summary-card .chg-tag.up { background: rgba(31,169,113,.85); } .summary-card .chg-tag.down { background: rgba(224,69,63,.85); }
+@keyframes chg-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes chg-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .chg-up, .chg-down, .chg-tag { animation: none; } }
+
+/* ---------- نوار هدف امروز در ردیف‌های درخت ---------- */
+.tree-row { position: relative; }
+.goal-bar { position: absolute; inset-inline: 16px; bottom: 5px; height: 3px; border-radius: 3px; background: var(--surface-tint); overflow: hidden; pointer-events: auto; }
+.goal-bar i { position: absolute; inset-block: 0; inset-inline-start: 0; width: var(--p); border-radius: inherit; background: var(--bar); transition: width .6s cubic-bezier(.4,0,.2,1); }
+.goal-bar.good { --bar: var(--good); } .goal-bar.warn { --bar: var(--warn); } .goal-bar.bad { --bar: var(--danger); }
+.tree-row:has(> .goal-bar) { padding-bottom: 17px; }
+
 </style>
 </head>
 <body>
@@ -1677,6 +1711,7 @@ window.APP_CONFIG = Object.freeze({
 
     $('login-screen').hidden = true;
     $('app-screen').hidden = false;
+    showSkeleton(4);
 
     const userId = sessionData.session.user.id;
     const { data: profile, error } = await sb
@@ -1946,8 +1981,55 @@ window.APP_CONFIG = Object.freeze({
   async function refreshView() {
     const scrollY = window.scrollY;
     window.__revealInstant = true; // موشن ورود در به‌روزرسانی خودکار اجرا نشود
+    const before = snapshotValues();
     try { await refreshViewInner(); } finally { setTimeout(() => { window.__revealInstant = false; }, 0); }
     window.scrollTo(0, scrollY);
+    markChanges(before);
+  }
+
+  // --- اسکلت بارگذاری: شکل کارت‌ها و ردیف‌ها به‌جای متن «در حال بارگذاری»
+  function showSkeleton(cards) {
+    $('summary-row').innerHTML = Array.from({ length: cards }, () => '<div class="sk sk-card" aria-hidden="true"></div>').join('');
+    $('content-area').innerHTML = `<div class="sk-list" role="status" aria-label="در حال بارگذاری">${
+      Array.from({ length: 6 }, (_, i) => `<div class="sk sk-row" style="--w:${88 - i * 7}%"></div>`).join('')}</div>`;
+  }
+
+  // --- نشانه‌ی تغییر در تازه‌سازی خودکار: عددی که عوض شده لحظه‌ای سبز/قرمز می‌شود و فلش ↑↓ می‌گیرد
+  const numOf = (el) => {
+    const t = String(el && el.textContent || '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[^\d.-]/g, '');
+    return t === '' ? null : Number(t);
+  };
+  function changeTargets() {
+    const out = [];
+    document.querySelectorAll('#summary-row .summary-card').forEach((card) => {
+      const label = card.querySelector('.label'), value = card.querySelector('.value:not(.date)');
+      if (label && value) out.push({ key: 'c:' + label.textContent.trim(), el: value, host: card });
+    });
+    document.querySelectorAll('#tree-root .tree-row[data-id]').forEach((row) => {
+      const total = row.querySelector('.tree-total:not(.salary)');
+      if (total) out.push({ key: 't:' + row.getAttribute('data-id'), el: total, host: row.querySelector('.tree-total-group') });
+    });
+    return out;
+  }
+  function snapshotValues() {
+    const m = new Map();
+    changeTargets().forEach((t) => m.set(t.key, numOf(t.el)));
+    return m;
+  }
+  function markChanges(before) {
+    changeTargets().forEach((t) => {
+      const prev = before.get(t.key), now = numOf(t.el);
+      if (prev == null || now == null || prev === now) return;
+      const up = now > prev;
+      t.el.classList.add(up ? 'chg-up' : 'chg-down');
+      const tag = document.createElement('span');
+      tag.className = `chg-tag ${up ? 'up' : 'down'}`;
+      const diff = Math.abs(now - prev);
+      tag.textContent = `${up ? '▲' : '▼'} ${diff >= 1e6 ? faDigits((diff / 1e6).toFixed(1).replace(/\.0$/, '')).replace('.', '٫') + ' م' : formatNum(diff)}`;
+      tag.title = 'تغییر از آخرین به‌روزرسانی';
+      t.host.appendChild(tag);
+      setTimeout(() => { t.el.classList.remove('chg-up', 'chg-down'); tag.remove(); }, 8000);
+    });
   }
   async function refreshViewInner() {
     if (state.profile.role === 'operator') {
@@ -3541,7 +3623,7 @@ window.APP_CONFIG = Object.freeze({
 
   async function renderManagerialView(profile, { silent = false } = {}) {
     const content = $('content-area');
-    if (!silent) content.innerHTML = '<div class="loading">در حال بارگذاری ساختار تیم...</div>';
+    if (!silent && !content.querySelector('.sk')) showSkeleton(4);
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes] = await Promise.all([
@@ -3869,19 +3951,23 @@ window.APP_CONFIG = Object.freeze({
 
   // جمع عملکرد، حقوق و تعداد فعال برای هر زیردرخت (یک‌بار محاسبه)
   function computeAggregates() {
-    const tot = {}, sal = {}, act = {}, tw = {}, tc = {};
+    const tot = {}, sal = {}, act = {}, tw = {}, tc = {}, td = {}, gn = {};
     const visiting = new Set();
     function walk(id) {
       if (tot[id] !== undefined) return;
-      if (visiting.has(id)) { tot[id] = 0; sal[id] = 0; act[id] = 0; tw[id] = 0; tc[id] = 0; return; } // محافظ حلقه
+      if (visiting.has(id)) { tot[id] = 0; sal[id] = 0; act[id] = 0; tw[id] = 0; tc[id] = 0; td[id] = 0; gn[id] = 0; return; } // محافظ حلقه
       visiting.add(id);
       const own = state.targetsByOperator[id];
       let t = own ? own.total : 0;
       let s = own ? own.totalSalary : 0;
       let a = isFullyActive(state.statusByOperator[id]) ? 1 : 0;
       let w = own ? own.timeW : 0, c = own ? own.timeC : 0;
-      (state.childrenOf[id] || []).forEach((cid) => { walk(cid); t += tot[cid]; s += sal[cid]; a += act[cid]; w += tw[cid]; c += tc[cid]; });
-      tot[id] = t; sal[id] = s; act[id] = a; tw[id] = w; tc[id] = c;
+      // هدف امروز: هر اپراتوری که فعال است یا امروز صدور داشته، DAY_GOAL صدور
+      const p = state.profileById[id];
+      let d = own ? own.todayCount : 0;
+      let g = (p && p.role === 'operator' && !(state.childrenOf[id] || []).length && (a || d > 0)) ? 1 : 0;
+      (state.childrenOf[id] || []).forEach((cid) => { walk(cid); t += tot[cid]; s += sal[cid]; a += act[cid]; w += tw[cid]; c += tc[cid]; d += td[cid]; g += gn[cid]; });
+      tot[id] = t; sal[id] = s; act[id] = a; tw[id] = w; tc[id] = c; td[id] = d; gn[id] = g;
       visiting.delete(id);
     }
     Object.keys(state.profileById).forEach(walk);
@@ -3889,6 +3975,8 @@ window.APP_CONFIG = Object.freeze({
     state.subtreeTotal = tot;
     state.subtreeSalary = sal;
     state.activeCountBySubtree = act;
+    state.subtreeToday = td;
+    state.subtreeGoalN = gn;
     state.subtreeTime = {};
     Object.keys(tw).forEach((id) => { state.subtreeTime[id] = tc[id] ? tw[id] / tc[id] : null; });
   }
@@ -3963,6 +4051,16 @@ window.APP_CONFIG = Object.freeze({
     return String(c || '').replace(/[\u200c\u200f]/g, ' ').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
   }
 
+  // نوار باریک «صدور امروز / هدف امروز» پایین هر ردیف درخت
+  function goalBarHtml(id) {
+    const n = state.subtreeGoalN && state.subtreeGoalN[id];
+    if (!n) return '';
+    const done = state.subtreeToday[id] || 0, goal = n * DAY_GOAL;
+    const pct = Math.round(done / goal * 100);
+    const cls = pct >= 100 ? 'good' : pct >= 50 ? 'warn' : 'bad';
+    return `<span class="goal-bar ${cls}" style="--p:${Math.min(100, pct)}%" title="صدور امروز: ${formatNum(done)} از هدف ${formatNum(goal)} (${formatNum(pct)}٪)"><i></i></span>`;
+  }
+
   function buildNodeHtml(id, idx, opts) {
     const p = state.profileById[id];
     const kids = state.childrenOf[id] || [];
@@ -4008,6 +4106,7 @@ window.APP_CONFIG = Object.freeze({
             <span class="tree-total">${totalLabel}</span>
             <span class="tree-total salary">${salaryLabel}</span>
           </div>
+          ${goalBarHtml(id)}
         </div>
         <div class="${isLeaf ? 'leaf-detail' : 'tree-children'}"><div class="${isLeaf ? 'leaf-detail-inner' : 'tree-children-inner'}"></div></div>
       </div>
