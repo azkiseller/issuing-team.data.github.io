@@ -1273,6 +1273,12 @@ td.bug-order { direction: ltr; text-align: center; font-variant-numeric: tabular
 table.bug-table td, table.bug-table th { vertical-align: top; }
 table.bug-table { min-width: 640px; }
 .bug-sub { margin: 18px 0 10px; font-size: 14px; font-weight: 800; color: var(--ink); }
+/* هشدار داده‌ی قدیمی */
+.stale-banner { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 16px; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--danger-soft); border: 1px solid rgba(224,69,63,.45); color: #A3241F; font-size: 13.5px; font-weight: 700; line-height: 1.8; }
+.stale-banner svg { width: 20px; height: 20px; flex: none; margin-top: 3px; }
+html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,107,100,.5); }
+
 </style>
 </head>
 <body>
@@ -2029,7 +2035,48 @@ window.APP_CONFIG = Object.freeze({
     note.textContent = (data && data.last_synced_at)
       ? `آخرین به‌روزرسانی: ${new Date(data.last_synced_at).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}`
       : '';
+    state.syncAt = (data && data.last_synced_at) || null;
+    renderStaleBanner();
     return (data && data.last_synced_at) || null;
+  }
+
+  // --- هشدار داده‌ی قدیمی: اگر ورک‌فلو مدتی چیزی ننوشته، کاربر بداند عددها تازه نیستند
+  const STALE_SYNC_MS = 4 * 60 * 60 * 1000;   // تارگت‌ها هر ۲ ساعت؛ ۴ ساعت = دست‌کم یک اجرای جاافتاده
+  const STALE_STATUS_MS = 60 * 60 * 1000;     // وضعیت فعال هر ۱۵ دقیقه؛ ۱ ساعت = چند اجرای جاافتاده
+  function agoLabel(ms) {
+    const h = Math.floor(ms / 3600000);
+    if (h >= 48) return `${formatNum(Math.floor(h / 24))} روز`;
+    if (h >= 1) return `${formatNum(h)} ساعت`;
+    return `${formatNum(Math.max(1, Math.floor(ms / 60000)))} دقیقه`;
+  }
+  function renderStaleBanner() {
+    const now = Date.now();
+    const lines = [];
+    if (state.syncAt) {
+      const age = now - new Date(state.syncAt).getTime();
+      if (age > STALE_SYNC_MS) lines.push(`آمار صدور و حقوق ${agoLabel(age)} است که به‌روز نشده؛ عددها ممکن است قدیمی باشند.`);
+    }
+    if (state.statusAt) {
+      const age = now - new Date(state.statusAt).getTime();
+      if (age > STALE_STATUS_MS) lines.push(`وضعیت فعال/غیرفعال ${agoLabel(age)} است که به‌روز نشده.`);
+    }
+    let el = $('stale-banner');
+    if (!lines.length) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'stale-banner';
+      el.className = 'stale-banner';
+      el.setAttribute('role', 'status');
+      const main = document.querySelector('main');
+      main.insertBefore(el, main.firstChild);
+    }
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></svg><div>${lines.map((l) => `<div>${esc(l)}</div>`).join('')}</div>`;
+  }
+  // زمان آخرین به‌روزرسانی وضعیت فعال = تازه‌ترین updated_at
+  function noteStatusAt(rows) {
+    const ts = (rows || []).map((r) => r && r.updated_at).filter(Boolean).sort().pop();
+    state.statusAt = ts || null;
+    renderStaleBanner();
   }
 
   // --- تازه‌سازی خودکار: هر ۲ دقیقه (و وقتی تب دوباره فعال می‌شود) اگر ورک‌فلو داده‌ی تازه نوشته باشد،
@@ -2121,6 +2168,7 @@ window.APP_CONFIG = Object.freeze({
 
     if (statusError) console.error('issuer_active_status query failed', statusError);
     renderOperatorStatusBadges(ownStatus);
+    noteStatusAt([ownStatus]);
     const content = $('content-area');
 
     if (error) {
@@ -3342,6 +3390,18 @@ window.APP_CONFIG = Object.freeze({
       label: `${PERSIAN_MONTHS[m - 1]} ماه`, // ماه پایان دوره‌ی قبل
     };
   }
+  // همه‌ی ردیف‌های یک کوئری، صفحه‌های ۱۰۰۰تایی (سقف هر درخواست در API). build باید ترتیب ثابت داشته باشد.
+  // خروجی مثل خود supabase-js: { data, error }
+  async function fetchAllRows(build, pageSize = 1000) {
+    const out = [];
+    for (let off = 0; off < 200000; off += pageSize) {
+      const { data, error } = await build(sb).range(off, off + pageSize - 1);
+      if (error) return { data: out.length ? out : null, error };
+      out.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+    }
+    return { data: out, error: null };
+  }
   async function fetchPeriodTargets(from, to) {
     const out = [];
     const PAGE = 1000;
@@ -3643,12 +3703,13 @@ window.APP_CONFIG = Object.freeze({
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes] = await Promise.all([
       sb.from('profiles').select('id, full_name, role, reports_to, unit'),
-      sb.from('daily_targets')
+      // صفحه‌به‌صفحه: API هر درخواست را به ۱۰۰۰ ردیف محدود می‌کند و یک دوره برای همه‌ی زیرمجموعه بیشتر از این است
+      fetchAllRows((q) => q.from('daily_targets')
         .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes')
         .gte('report_date_sort', CURRENT_PERIOD.startSort)
         .lte('report_date_sort', CURRENT_PERIOD.endSort)
         .order('report_date_sort', { ascending: false })
-        .limit(10000),
+        .order('operator_id', { ascending: true })),
       sb.from('issuer_active_status').select('operator_id, is_active, is_active_to_issue, status, companies, all_companies, updated_at'),
       // آمار شرکت‌ها: RLS خودش تعیین می‌کنه چه شرکت‌هایی دیده بشه
       sb.from('company_active_status').select('company, active_count').order('active_count', { ascending: false }),
@@ -3756,6 +3817,7 @@ window.APP_CONFIG = Object.freeze({
 
     // --- وضعیت فعال/غیرفعال
     state.statusByOperator = {};
+    noteStatusAt(statusRes.data);
     (statusRes.data || []).forEach((r) => { if (!bot || r.operator_id !== bot.id) state.statusByOperator[r.operator_id] = r; });
 
     // --- عملکرد و حقوق
