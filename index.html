@@ -1714,16 +1714,28 @@ window.APP_CONFIG = Object.freeze({
     showSkeleton(4);
 
     const userId = sessionData.session.user.id;
-    const { data: profile, error } = await sb
-      .from('profiles')
-      .select('id, full_name, role, reports_to, unit')
-      .eq('id', userId)
-      .maybeSingle();
+    // قطعی لحظه‌ای شبکه (مثلاً عوض شدن VPN) جواب بدون کد می‌دهد؛ چند بار با فاصله دوباره امتحان می‌شود
+    let profile = null, error = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      ({ data: profile, error } = await sb
+        .from('profiles')
+        .select('id, full_name, role, reports_to, unit')
+        .eq('id', userId)
+        .maybeSingle());
+      if (!error || error.code) break;
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+    }
 
     if (error) {
       // متن کامل خطا فقط در Console؛ به کاربر فقط کد خطا نشون داده می‌شه تا عیب‌یابی ممکن باشه
       console.error('profiles query failed', error);
-      $('content-area').innerHTML = `<div class="empty-state">خواندن پروفایل از سرور ناموفق بود. (کد خطا: ${esc(error.code || error.status || 'نامشخص')})</div>`;
+      $('summary-row').innerHTML = '';
+      $('content-area').innerHTML = error.code
+        ? `<div class="empty-state">خواندن پروفایل از سرور ناموفق بود. (کد خطا: ${esc(error.code || error.status)})</div>`
+        : `<div class="empty-state">اتصال به سرور برقرار نشد. اینترنت یا VPN را بررسی کنید و دوباره تلاش کنید.
+            <div><button type="button" class="df-reset" id="retry-boot" style="margin-top:14px">تلاش دوباره</button></div></div>`;
+      const retry = $('retry-boot');
+      if (retry) retry.addEventListener('click', () => location.reload());
       return;
     }
     if (!profile) {
