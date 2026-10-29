@@ -660,7 +660,8 @@ html[data-theme="dark"] .trend-tip { background: #EAF0FB; color: #0F1B33; }
 .bot-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .bot-more { margin-inline-start: auto; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
 .bot-chevron { display: inline-block; font-size: 12px; transition: transform .2s; }
-.bot-panel:not(.open) .bot-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bot-panel:not(.open) .bot-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 560px) { .bot-panel:not(.open) .bot-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .bot-panel:not(.open) .bot-stat .label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bot-panel:not(.open) .bot-stat .label .unit { display: none; }
 @media (max-width: 560px) { .bot-panel:not(.open) .bot-stat .label .long { display: none; } }
@@ -1293,6 +1294,17 @@ html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,1
 .goal-bar i { position: absolute; inset-block: 0; inset-inline-start: 0; width: var(--p); border-radius: inherit; background: var(--bar); transition: width .6s cubic-bezier(.4,0,.2,1); }
 .goal-bar.good { --bar: var(--good); } .goal-bar.warn { --bar: var(--warn); } .goal-bar.bad { --bar: var(--danger); }
 .tree-row:has(> .goal-bar) { padding-bottom: 17px; }
+
+/* ---------- بات به تفکیک شرکت ---------- */
+.panel.bot-co { margin-top: 14px; padding: 16px 18px; }
+.bot-co-list li b small { font-weight: 600; color: var(--ink-faint); font-size: 11px; }
+.bot-co-list { margin-bottom: 14px; }
+.bot-co-list li { grid-template-columns: minmax(84px, 140px) minmax(0, 1fr) 112px; }
+.bot-co-table-wrap { overflow-x: auto; }
+table.bot-co-table { table-layout: auto; min-width: 420px; }
+table.bot-co-table th, table.bot-co-table td { padding: 6px 10px; white-space: nowrap; }
+table.bot-co-table th.num, table.bot-co-table td.num { width: auto; }
+table.bot-co-table .muted { color: var(--ink-faint); }
 
 </style>
 </head>
@@ -2989,8 +3001,12 @@ window.APP_CONFIG = Object.freeze({
   }
 
   // پنل بات: صدور دوره، صدور امروز، حقوقی که صرفه‌جویی شده، و نمودار روزانه (روزهای بی‌کار = ۰)
-  function renderBotPanel(rows) {
+  function renderBotPanel(rows, companyRows = []) {
     const total = rows.reduce((s, r) => s + (Number(r.target_count) || 0), 0);
+    // میانگین وزنی زمان صدور (وزن = تعداد صدور هر روز)
+    const timed = rows.filter((r) => r.avg_issuance_minutes != null && Number(r.target_count) > 0);
+    const tc = timed.reduce((s, r) => s + Number(r.target_count), 0);
+    const avgTime = tc ? timed.reduce((s, r) => s + Number(r.avg_issuance_minutes) * Number(r.target_count), 0) / tc : null;
     const saved = rows.reduce((s, r) => s + (Number(r.daily_salary) || 0), 0);
     const today = rows
       .filter((r) => Number(r.report_date_sort) === TODAY_SORT)
@@ -3006,14 +3022,58 @@ window.APP_CONFIG = Object.freeze({
           <div class="bot-stats">
             <div class="bot-stat"><div class="label">صدور ${esc(CURRENT_PERIOD.label)}</div><div class="value">${formatNum(total)}</div></div>
             <div class="bot-stat"><div class="label">صدور امروز</div><div class="value">${formatNum(today)}</div></div>
+            <div class="bot-stat"><div class="label">میانگین زمان صدور</div><div class="value">${avgTime == null ? '—' : `${formatNum(Math.round(avgTime * 10) / 10)} <small>دقیقه</small>`}</div></div>
             <div class="bot-stat saved"><div class="label">صرفه‌جویی<span class="long"> در حقوق</span> <span class="unit">(ریال)</span></div><div class="value">${formatNum(saved)}</div></div>
           </div>
         </div>
         <div class="bot-drawer" id="bot-drawer"><div class="bot-drawer-inner">
           ${renderDailyTrendChart(dailySeries(rows), 'bot', `صدور روزانه‌ی بات در ${CURRENT_PERIOD.label}`)}
+          ${renderBotCompanies(companyRows, rows)}
         </div></div>
       </section>
     `;
+  }
+  // بات به تفکیک شرکت: سهم هر شرکت در دوره + جدول روزانه (روز × شرکت)
+  function renderBotCompanies(companyRows, rows) {
+    if (!companyRows.length) return '';
+    const byCo = {}, byDay = {};
+    companyRows.forEach((r) => {
+      const co = (r.company || '').trim(), n = Number(r.issue_count) || 0, d = String(r.report_date_sort);
+      if (!co || !n) return;
+      byCo[co] = (byCo[co] || 0) + n;
+      (byDay[d] = byDay[d] || {})[co] = (byDay[d][co] || 0) + n;
+    });
+    const cos = Object.entries(byCo).sort((a, b) => b[1] - a[1]);
+    if (!cos.length) return '';
+    const total = cos.reduce((s, [, n]) => s + n, 0);
+    const max = cos[0][1];
+    const timeByDay = {};
+    rows.forEach((r) => { if (r.avg_issuance_minutes != null) timeByDay[String(r.report_date_sort)] = Number(r.avg_issuance_minutes); });
+    const days = Object.keys(byDay).sort((a, b) => b - a);
+    const dayLabel = (d) => faDigits(`${d.slice(4, 6)}/${d.slice(6, 8)}`);
+    return `
+      <section class="panel bot-co" aria-label="صدور بات به تفکیک شرکت">
+        <div class="ctc-head"><h3>صدور بات به تفکیک شرکت</h3><span>${esc(CURRENT_PERIOD.label)}</span></div>
+        <ul class="ctc-list bot-co-list">
+          ${cos.map(([co, n]) => `
+            <li>
+              <span class="ctc-name">${esc(co)}</span>
+              <span class="ctc-track"><i style="width:${Math.max(4, Math.round((n / max) * 100))}%"></i></span>
+              <b>${formatNum(n)} <small>(${formatNum(Math.round((n / total) * 100))}٪)</small></b>
+            </li>`).join('')}
+        </ul>
+        <div class="bot-co-table-wrap">
+          <table class="rows bot-co-table">
+            <thead><tr><th>روز</th>${cos.map(([co]) => `<th class="num">${esc(co)}</th>`).join('')}<th class="num">جمع</th><th class="num">زمان صدور</th></tr></thead>
+            <tbody>
+              ${days.map((d) => {
+                const m = byDay[d]; const sum = Object.values(m).reduce((s, n) => s + n, 0);
+                return `<tr><td class="date">${dayLabel(d)}</td>${cos.map(([co]) => `<td class="num">${m[co] ? formatNum(m[co]) : '<span class="muted">—</span>'}</td>`).join('')}<td class="num"><b>${formatNum(sum)}</b></td><td class="num">${timeByDay[d] == null ? '—' : `${formatNum(Math.round(timeByDay[d] * 10) / 10)}′`}</td></tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>`;
   }
   function bindBotPanel() {
     const t = $('bot-toggle');
@@ -3680,6 +3740,12 @@ window.APP_CONFIG = Object.freeze({
     // --- بات جدا می‌شه: نه در درخت، نه در جمع‌ها و تعداد نفرات
     const bot = (profilesRes.data || []).find((p) => (p.full_name || '').trim() === BOT_NAME) || null;
     const botRows = bot ? (targetsRes.data || []).filter((r) => r.operator_id === bot.id) : [];
+    // تفکیک شرکتی بات (چند ردیف «بات صدور خودکار | شرکت» در ورک‌فلو روی همین یک پروفایل جمع می‌شوند)
+    const botCompanyRows = bot
+      ? ((await sb.from('daily_company_targets').select('report_date_sort, company, issue_count')
+          .eq('operator_id', bot.id).gte('report_date_sort', CURRENT_PERIOD.startSort).lte('report_date_sort', CURRENT_PERIOD.endSort)
+          .limit(2000)).data || [])
+      : [];
 
     // --- ساختار درخت
     state.visibleProfiles = (profilesRes.data || []).filter((p) => !bot || p.id !== bot.id);
@@ -3823,7 +3889,7 @@ window.APP_CONFIG = Object.freeze({
       </div>` : '') + (showKpiTab && !state.sidebar ? renderViewTabs() : '') + `
       <div id="tab-team" ${showKpiTab && !state.sidebar && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
-      ${bot ? `<div data-page="overview">${renderBotPanel(botRows)}</div>` : ''}
+      ${bot ? `<div data-page="overview">${renderBotPanel(botRows, botCompanyRows)}</div>` : ''}
       ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
       ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
