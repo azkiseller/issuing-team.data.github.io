@@ -1295,16 +1295,31 @@ html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,1
 .goal-bar.good { --bar: var(--good); } .goal-bar.warn { --bar: var(--warn); } .goal-bar.bad { --bar: var(--danger); }
 .tree-row:has(> .goal-bar) { padding-bottom: 17px; }
 
-/* ---------- بات به تفکیک شرکت ---------- */
-.panel.bot-co { margin-top: 14px; padding: 16px 18px; }
-.bot-co-list li b small { font-weight: 600; color: var(--ink-faint); font-size: 11px; }
-.bot-co-list { margin-bottom: 14px; }
-.bot-co-list li { grid-template-columns: minmax(84px, 140px) minmax(0, 1fr) 112px; }
-.bot-co-table-wrap { overflow-x: auto; }
-table.bot-co-table { table-layout: auto; min-width: 420px; }
-table.bot-co-table th, table.bot-co-table td { padding: 6px 10px; white-space: nowrap; }
-table.bot-co-table th.num, table.bot-co-table td.num { width: auto; }
-table.bot-co-table .muted { color: var(--ink-faint); }
+/* ---------- بات: نمودار ستونی انباشته به تفکیک شرکت ---------- */
+.bs-plot { position: relative; height: 200px; display: flex; align-items: flex-end; gap: 4px; direction: ltr; padding-top: 18px; outline: none; }
+.bs-plot:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 8px; }
+.bs-col { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; position: relative; cursor: pointer; }
+.bs-bar { display: flex; flex-direction: column-reverse; border-radius: 6px 6px 2px 2px; overflow: hidden; min-height: 0; transition: filter .15s, transform .15s; }
+.bs-bar i { display: block; min-height: 1px; }
+.bs-total { position: absolute; left: 50%; transform: translateX(-50%); font-size: 10.5px; font-weight: 800; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bs-col .bs-total { bottom: calc(var(--h, 0%) + 2px); }
+.bs-col.active .bs-bar { filter: brightness(1.08); transform: scaleX(1.08); }
+.bs-col.active .bs-total { color: var(--ink); }
+.bs-tip { position: absolute; top: 0; z-index: 3; transform: translate(-50%, 0); min-width: 170px; padding: 10px 12px; border-radius: 12px; background: #0F1B33; color: #fff;
+  box-shadow: 0 10px 28px -10px rgba(0,0,0,.45); direction: rtl; font-size: 12px; pointer-events: none; }
+html[data-theme="dark"] .bs-tip { background: #EAF0FB; color: #0F1B33; }
+.bs-tip.edge-left { transform: translate(0, 0); }
+.bs-tip.edge-right { transform: translate(-100%, 0); }
+.bs-tip > b { display: block; font-size: 12.5px; margin-bottom: 6px; }
+.bs-tip ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.bs-tip li { display: flex; align-items: center; gap: 6px; }
+.bs-tip li b { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.bs-tip i, .bs-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.bs-tip .bs-time { display: flex; align-items: center; gap: 4px; margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.18); opacity: .85; font-size: 11px; }
+.bs-tip .bs-time .clk { width: 12px; height: 12px; }
+.bs-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; margin-top: 12px; font-size: 12px; color: var(--ink-soft); }
+.bs-legend span { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 560px) { .bs-plot { gap: 2px; } .bs-total { font-size: 8.5px; } }
 
 </style>
 </head>
@@ -3027,53 +3042,96 @@ window.APP_CONFIG = Object.freeze({
           </div>
         </div>
         <div class="bot-drawer" id="bot-drawer"><div class="bot-drawer-inner">
-          ${renderDailyTrendChart(dailySeries(rows), 'bot', `صدور روزانه‌ی بات در ${CURRENT_PERIOD.label}`)}
-          ${renderBotCompanies(companyRows, rows)}
+          ${renderBotStackChart(rows, companyRows)}
         </div></div>
       </section>
     `;
   }
-  // بات به تفکیک شرکت: سهم هر شرکت در دوره + جدول روزانه (روز × شرکت)
-  function renderBotCompanies(companyRows, rows) {
-    if (!companyRows.length) return '';
-    const byCo = {}, byDay = {};
-    companyRows.forEach((r) => {
-      const co = (r.company || '').trim(), n = Number(r.issue_count) || 0, d = String(r.report_date_sort);
+  // نمودار ستونی انباشته‌ی بات: هر روز یک ستون (جمع روی ستون)، رنگ‌ها = شرکت‌ها؛ با نگه داشتن ماوس تفکیک شرکتی آن روز
+  const BOT_CO_COLORS = ['#7C5CE0', '#17A9FF', '#1FA971', '#E08A17', '#E0453F', '#0FB5AE', '#C2449F', '#5B6B8A'];
+  function botStackData(rows, companyRows) {
+    const byDay = {}, coTotal = {};
+    (companyRows || []).forEach((r) => {
+      const co = (r.company || '').trim(), n = Number(r.issue_count) || 0, d = Number(r.report_date_sort);
       if (!co || !n) return;
-      byCo[co] = (byCo[co] || 0) + n;
       (byDay[d] = byDay[d] || {})[co] = (byDay[d][co] || 0) + n;
+      coTotal[co] = (coTotal[co] || 0) + n;
     });
-    const cos = Object.entries(byCo).sort((a, b) => b[1] - a[1]);
-    if (!cos.length) return '';
-    const total = cos.reduce((s, [, n]) => s + n, 0);
-    const max = cos[0][1];
-    const timeByDay = {};
-    rows.forEach((r) => { if (r.avg_issuance_minutes != null) timeByDay[String(r.report_date_sort)] = Number(r.avg_issuance_minutes); });
-    const days = Object.keys(byDay).sort((a, b) => b - a);
-    const dayLabel = (d) => faDigits(`${d.slice(4, 6)}/${d.slice(6, 8)}`);
+    const cos = Object.keys(coTotal).sort((a, b) => coTotal[b] - coTotal[a]);
+    const color = {}; cos.forEach((c, k) => { color[c] = BOT_CO_COLORS[k % BOT_CO_COLORS.length]; });
+    const timeBy = {};
+    (rows || []).forEach((r) => { if (r.avg_issuance_minutes != null) timeBy[Number(r.report_date_sort)] = Number(r.avg_issuance_minutes); });
+    const days = dailySeries(rows).map((d) => {
+      const sort = Number(d.report_date_sort), parts = byDay[sort] || {};
+      const split = cos.filter((c) => parts[c]).map((c) => ({ co: c, n: parts[c] }));
+      const splitSum = split.reduce((a, x) => a + x.n, 0);
+      const total = Math.max(Number(d.target_count) || 0, splitSum);
+      if (total > splitSum) split.push({ co: 'نامشخص', n: total - splitSum });
+      return { sort, jalali: d.report_date_jalali, total, split, time: timeBy[sort] };
+    });
+    color['نامشخص'] = '#B8C2D6';
+    return { days, cos, color };
+  }
+  function renderBotStackChart(rows, companyRows) {
+    const { days, cos, color } = botStackData(rows, companyRows);
+    if (days.length < 1) return '';
+    const max = Math.max(...days.map((d) => d.total), 1);
     return `
-      <section class="panel bot-co" aria-label="صدور بات به تفکیک شرکت">
-        <div class="ctc-head"><h3>صدور بات به تفکیک شرکت</h3><span>${esc(CURRENT_PERIOD.label)}</span></div>
-        <ul class="ctc-list bot-co-list">
-          ${cos.map(([co, n]) => `
-            <li>
-              <span class="ctc-name">${esc(co)}</span>
-              <span class="ctc-track"><i style="width:${Math.max(4, Math.round((n / max) * 100))}%"></i></span>
-              <b>${formatNum(n)} <small>(${formatNum(Math.round((n / total) * 100))}٪)</small></b>
-            </li>`).join('')}
-        </ul>
-        <div class="bot-co-table-wrap">
-          <table class="rows bot-co-table">
-            <thead><tr><th>روز</th>${cos.map(([co]) => `<th class="num">${esc(co)}</th>`).join('')}<th class="num">جمع</th><th class="num">زمان صدور</th></tr></thead>
-            <tbody>
-              ${days.map((d) => {
-                const m = byDay[d]; const sum = Object.values(m).reduce((s, n) => s + n, 0);
-                return `<tr><td class="date">${dayLabel(d)}</td>${cos.map(([co]) => `<td class="num">${m[co] ? formatNum(m[co]) : '<span class="muted">—</span>'}</td>`).join('')}<td class="num"><b>${formatNum(sum)}</b></td><td class="num">${timeByDay[d] == null ? '—' : `${formatNum(Math.round(timeByDay[d] * 10) / 10)}′`}</td></tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+      <div class="panel chart bot-stack">
+        <div class="trend-head">
+          <div class="label">صدور روزانه‌ی بات به تفکیک شرکت در ${esc(CURRENT_PERIOD.label)}</div>
+          <div class="trend-max">بیشترین: ${formatNum(max)}</div>
         </div>
-      </section>`;
+        <div class="bs-plot" id="bot-stack-plot" tabindex="0" role="img" aria-label="نمودار صدور روزانه‌ی بات؛ با کلیدهای جهت‌نما بین روزها جابه‌جا شوید">
+          ${days.map((d, i) => `
+            <div class="bs-col" data-i="${i}" style="--h:${((d.total / max) * 100).toFixed(2)}%">
+              <span class="bs-total">${d.total ? formatNum(d.total) : ''}</span>
+              <div class="bs-bar" style="height:var(--h)">
+                ${d.split.map((x) => `<i style="flex:${x.n};background:${color[x.co]}"></i>`).join('')}
+              </div>
+            </div>`).join('')}
+          <div class="bs-tip" id="bot-stack-tip" hidden></div>
+        </div>
+        <div class="trend-axis"><span>${esc(faDigits(days[0].jalali))}</span><span>${esc(faDigits(days[days.length - 1].jalali))}</span></div>
+        ${cos.length ? `<div class="bs-legend">${cos.map((c) => `<span><i style="background:${color[c]}"></i>${esc(c)}</span>`).join('')}</div>` : ''}
+      </div>`;
+  }
+  function bindBotStackChart(rows, companyRows) {
+    const plot = $('bot-stack-plot');
+    if (!plot) return;
+    const { days, color } = botStackData(rows, companyRows);
+    const tip = $('bot-stack-tip');
+    const cols = plot.querySelectorAll('.bs-col');
+    let current = -1;
+    function show(i) {
+      current = i;
+      const d = days[i];
+      cols.forEach((c, k) => c.classList.toggle('active', k === i));
+      tip.innerHTML = `<b>${esc(faDigits(d.jalali))} · ${formatNum(d.total)} صدور</b>`
+        + (d.split.length ? `<ul>${d.split.map((x) => `<li><i style="background:${color[x.co]}"></i>${esc(x.co)}<b>${formatNum(x.n)}</b></li>`).join('')}</ul>` : '<span>بدون صدور</span>')
+        + (d.time != null ? `<span class="bs-time">${CLOCK_ICON} میانگین زمان صدور: ${formatNum(Math.round(d.time * 10) / 10)} دقیقه</span>` : '');
+      tip.hidden = false;
+      const pr = plot.getBoundingClientRect(), cr = cols[i].getBoundingClientRect();
+      const x = ((cr.left + cr.width / 2 - pr.left) / pr.width) * 100;
+      tip.style.left = `${x}%`;
+      tip.classList.toggle('edge-left', x < 22);
+      tip.classList.toggle('edge-right', x > 78);
+    }
+    function hide() { current = -1; tip.hidden = true; cols.forEach((c) => c.classList.remove('active')); }
+    const indexAt = (clientX) => {
+      let best = 0, dist = Infinity;
+      cols.forEach((c, k) => { const r = c.getBoundingClientRect(); const dd = Math.abs(clientX - (r.left + r.width / 2)); if (dd < dist) { dist = dd; best = k; } });
+      return best;
+    };
+    plot.addEventListener('pointermove', (e) => show(indexAt(e.clientX)));
+    plot.addEventListener('pointerdown', (e) => show(indexAt(e.clientX)));
+    plot.addEventListener('pointerleave', hide);
+    plot.addEventListener('blur', hide);
+    plot.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); show(Math.max((current < 0 ? days.length : current) - 1, 0)); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); show(Math.min(current + 1, days.length - 1)); }
+      else if (e.key === 'Escape') hide();
+    });
   }
   function bindBotPanel() {
     const t = $('bot-toggle');
@@ -3915,7 +3973,7 @@ window.APP_CONFIG = Object.freeze({
     if (state.sidebar) renderPerf();
     if (state.sidebar && profile.role === 'team_lead') loadBugsPage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
-    if (bot) { bindTrendChart(dailySeries(botRows), 'bot'); bindBotPanel(); }
+    if (bot) { bindBotStackChart(botRows, botCompanyRows); bindBotPanel(); }
     bindCompanyGroups();
     if (hasHourly) {
       if (hourlyRes.data.length) bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', { unit: 'کاربر فعال' });
