@@ -1510,6 +1510,16 @@ body.with-sidebar header.topbar {
 }
 .side-link[aria-current="page"]:hover { color: #fff; background: linear-gradient(135deg, var(--accent-deep), var(--accent)); box-shadow: 0 10px 22px -10px rgba(22,86,245,.65), inset 0 1px 0 rgba(255,255,255,.25); }
 
+/* ---------- باگ‌های Training ---------- */
+.tb-type-field { display: grid; gap: 6px; }
+.tb-type-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.au-tabs.tb-types { grid-template-columns: repeat(3, 1fr); max-width: 460px; }
+.tb-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.tb-chip.financial { color: var(--danger); background: var(--danger-soft); }
+.tb-chip.non_financial { color: var(--warn); background: rgba(224,138,23,.16); }
+.tb-chip.effective { color: var(--accent-strong); background: var(--accent-soft); }
+.tb-amount { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
+
 </style>
 </head>
 <body>
@@ -1681,6 +1691,7 @@ window.APP_CONFIG = Object.freeze({
     operator: 'اپراتور',
     team_lead: 'سرگروه',
     supervisor: 'سرپرست',
+    training: 'Training',
     team_pair: 'دو تیم',
   };
   // نودهای مجازی: «تیم X و Y» برای سرگروه‌های پارتنر، و ریشه‌ی درخت برای سرگروهِ دارای پارتنر
@@ -2039,10 +2050,10 @@ window.APP_CONFIG = Object.freeze({
   // roles: کدام نقش‌ها این بخش را دارند (خالی = همه)
   const SIDE_PAGES = [
     { id: 'overview', label: 'نمای کلی' },
-    { id: 'team', label: 'تیم من', notFor: ['operator'] },
+    { id: 'team', label: 'تیم من', notFor: ['operator'], labels: { training: 'کارشناسان' } },
     { id: 'companies', label: 'شرکت‌ها' },
     { id: 'perf', label: 'عملکرد تیم', notFor: ['operator'] },
-    { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator'], labels: { operator: 'باگ‌های من' } },
+    { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator', 'training'], labels: { operator: 'باگ‌های من' } },
     { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
@@ -2051,7 +2062,7 @@ window.APP_CONFIG = Object.freeze({
     .map((p) => (p.labels && p.labels[role] ? Object.assign({}, p, { label: p.labels[role] }) : p));
   const sideIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${name}</svg>`;
   function usesSidebar(profile) {
-    return SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead' || profile.role === 'operator';
+    return SUPERVISOR_ROLES.includes(profile.role) || ['team_lead', 'operator', 'training'].includes(profile.role);
   }
   function initSidebar(profile) {
     state.sidebar = true;
@@ -2099,7 +2110,7 @@ window.APP_CONFIG = Object.freeze({
     pwBtn.setAttribute('aria-label', 'تغییر رمز'); outBtn.setAttribute('aria-label', 'خروج');
     acts.append(pwBtn, outBtn);
     userBox.appendChild(acts);
-    if (['operator', 'team_lead', 'supervisor'].includes(profile.role)) {
+    if (['operator', 'team_lead', 'supervisor', 'training'].includes(profile.role)) {
       // اپراتور، سرگروه و سرپرست: کارت پروفایل پایین منوی کناری (پایین سمت راست صفحه)
       userBox.className = 'side-user';
       aside.appendChild(userBox);
@@ -3807,6 +3818,14 @@ window.APP_CONFIG = Object.freeze({
   async function loadBugsPage() {
     const root = $('bugs-root');
     if (!root || !state.profile) return;
+    if (state.profile.role === 'training') {
+      const res = await fetchTrainingBugs();
+      const el = $('bugs-root');
+      if (!el) return;
+      if (res.error) { console.error('training_bugs query failed', res.error); el.innerHTML = '<div class="panel"><div class="empty-state">خواندن باگ‌ها ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>'; return; }
+      renderBugsTraining(el, res.data);
+      return;
+    }
     const { data, error } = await fetchBugs();
     const live = $('bugs-root');
     if (!live) return;
@@ -4106,12 +4125,15 @@ window.APP_CONFIG = Object.freeze({
   const canManageTeam = (p) => !!p && (p.role === 'team_lead' || (p.role === 'supervisor' && (p.unit || 'seller') === 'seller'));
   async function loadManageData(force) {
     if (state.manage && state.manage.loaded && !force) return;
-    const [opt, un] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators')]);
+    const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
+    const [opt, un, tr] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
+      isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] })]);
     state.manage = Object.assign(state.manage || {}, {
       loaded: !opt.error,
       error: opt.error || un.error || null,
       options: opt.data || [],
       unassigned: un.data || [],
+      training: (tr && tr.data) || [],
     });
     if (opt.error) console.error('team_lead_options failed', opt.error);
     if (un.error) console.error('unassigned_operators failed', un.error);
@@ -4167,7 +4189,8 @@ window.APP_CONFIG = Object.freeze({
           <thead><tr><th>اپراتور</th><th>تیم فعلی</th><th>انتقال به</th><th></th></tr></thead>
           <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
       </div>
-      <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. با حذف، حساب و پروفایل کارشناس پاک می‌شود ولی آمار صدور و حقوقش برای محاسبه‌ی حقوق می‌ماند.</div>`;
+      <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. با حذف، حساب و پروفایل کارشناس پاک می‌شود ولی آمار صدور و حقوقش برای محاسبه‌ی حقوق می‌ماند.</div>
+      ${SUPERVISOR_ROLES.includes(me.role) ? trainingUsersHtml() : ''}`;
     bindManagePage(root2);
   }
   function bindManagePage(root) {
@@ -4205,6 +4228,7 @@ window.APP_CONFIG = Object.freeze({
     });
     const add = $('mg-add');
     if (add) add.addEventListener('click', openAddUsersModal);
+    if (SUPERVISOR_ROLES.includes(state.profile.role)) bindTrainingUsers(root);
     root.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
       const id = b.getAttribute('data-reset');
       openModal({
@@ -4478,6 +4502,242 @@ window.APP_CONFIG = Object.freeze({
     });
   }
 
+  // ---------------------------------------------------------------
+  // باگ‌های Training: بار مالی / بدون بار مالی / مؤثر، با مبلغ (ریال)، شماره سفارش و توضیحات — برای همه‌ی کارشناسان
+  // ---------------------------------------------------------------
+  const TB_TYPES = [
+    { id: 'financial', label: 'بار مالی' },
+    { id: 'non_financial', label: 'بدون بار مالی' },
+    { id: 'effective', label: 'مؤثر' },
+  ];
+  const tbLabel = (t) => (TB_TYPES.find((x) => x.id === t) || { label: t }).label;
+  const digitsOnly = (v) => toEnDigits(v).replace(/[^\d]/g, '');
+  async function fetchTrainingBugs() {
+    const { data, error } = await sb.from('training_bugs')
+      .select('id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, created_at')
+      .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    return { data: data || [], error };
+  }
+  function renderBugsTraining(root, rows) {
+    const me = state.profile;
+    const d = state.tbDraft || (state.tbDraft = { operator: '', day: String(TODAY_SORT), type: 'financial', amount: '', order: '', company: '', desc: '' });
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at && (p.full_name || '').trim() !== BOT_NAME)
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const days = periodDaysUntilToday().slice().reverse();
+    const companies = bugCompanyOptions(me);
+    const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
+    const sel = (v, cur) => (String(v) === String(cur) ? ' selected' : '');
+    const money = (n) => (n == null ? '—' : `${formatNum(n)} ریال`);
+    // خلاصه‌ی دوره به ازای هر کارشناس
+    const by = {};
+    rows.forEach((r) => {
+      const b = (by[r.operator_id] = by[r.operator_id] || { financial: 0, non_financial: 0, effective: 0, amount: 0 });
+      b[r.bug_type] = (b[r.bug_type] || 0) + 1;
+      b.amount += Number(r.amount) || 0;
+    });
+    const summary = Object.keys(by).sort((a, b) => by[b].amount - by[a].amount || nameOf(a).localeCompare(nameOf(b), 'fa')).map((id) => `
+      <tr>
+        <td class="nm">${esc(nameOf(id))}</td>
+        <td class="tm">${esc(teamLabelOf(id))}</td>
+        <td class="num">${by[id].financial ? `<span class="tb-chip financial">${formatNum(by[id].financial)}</span>` : '—'}</td>
+        <td class="num">${by[id].non_financial ? `<span class="tb-chip non_financial">${formatNum(by[id].non_financial)}</span>` : '—'}</td>
+        <td class="num">${by[id].effective ? `<span class="tb-chip effective">${formatNum(by[id].effective)}</span>` : '—'}</td>
+        <td class="num tb-amount">${by[id].amount ? money(by[id].amount) : '—'}</td>
+      </tr>`).join('');
+    const totalAmount = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const recent = rows.slice(0, 80).map((r) => `
+      <tr>
+        <td>${esc(faDigits(r.bug_date_jalali))}</td>
+        <td class="nm">${esc(nameOf(r.operator_id))}</td>
+        <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
+        <td class="num tb-amount">${money(r.amount)}</td>
+        <td class="bug-order">${esc(r.order_number)}</td>
+        <td>${esc(r.company || '—')}</td>
+        <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
+        <td>${r.reported_by === me.id ? `<button type="button" class="bug-del" data-tbdel="${esc(r.id)}">حذف</button>` : ''}</td>
+      </tr>`).join('');
+    const amountShown = d.amount ? formatNum(Number(d.amount)) : '';
+    root.innerHTML = `
+      <div class="panel">
+        <form class="bug-form" id="tb-form" autocomplete="off" novalidate>
+          <label>کارشناس
+            <select class="tree-search" id="tb-operator">
+              <option value="">انتخاب کارشناس...</option>
+              ${ops.map((p) => `<option value="${esc(p.id)}"${sel(p.id, d.operator)}>${esc(p.full_name || '—')} — ${esc(teamLabelOf(p.id))}</option>`).join('')}
+            </select>
+          </label>
+          <label>تاریخ باگ
+            <select class="tree-search" id="tb-day">
+              ${days.map((x) => `<option value="${x.sort}"${sel(x.sort, d.day)}>${esc(faDigits(x.jalali))}${x.sort === TODAY_SORT ? ' (امروز)' : ''}</option>`).join('')}
+            </select>
+          </label>
+          <div class="full tb-type-field"><span class="tb-type-label">نوع باگ</span>
+            <div class="au-tabs tb-types" role="radiogroup" aria-label="نوع باگ">
+              ${TB_TYPES.map((t) => `<button type="button" role="radio" data-tbtype="${t.id}" aria-checked="${t.id === d.type}" aria-selected="${t.id === d.type}">${t.label}</button>`).join('')}
+            </div>
+          </div>
+          <label>مبلغ (ریال) <span class="opt" id="tb-amount-opt">${d.type === 'financial' ? '(الزامی)' : '(اختیاری)'}</span>
+            <input class="tree-search" id="tb-amount" type="text" inputmode="numeric" dir="ltr" maxlength="20" placeholder="مثلاً ۲,۵۰۰,۰۰۰" value="${esc(amountShown)}">
+          </label>
+          <label>شماره سفارش
+            <input class="tree-search" id="tb-order" type="text" inputmode="numeric" maxlength="40" dir="ltr" placeholder="مثلاً 123456" value="${esc(d.order)}">
+          </label>
+          <label>شرکت <span class="opt">(اختیاری)</span>
+            <input class="tree-search" id="tb-company" type="text" list="tb-companies" maxlength="80" placeholder="نام شرکت" value="${esc(d.company)}">
+            <datalist id="tb-companies">${companies.map((c) => `<option value="${esc(c)}"></option>`).join('')}</datalist>
+          </label>
+          <label class="full">توضیحات
+            <textarea class="tree-search" id="tb-desc" maxlength="1000" placeholder="شرح باگ و دلیل آن">${esc(d.desc)}</textarea>
+          </label>
+          <div class="full bug-actions">
+            <button type="submit" class="bug-submit" id="tb-submit">ثبت باگ</button>
+            <span class="bug-msg" id="tb-msg" role="status" aria-live="polite">${state.tbMsg ? esc(state.tbMsg.text) : ''}</span>
+          </div>
+        </form>
+      </div>
+      <div class="bug-sub">خلاصه‌ی ${esc(CURRENT_PERIOD.label)} <span class="mg-count">${formatNum(rows.length)} باگ · جمع مبلغ ${money(totalAmount)}</span></div>
+      <div class="panel perf-wrap">
+        ${summary ? `<table class="perf-table">
+          <thead><tr><th>کارشناس</th><th>تیم</th><th class="num">بار مالی</th><th class="num">بدون بار مالی</th><th class="num">مؤثر</th><th class="num">جمع مبلغ</th></tr></thead>
+          <tbody>${summary}</tbody></table>` : '<div class="empty-state">در این دوره هنوز باگی ثبت نشده است</div>'}
+      </div>
+      <div class="bug-sub">آخرین باگ‌های ثبت‌شده</div>
+      <div class="panel perf-wrap">
+        ${recent ? `<table class="perf-table bug-table">
+          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th></th></tr></thead>
+          <tbody>${recent}</tbody></table>` : '<div class="empty-state">—</div>'}
+      </div>`;
+    bindBugsTraining(root);
+  }
+  function bindBugsTraining(root) {
+    const d = state.tbDraft;
+    const setMsg = (text, kind) => { const m = $('tb-msg'); if (m) { m.textContent = text; m.className = 'bug-msg ' + (kind || ''); } state.tbMsg = text ? { text, kind } : null; };
+    const map = { 'tb-operator': 'operator', 'tb-day': 'day', 'tb-order': 'order', 'tb-company': 'company', 'tb-desc': 'desc' };
+    Object.keys(map).forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      const sync = () => { d[map[id]] = el.value; if (state.tbMsg && state.tbMsg.kind === 'ok') setMsg('', ''); };
+      el.addEventListener('input', sync);
+      el.addEventListener('change', sync);
+    });
+    // مبلغ: فقط رقم، با جداکننده‌ی هزارگان هنگام تایپ
+    const amt = $('tb-amount');
+    amt.addEventListener('input', () => {
+      const raw = digitsOnly(amt.value).replace(/^0+(?=\d)/, '');
+      d.amount = raw;
+      amt.value = raw ? Number(raw).toLocaleString('en-US') : '';
+    });
+    root.querySelectorAll('[data-tbtype]').forEach((b) => b.addEventListener('click', () => {
+      d.type = b.getAttribute('data-tbtype');
+      root.querySelectorAll('[data-tbtype]').forEach((x) => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
+      $('tb-amount-opt').textContent = d.type === 'financial' ? '(الزامی)' : '(اختیاری)';
+    }));
+    $('tb-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const order = toEnDigits(d.order).trim();
+      const amount = d.amount ? Number(d.amount) : null;
+      if (!d.operator) return setMsg('کارشناس را انتخاب کنید.', 'err');
+      if (d.type === 'financial' && !amount) return setMsg('برای باگ بار مالی، مبلغ را وارد کنید.', 'err');
+      if (!order) return setMsg('شماره سفارش را وارد کنید.', 'err');
+      const day = Number(d.day);
+      const btn = $('tb-submit');
+      btn.disabled = true;
+      setMsg('در حال ثبت...', '');
+      const { error } = await sb.from('training_bugs').insert({
+        operator_id: d.operator,
+        reported_by: state.profile.id,
+        bug_type: d.type,
+        amount,
+        order_number: order,
+        company: String(d.company || '').trim() || null,
+        description: String(d.desc || '').trim() || null,
+        bug_date_sort: day,
+        bug_date_jalali: toEnDigits(jLabel(sortToJ(day))),
+        period_start_sort: Number(CURRENT_PERIOD.startSort),
+      });
+      if (error) {
+        console.error('training_bugs insert failed', error);
+        btn.disabled = false;
+        return setMsg(error.code === '42501' ? 'اجازه‌ی ثبت این باگ را ندارید.' : `ثبت ناموفق بود. (کد خطا: ${error.code || error.status || 'نامشخص'})`, 'err');
+      }
+      const who = state.profileById[d.operator];
+      d.order = ''; d.desc = ''; d.amount = '';
+      state.tbMsg = { text: `باگ «${tbLabel(d.type)}» برای ${(who && who.full_name) || 'کارشناس'} ثبت شد.`, kind: 'ok' };
+      await loadBugsPage();
+    });
+    root.querySelectorAll('[data-tbdel]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('این باگ حذف شود؟')) return;
+      b.disabled = true;
+      const { error } = await sb.from('training_bugs').delete().eq('id', b.getAttribute('data-tbdel'));
+      if (error) { console.error(error); b.disabled = false; return setMsg('حذف ناموفق بود.', 'err'); }
+      state.tbMsg = { text: 'باگ حذف شد.', kind: 'ok' };
+      await loadBugsPage();
+    }));
+    if (state.tbMsg && $('tb-msg')) $('tb-msg').className = 'bug-msg ' + (state.tbMsg.kind || '');
+  }
+
+  // سرپرست: کاربران Training (ساخت، ریست رمز)
+  function trainingUsersHtml() {
+    const list = (state.manage && state.manage.training) || [];
+    return `
+      <div class="mg-head">
+        <div class="bug-sub">کاربران Training <span class="mg-count">${formatNum(list.length)} نفر</span></div>
+        <div class="mg-tools"><button type="button" class="mg-btn mg-primary mg-add" id="tr-add">+ تعریف کاربر Training</button></div>
+      </div>
+      <div class="panel perf-wrap">
+        ${list.length ? `<table class="perf-table mg-table">
+          <thead><tr><th>نام</th><th>نام کاربری</th><th></th></tr></thead>
+          <tbody>${list.map((u) => `<tr><td class="nm">${esc(u.full_name || '—')}</td><td class="tm" dir="ltr">${esc(u.username || '—')}</td>
+            <td class="mg-acts"><button type="button" class="mg-btn" data-trreset="${esc(u.id)}" data-name="${esc(u.full_name || '')}">ریست رمز</button></td></tr>`).join('')}</tbody>
+        </table>` : '<div class="empty-state">هنوز کاربر Training تعریف نشده است</div>'}
+      </div>`;
+  }
+  function bindTrainingUsers(root) {
+    const add = $('tr-add');
+    if (add) add.addEventListener('click', () => openModal({
+      title: 'تعریف کاربر Training',
+      confirmText: 'ساخت کاربر',
+      body: `
+        <p class="modal-text">کاربر Training همه‌ی کارشناسان، شرکت‌هایشان و عملکرد روزانه را می‌بیند و برایشان باگ بار مالی / بدون بار مالی / مؤثر ثبت می‌کند.</p>
+        <label class="modal-field">نام و نام خانوادگی<input class="tree-search" id="tr-name" type="text" maxlength="80" autocomplete="off"></label>
+        <label class="modal-field">نام کاربری <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+          <input class="tree-search" id="tr-user" type="text" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="training.1"></label>
+        <label class="modal-field">رمز اولیه <span class="opt">(حداقل ۸ کاراکتر)</span>
+          <span class="pw-row"><input class="tree-search" id="tr-pass" type="text" dir="ltr" autocomplete="off"><button type="button" class="mg-btn" id="tr-gen">ساخت رمز</button></span></label>`,
+      onOpen: (dlg) => dlg.querySelector('#tr-gen').addEventListener('click', () => { const i = dlg.querySelector('#tr-pass'); i.value = randomPassword(); i.select(); }),
+      onConfirm: async (dlg) => {
+        const name = dlg.querySelector('#tr-name').value.trim().replace(/\s+/g, ' ');
+        const user = toEnDigits(dlg.querySelector('#tr-user').value).trim().toLowerCase();
+        const pass = dlg.querySelector('#tr-pass').value.trim();
+        if (name.length < 3) throw new Error('نام و نام خانوادگی را کامل وارد کنید.');
+        if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(user)) throw new Error('نام کاربری فقط حروف انگلیسی کوچک، عدد، نقطه، خط تیره یا زیرخط (۳ تا ۴۰ کاراکتر).');
+        if (pass.length < 8) throw new Error('رمز اولیه باید حداقل ۸ کاراکتر باشد.');
+        const { error } = await sb.rpc('admin_create_user', { p_full_name: name, p_username: user, p_password: pass, p_role: 'training' });
+        if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ساخت کاربر ناموفق بود.')); }
+        await afterManageChange(`کاربر Training «${name}» ساخته شد. نام کاربری: ${user}`);
+      },
+    }));
+    root.querySelectorAll('[data-trreset]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-trreset'), name = b.getAttribute('data-name');
+      openModal({
+        title: `ریست رمز «${name}»`,
+        confirmText: 'ثبت رمز جدید',
+        body: `<label class="modal-field">رمز جدید <span class="opt">(حداقل ۸ کاراکتر)</span>
+          <span class="pw-row"><input class="tree-search" type="text" id="trp-new" autocomplete="off" dir="ltr"><button type="button" class="mg-btn" id="trp-gen">ساخت رمز</button></span></label>`,
+        onOpen: (dlg) => dlg.querySelector('#trp-gen').addEventListener('click', () => { const i = dlg.querySelector('#trp-new'); i.value = randomPassword(); i.select(); }),
+        onConfirm: async (dlg) => {
+          const pw = dlg.querySelector('#trp-new').value.trim();
+          if (pw.length < 8) throw new Error('رمز باید حداقل ۸ کاراکتر باشد.');
+          const { error } = await sb.rpc('team_reset_password', { p_operator: id, p_password: pw });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ریست رمز ناموفق بود.')); }
+          toast(`رمز «${name}» عوض شد.`);
+        },
+      });
+    }));
+  }
+
   // تارگت‌های دوره: بار اول کامل؛ در تازه‌سازی خودکار فقط از «روزِ تغییرکرده» به بعد و ادغام با نسخه‌ی قبلی
   const TARGET_COLS = 'operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes';
   async function loadPeriodTargets(changedFrom) {
@@ -4608,6 +4868,13 @@ window.APP_CONFIG = Object.freeze({
         // تیم‌ها اول، بعد بقیه
         state.childrenOf[parentId] = grouped.filter(isVirtualId).concat(grouped.filter((id) => !isVirtualId(id)));
       });
+      // Training: زیرمجموعه ندارد؛ درختش همه‌ی کسانی است که زیر سرپرست(های) سلر هستند
+      if (profile.role === 'training') {
+        const sups = state.visibleProfiles.filter((p) => p.role === 'supervisor' && (p.unit || 'seller') === 'seller');
+        state.childrenOf[TREE_ROOT_ID] = sups.flatMap((p) => state.childrenOf[p.id] || []);
+        state.treeRootId = TREE_ROOT_ID;
+        summaryId = TREE_ROOT_ID;
+      }
     }
     // فقط افرادِ داخل درخت (مدیرِ خودِ کاربر که RLS برمی‌گرداند شمرده و جستجو نمی‌شود)
     state.treeIds = new Set();
@@ -4680,7 +4947,7 @@ window.APP_CONFIG = Object.freeze({
     if (profile.role === 'team_lead' && myScope.length) {
       // هر شرکتِ گروه (به ترتیب team_lead_company_scope) با اسم اعضای تیم که الان در آن فعال‌اند
       companyStatsHtml = companyCardsHtml(myScope);
-    } else if (SUPERVISOR_ROLES.includes(profile.role)) {
+    } else if (SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'training') {
       companyStatsHtml = companyCardsHtml(null, { showTeam: true }); // سرپرست: همه‌ی شرکت‌ها با نام تیم هر نفر
     } else if (companyStats.length && Object.keys(state.scopeByLead).length) {
       companyStatsHtml = renderCompanyGroups(companyStats);
@@ -4706,9 +4973,9 @@ window.APP_CONFIG = Object.freeze({
       <div id="tab-team" ${showKpiTab && !state.sidebar && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows, botCompanyRows)}</div>` : ''}
-      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead' ? renderCompanyTimeChart() : ''}</div>` : ''}
+      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) || ['team_lead', 'training'].includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
-      ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
+      ${state.sidebar && ['team_lead', 'training'].includes(profile.role) ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
       ${state.sidebar && canManageTeam(profile) ? '<div data-page="manage" id="manage-root"></div>' : ''}
       <div data-page="team">
       <div class="filters">
@@ -4730,7 +4997,7 @@ window.APP_CONFIG = Object.freeze({
 
     renderTree(state.treeRootId);
     if (state.sidebar) renderPerf();
-    if (state.sidebar && profile.role === 'team_lead') loadBugsPage();
+    if (state.sidebar && ['team_lead', 'training'].includes(profile.role)) loadBugsPage();
     if (state.sidebar && canManageTeam(profile)) renderManagePage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot', { detail: botDayDetail(botRows, botCompanyRows) }); bindBotPanel(); }
