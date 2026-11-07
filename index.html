@@ -1397,18 +1397,32 @@ body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]) { di
 .au-count { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 @media (max-width: 640px) { .mg-tools { width: 100%; flex-wrap: wrap; } .mg-tools .mg-search { width: 100%; } .mg-add { width: 100%; justify-content: center; } }
 
-/* ---------- شرکت‌های سرگروه: اعضای فعال تیم در هر شرکت ---------- */
-.tc-sub { margin: 4px 0 12px; font-size: 14px; font-weight: 800; color: var(--ink); }
-.tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-items: start; }
-.tc-card { padding: 14px 16px; }
-.tc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
-.tc-name { font-size: 15px; font-weight: 800; color: var(--ink); }
-.tc-count { margin-inline-start: auto; font-size: 12px; font-weight: 700; color: var(--good); }
-.tc-head .co-time { font-size: 11.5px; }
-.tc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.tc-list li { position: relative; padding-inline-start: 14px; font-size: 13px; color: var(--ink-soft); }
-.tc-list li::before { content: ''; position: absolute; inset-inline-start: 2px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
-.tc-empty { font-size: 12.5px; color: var(--ink-faint); padding: 4px 0; }
+/* ---------- شرکت‌ها: کاربران فعال در هر شرکت (سرگروه و سرپرست) ---------- */
+.tc-sub { margin: 18px 0 12px; font-size: 14px; font-weight: 800; color: var(--ink); }
+.tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; align-items: stretch; }
+.tc-card { display: flex; flex-direction: column; padding: 14px 16px 16px; }
+.tc-card.empty { opacity: .72; }
+.tc-head { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.tc-name { font-size: 15px; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tc-head .co-time { font-size: 11.5px; flex: none; }
+.tc-count { margin-inline-start: auto; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; color: var(--good); background: var(--good-soft); }
+.tc-count.zero { color: var(--ink-faint); background: var(--surface-tint); }
+.tc-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.tc-list li { display: flex; flex-direction: column; justify-content: center; min-height: 34px; padding: 5px 10px; border-radius: 10px; background: var(--surface-tint); min-width: 0; }
+.tc-person { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-team { font-size: 10.5px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-empty { font-size: 12.5px; color: var(--ink-faint); padding: 6px 0; }
+@media (max-width: 380px) { .tc-list { grid-template-columns: minmax(0, 1fr); } }
+.co-time-chart + .tc-sub { margin-top: 18px; }
+
+/* ---------- افزودن کاربر: سربرگ «کارشناس جدید / از بدون سرگروه‌ها» ---------- */
+.au-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-tint); border: 1px solid var(--line); }
+.au-tabs button { min-height: 36px; border: 0; border-radius: 9px; background: none; color: var(--ink-soft); font: 700 12.5px var(--font); cursor: pointer; }
+.au-tabs button[aria-selected="true"] { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); box-shadow: 0 4px 12px -6px rgba(22,86,245,.6); }
+.au-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.au-pane { display: grid; gap: 12px; }
+.au-pane[hidden] { display: none; }
 .pulse-dot.off { background: var(--ink-faint); box-shadow: none; animation: none; }
 .trend-tip .tt-detail li small { font-size: 10.5px; font-weight: 600; opacity: .75; }
 
@@ -1779,29 +1793,46 @@ window.APP_CONFIG = Object.freeze({
     treeIds: new Set(),
   };
 
-  // صفحه‌ی شرکت‌های سرگروه: هر شرکتِ گروه با اسم اعضای تیم که الان در آن فعال (و مجاز به صدور) هستند
-  function teamCompanyCardsHtml(scope) {
+  // صفحه‌ی شرکت‌ها: هر شرکت یک کارت با اسم کاربرانی که الان در آن فعال (و مجاز به صدور) هستند.
+  // سرگروه: شرکت‌های گروه خودش و اعضای تیمش؛ سرپرست: همه‌ی شرکت‌ها و همه‌ی کاربران (با نام تیم).
+  function companyCardsHtml(scope, { showTeam = false } = {}) {
     const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at);
     const activeIn = {};
+    const label = {};
     ops.forEach((p) => {
       const st = state.statusByOperator[p.id];
       if (!isFullyActive(st)) return;
-      splitCompanies(st.companies).forEach((c) => { (activeIn[normCompany(c)] = activeIn[normCompany(c)] || []).push(p); });
+      splitCompanies(st.companies).forEach((c) => {
+        const k = normCompany(c);
+        if (!label[k]) label[k] = c;
+        (activeIn[k] = activeIn[k] || []).push(p);
+      });
     });
     const totalActive = ops.filter((p) => isFullyActive(state.statusByOperator[p.id])).length;
-    const cards = scope.map((c) => {
-      const people = (activeIn[normCompany(c)] || []).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    // سرگروه: ترتیب گروه خودش؛ سرپرست: همه‌ی شرکت‌هایی که کسی در آن فعال است + شرکت‌های گروه‌ها، به ترتیب تعداد فعال
+    let list;
+    if (scope) list = scope.map((c) => ({ key: normCompany(c), name: c }));
+    else {
+      const keys = new Set(Object.keys(activeIn));
+      Object.values(state.scopeByLead || {}).flat().forEach((c) => keys.add(normCompany(c)));
+      list = [...keys].map((k) => ({ key: k, name: label[k] || k }))
+        .sort((a, b) => ((activeIn[b.key] || []).length - (activeIn[a.key] || []).length) || a.name.localeCompare(b.name, 'fa'));
+    }
+    const cards = list.map(({ key, name }) => {
+      const people = (activeIn[key] || []).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
       return `
-        <div class="panel tc-card">
-          <div class="tc-head">
-            <span class="pulse-dot sm${people.length ? '' : ' off'}"></span><b class="tc-name">${esc(c)}</b>
-            <span class="tc-count">${formatNum(people.length)} نفر فعال</span>${companyTimeTag(c)}
-          </div>
-          ${people.length ? `<ul class="tc-list">${people.map((p) => `<li>${esc(p.full_name || '—')}</li>`).join('')}</ul>`
-            : '<div class="tc-empty">الان کسی از تیم در این شرکت فعال نیست</div>'}
-        </div>`;
+        <article class="panel tc-card${people.length ? '' : ' empty'}">
+          <header class="tc-head">
+            <b class="tc-name">${esc(name)}</b>
+            ${companyTimeTag(name)}
+            <span class="tc-count${people.length ? '' : ' zero'}"><span class="pulse-dot sm${people.length ? '' : ' off'}"></span>${formatNum(people.length)} فعال</span>
+          </header>
+          ${people.length ? `<ul class="tc-list">${people.map((p) => `
+            <li title="${esc(showTeam ? teamLabelOf(p.id) : p.full_name || '')}"><span class="tc-person">${esc(p.full_name || '—')}</span>${showTeam ? `<span class="tc-team">${esc(teamLabelOf(p.id).replace(/^تیم\s*/, ''))}</span>` : ''}</li>`).join('')}
+          </ul>` : '<div class="tc-empty">الان کسی در این شرکت فعال نیست</div>'}
+        </article>`;
     }).join('');
-    return `<div class="tc-sub">اعضای فعال تیم در هر شرکت <span class="mg-count">${formatNum(totalActive)} از ${formatNum(ops.length)} نفر الان فعال‌اند</span></div>
+    return `<div class="tc-sub">کاربران فعال به تفکیک شرکت <span class="mg-count">${formatNum(totalActive)} از ${formatNum(ops.length)} نفر الان فعال‌اند</span></div>
       <div class="tc-grid">${cards}</div>`;
   }
   function isFullyActive(st) {
@@ -3030,30 +3061,43 @@ window.APP_CONFIG = Object.freeze({
   // نمودار ۲۴ ساعته‌ی میانگین کاربران فعال (سرپرست)
   const HOURLY_DAYS = 30;
   // ۹۶ خانه‌ی ربع‌ساعتی از ۰۰:۰۰ تا ۲۳:۴۵ (slot = ساعت × ۴ + ربع)
+  // ۲۴ نقطه‌ی ساعتی: میانگینِ ربع‌ساعت‌های همان ساعت (عکس‌ها هر ۱۵ دقیقه گرفته می‌شوند)
   function hourlySeries(rows) {
-    const bySlot = {};
-    (rows || []).forEach((r) => { bySlot[r.slot] = r; });
-    return Array.from({ length: 96 }, (_, sl) => {
-      const r = bySlot[sl];
-      const hh = `${String(Math.floor(sl / 4)).padStart(2, '0')}:${String((sl % 4) * 15).padStart(2, '0')}`;
+    const byHour = {};
+    (rows || []).forEach((r) => {
+      const h = Math.floor(Number(r.slot) / 4);
+      const b = (byHour[h] = byHour[h] || { a: [], t: [], days: 0 });
+      b.a.push(Number(r.avg_active) || 0);
+      if (r.today != null) b.t.push(Number(r.today));
+      b.days = Math.max(b.days, Number(r.days) || 0);
+    });
+    const mean = (xs) => xs.reduce((x, y) => x + y, 0) / xs.length;
+    const r1 = (n) => Math.round(n * 10) / 10;
+    return Array.from({ length: 24 }, (_, h) => {
+      const b = byHour[h];
+      const hh = `${String(h).padStart(2, '0')}:۰۰`;
       return {
-        target_count: r ? Number(r.avg_active) : 0,
+        target_count: b ? r1(mean(b.a)) : 0,
         report_date_jalali: `ساعت ${hh}`,
-        empty: !r,
-        note: r ? [`میانگین ${formatNum(r.days)} روز`, r.today != null ? `امروز: ${formatNum(Number(r.today))}` : ''].filter(Boolean).join(' · ') : '',
+        empty: !b,
+        note: b ? [`میانگین ${formatNum(b.days)} روز`, b.t.length ? `امروز: ${formatNum(r1(mean(b.t)))}` : ''].filter(Boolean).join(' · ') : '',
       };
     });
   }
-  // جزئیات هر ربع ساعت: کاربران فعال به تفکیک شرکت (میانگین روزهای اخیر، و امروز)
+  // جزئیات هر ساعت: کاربران فعال به تفکیک شرکت (میانگین روزهای اخیر، و امروز)
   function hourlyCompanyDetail(rows) {
-    const by = {};
+    const acc = {};
     (rows || []).forEach((r) => {
-      const a = Number(r.avg_active) || 0, t = r.today == null ? null : Number(r.today);
-      if (a > 0 || t > 0) (by[r.slot] = by[r.slot] || []).push({ c: r.company, a, t });
+      const h = Math.floor(Number(r.slot) / 4);
+      const k = (acc[h] = acc[h] || {});
+      const c = (k[r.company] = k[r.company] || { a: 0, n: 0, t: 0, tn: 0 });
+      c.a += Number(r.avg_active) || 0; c.n += 1;
+      if (r.today != null) { c.t += Number(r.today); c.tn += 1; }
     });
     const f1 = (n) => formatNum(Math.round(n * 10) / 10);
     return (i) => {
-      const list = (by[i] || []).sort((x, y) => y.a - x.a).slice(0, 12);
+      const list = Object.entries(acc[i] || {}).map(([c, v]) => ({ c, a: v.a / 4, t: v.tn ? v.t / v.tn : null }))
+        .filter((x) => x.a > 0 || x.t > 0).sort((x, y) => y.a - x.a).slice(0, 12);
       if (!list.length) return '';
       return `<ul>${list.map((x) => `<li><span>${esc(x.c)}</span><b>${x.t != null ? `<small>(امروز ${f1(x.t)})</small> ` : ''}${f1(x.a)}</b></li>`).join('')}</ul>`;
     };
@@ -3066,13 +3110,31 @@ window.APP_CONFIG = Object.freeze({
     }
     const maxDays = Math.max(...rows.map((r) => Number(r.days) || 0));
     return renderDailyTrendChart(hourlySeries(rows), 'hourly', title, {
-      aria: 'میانگین کاربران فعال در هر ربع ساعت؛ با کلیدهای جهت‌نما بین زمان‌ها جابه‌جا شوید',
-      axis: ['۰۰:۰۰', '۰۶:۰۰', '۱۲:۰۰', '۱۸:۰۰', '۲۳:۴۵'],
-      dense: true,
-      footnote: `هر ربع ساعت، میانگین ${formatNum(maxDays)} روز اخیر (حداکثر ${formatNum(HOURLY_DAYS)} روز). ربع‌ساعت‌های بدون داده خالی می‌مانند.`,
+      aria: 'میانگین کاربران فعال در هر ساعت روز؛ با کلیدهای جهت‌نما بین ساعت‌ها جابه‌جا شوید',
+      axis: ['۰۰:۰۰', '۰۶:۰۰', '۱۲:۰۰', '۱۸:۰۰', '۲۳:۰۰'],
+      smooth: true,
+      footnote: `هر ساعت، میانگین ${formatNum(maxDays)} روز اخیر (حداکثر ${formatNum(HOURLY_DAYS)} روز). ساعت‌های بدون داده خالی می‌مانند.`,
     });
   }
 
+  // مسیر منحنی یکنوا (Fritsch–Carlson) از نقطه‌های [x, y]
+  function monotonePath(p) {
+    const n = p.length;
+    const dx = [], m = [];
+    for (let i = 0; i < n - 1; i++) { dx[i] = p[i + 1][0] - p[i][0]; m[i] = (p[i + 1][1] - p[i][1]) / (dx[i] || 1); }
+    const t = [m[0]];
+    for (let i = 1; i < n - 1; i++) {
+      t[i] = m[i - 1] * m[i] <= 0 ? 0 : (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / m[i - 1] + (dx[i] + 2 * dx[i - 1]) / m[i]);
+    }
+    t[n - 1] = m[n - 2];
+    const f = (v) => v.toFixed(2);
+    let d = `M${f(p[0][0])},${f(p[0][1])}`;
+    for (let i = 0; i < n - 1; i++) {
+      const h = dx[i] / 3;
+      d += ` C${f(p[i][0] + h)},${f(p[i][1] + t[i] * h)} ${f(p[i + 1][0] - h)},${f(p[i + 1][1] - t[i + 1] * h)} ${f(p[i + 1][0])},${f(p[i + 1][1])}`;
+    }
+    return d;
+  }
   function renderDailyTrendChart(asc, id = 'trend', title = `روند صدور روزانه در ${CURRENT_PERIOD.label}`, opts = {}) {
     if (!asc || asc.length < 2) return '';
     const values = asc.map((r) => Number(r.target_count) || 0);
@@ -3088,9 +3150,13 @@ window.APP_CONFIG = Object.freeze({
     });
     if (seg.length) segments.push(seg);
     const pt = (i) => `${xs[i].toFixed(2)},${trendY(values[i], max).toFixed(2)}`;
-    const line = segments.map((s) => s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' ')).join(' ');
+    // smooth: منحنی یکنوا (بدون بیرون‌زدگی از بالا/پایین نقطه‌ها) به‌جای خط شکسته
+    const segPath = (s) => (opts.smooth && s.length > 2
+      ? monotonePath(s.map((i) => [xs[i], trendY(values[i], max)]))
+      : s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' '));
+    const line = segments.map(segPath).join(' ');
     const area = segments.filter((s) => s.length > 1)
-      .map((s) => `${s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' ')} L${xs[s[s.length - 1]].toFixed(2)},${TREND_H} L${xs[s[0]].toFixed(2)},${TREND_H} Z`).join(' ');
+      .map((s) => `${segPath(s)} L${xs[s[s.length - 1]].toFixed(2)},${TREND_H} L${xs[s[0]].toFixed(2)},${TREND_H} Z`).join(' ');
     const solo = new Set(segments.filter((s) => s.length === 1).map((s) => s[0])); // نقطه‌ی تنها همیشه دیده شود
     const dots = values.map((v, i) => (asc[i].empty ? '<span class="trend-dot" hidden></span>'
       : `<span class="trend-dot ${solo.has(i) ? 'solo' : ''}" style="left:${xs[i]}%;top:${(trendY(v, max) / TREND_H) * 100}%"></span>`)).join('');
@@ -3996,14 +4062,13 @@ window.APP_CONFIG = Object.freeze({
           <button type="button" class="bug-del" data-delop="${esc(p.id)}">حذف</button>
         </td>
       </tr>`).join('');
-    const unCount = (m.unassigned || []).length;
     root2.innerHTML = `
       ${m.error ? '<div class="panel"><div class="empty-state">خواندن اطلاعات مدیریت تیم ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>' : ''}
       <div class="mg-head">
         <div class="bug-sub">اپراتورهای ${isLead ? 'تیم من' : 'زیرمجموعه'} <span class="mg-count">${formatNum(ops.length)} نفر</span></div>
         <div class="mg-tools">
           <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام..." value="${esc(q)}" aria-label="جستجوی اپراتور">
-          <button type="button" class="mg-btn mg-primary mg-add" id="mg-add">+ افزودن کاربر به تیم${unCount ? ` <span class="mg-badge">${formatNum(unCount)}</span>` : ''}</button>
+          <button type="button" class="mg-btn mg-primary mg-add" id="mg-add">+ افزودن کاربر به تیم</button>
         </div>
       </div>
       <div class="panel perf-wrap">
@@ -4090,28 +4155,53 @@ window.APP_CONFIG = Object.freeze({
     }));
   }
 
-  // افزودن کاربرهای بدون سرگروه به تیم (چند انتخابی). سرگروه: به تیم خودش؛ سرپرست: اول سرگروه را انتخاب می‌کند
+  // افزودن کاربر به تیم: ساخت کارشناس جدید (پیش‌فرض) یا، به‌صورت اختیاری، انتخاب از کاربرهای بدون سرگروه.
+  // سرگروه: همیشه در تیم خودش؛ سرپرست: اول سرگروه را انتخاب می‌کند.
   function openAddUsersModal() {
     const m = state.manage || { options: [], unassigned: [] };
     const isLead = state.profile.role === 'team_lead';
     const list = (m.unassigned || []).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    let mode = 'new';
     openModal({
       title: 'افزودن کاربر به تیم',
-      confirmText: list.length ? 'افزودن به تیم' : 'بستن',
+      confirmText: 'ساخت کارشناس',
       body: `
-        ${isLead || !list.length ? '' : `<label class="modal-field">سرگروه
+        ${isLead ? '' : `<label class="modal-field">سرگروه
           <select class="tree-search" id="au-lead"><option value="">انتخاب سرگروه...</option>
             ${m.options.map((o) => `<option value="${esc(o.id)}">${esc(o.full_name || '—')}</option>`).join('')}
           </select></label>`}
-        ${list.length ? `
-          <p class="modal-text">کاربرهای بدون سرگروه؛ هر تعداد را که می‌خواهید انتخاب کنید.</p>
-          <input class="tree-search" id="au-search" type="search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
-          <div class="au-list" id="au-list">
-            ${list.map((u) => `<label class="au-item" data-name="${esc(u.full_name || '')}"><input type="checkbox" value="${esc(u.id)}"><span>${esc(u.full_name || '—')}</span></label>`).join('')}
-          </div>
-          <div class="au-count" id="au-count">هنوز کسی انتخاب نشده</div>`
-        : '<p class="modal-text">الان کاربری بدون سرگروه وجود ندارد.</p>'}`,
+        <div class="au-tabs" role="tablist" aria-label="روش افزودن">
+          <button type="button" role="tab" data-mode="new" aria-selected="true">کارشناس جدید</button>
+          <button type="button" role="tab" data-mode="pick" aria-selected="false">از بدون سرگروه‌ها${list.length ? ` (${formatNum(list.length)})` : ''}</button>
+        </div>
+        <div class="au-pane" data-pane="new">
+          <label class="modal-field">نام و نام خانوادگی <span class="opt">(دقیقاً همان نامی که در گزارش متابیس/ازکی‌ایجنت آمده)</span>
+            <input class="tree-search" id="nu-name" type="text" maxlength="80" autocomplete="off"></label>
+          <label class="modal-field">نام کاربری <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+            <input class="tree-search" id="nu-user" type="text" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="a.ahmadi"></label>
+          <label class="modal-field">رمز اولیه <span class="opt">(حداقل ۸ کاراکتر؛ بعد از ورود خودش عوض می‌کند)</span>
+            <span class="pw-row"><input class="tree-search" id="nu-pass" type="text" dir="ltr" minlength="8" autocomplete="off"><button type="button" class="mg-btn" id="nu-gen">ساخت رمز</button></span></label>
+        </div>
+        <div class="au-pane" data-pane="pick" hidden>
+          ${list.length ? `
+            <input class="tree-search" id="au-search" type="search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
+            <div class="au-list" id="au-list">
+              ${list.map((u) => `<label class="au-item" data-name="${esc(u.full_name || '')}"><input type="checkbox" value="${esc(u.id)}"><span>${esc(u.full_name || '—')}</span></label>`).join('')}
+            </div>
+            <div class="au-count" id="au-count">هنوز کسی انتخاب نشده</div>`
+          : '<p class="modal-text">الان کاربری بدون سرگروه وجود ندارد.</p>'}
+        </div>`,
       onOpen: (dlg) => {
+        const ok = dlg.querySelector('button[type="submit"]');
+        dlg.querySelectorAll('.au-tabs [data-mode]').forEach((t) => t.addEventListener('click', () => {
+          mode = t.getAttribute('data-mode');
+          dlg.querySelectorAll('.au-tabs [data-mode]').forEach((x) => x.setAttribute('aria-selected', String(x === t)));
+          dlg.querySelectorAll('.au-pane').forEach((p) => { p.hidden = p.getAttribute('data-pane') !== mode; });
+          ok.textContent = mode === 'new' ? 'ساخت کارشناس' : 'افزودن به تیم';
+          const msg = dlg.querySelector('.modal-msg'); if (msg) msg.textContent = '';
+          const f = dlg.querySelector(mode === 'new' ? '#nu-name' : '#au-search'); if (f) f.focus();
+        }));
+        dlg.querySelector('#nu-gen').addEventListener('click', () => { const i = dlg.querySelector('#nu-pass'); i.value = randomPassword(); i.select(); });
         const search = dlg.querySelector('#au-search');
         const count = dlg.querySelector('#au-count');
         if (search) search.addEventListener('input', () => {
@@ -4124,20 +4214,32 @@ window.APP_CONFIG = Object.freeze({
         }));
       },
       onConfirm: async (dlg) => {
-        if (!list.length) return true;
         const lead = isLead ? state.profile.id : (dlg.querySelector('#au-lead') || {}).value;
-        const ids = [...dlg.querySelectorAll('.au-item input:checked')].map((c) => c.value);
         if (!lead) throw new Error('سرگروه را انتخاب کنید.');
+        const leadName = isLead ? 'تیم شما' : `تیم ${((m.options || []).find((o) => o.id === lead) || {}).full_name || ''}`;
+        if (mode === 'new') {
+          const name = dlg.querySelector('#nu-name').value.trim().replace(/\s+/g, ' ');
+          const user = toEnDigits(dlg.querySelector('#nu-user').value).trim().toLowerCase();
+          const pass = dlg.querySelector('#nu-pass').value.trim();
+          if (name.length < 3) throw new Error('نام و نام خانوادگی را کامل وارد کنید.');
+          if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(user)) throw new Error('نام کاربری فقط حروف انگلیسی کوچک، عدد، نقطه، خط تیره یا زیرخط (۳ تا ۴۰ کاراکتر).');
+          if (pass.length < 8) throw new Error('رمز اولیه باید حداقل ۸ کاراکتر باشد.');
+          const { error } = await sb.rpc('team_create_operator', { p_full_name: name, p_username: user, p_password: pass, p_lead: isLead ? null : lead });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ساخت کارشناس ناموفق بود.')); }
+          await afterManageChange(`«${name}» در ${leadName} ساخته شد. نام کاربری: ${user}`);
+          return;
+        }
+        if (!list.length) throw new Error('کاربری بدون سرگروه وجود ندارد.');
+        const ids = [...dlg.querySelectorAll('.au-item input:checked')].map((c) => c.value);
         if (!ids.length) throw new Error('حداقل یک نفر را انتخاب کنید.');
         const failed = [];
         for (const id of ids) {
           const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: lead });
           if (error) { console.error(error); failed.push(id); }
         }
-        const ok = ids.length - failed.length;
-        if (!ok) throw new Error('افزودن ناموفق بود. دوباره تلاش کنید.');
-        const leadName = isLead ? 'تیم شما' : `تیم ${((m.options || []).find((o) => o.id === lead) || {}).full_name || ''}`;
-        await afterManageChange(`${formatNum(ok)} نفر به ${leadName} اضافه شد${failed.length ? ` (${formatNum(failed.length)} نفر ناموفق)` : ''}.`);
+        const okN = ids.length - failed.length;
+        if (!okN) throw new Error('افزودن ناموفق بود. دوباره تلاش کنید.');
+        await afterManageChange(`${formatNum(okN)} نفر به ${leadName} اضافه شد${failed.length ? ` (${formatNum(failed.length)} نفر ناموفق)` : ''}.`);
       },
     });
   }
@@ -4485,9 +4587,11 @@ window.APP_CONFIG = Object.freeze({
     const myScope = state.scopeByLead[profile.id] || [];
     if (profile.role === 'team_lead' && myScope.length) {
       // هر شرکتِ گروه (به ترتیب team_lead_company_scope) با اسم اعضای تیم که الان در آن فعال‌اند
-      companyStatsHtml = teamCompanyCardsHtml(myScope);
+      companyStatsHtml = companyCardsHtml(myScope);
+    } else if (SUPERVISOR_ROLES.includes(profile.role)) {
+      companyStatsHtml = companyCardsHtml(null, { showTeam: true }); // سرپرست: همه‌ی شرکت‌ها با نام تیم هر نفر
     } else if (companyStats.length && Object.keys(state.scopeByLead).length) {
-      companyStatsHtml = renderCompanyGroups(companyStats); // سرپرست/مدیر: گروه‌بندی بر اساس گروه‌های شرکتی سرگروه‌ها
+      companyStatsHtml = renderCompanyGroups(companyStats);
     } else if (companyStats.length) {
       companyStatsHtml = companyPillsHtml(companyStats);
     }
@@ -4510,7 +4614,7 @@ window.APP_CONFIG = Object.freeze({
       <div id="tab-team" ${showKpiTab && !state.sidebar && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows, botCompanyRows)}</div>` : ''}
-      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
+      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead' ? renderCompanyTimeChart() : ''}${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}</div>` : ''}
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
       ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
       ${state.sidebar && canManageTeam(profile) ? '<div data-page="manage" id="manage-root"></div>' : ''}
