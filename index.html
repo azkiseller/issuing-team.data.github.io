@@ -607,16 +607,21 @@ html[data-theme="dark"] .company-stats-row .company-pill { background: rgba(0,18
 }
 .trend-plot:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 8px; }
 .trend-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.trend .trend-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.trend .trend-line { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .trend .trend-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
-.trend .trend-fill-top { stop-color: var(--accent); stop-opacity: .32; }
+.trend .trend-fill-top { stop-color: var(--accent); stop-opacity: .22; }
 .trend .trend-fill-bottom { stop-color: var(--accent); stop-opacity: 0; }
 .trend-dot {
-  position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
-  background: var(--accent-strong); box-shadow: 0 0 0 2px var(--surface); pointer-events: none;
-  transition: transform .12s;
+  position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
+  background: var(--surface-solid, #fff); border: 2px solid var(--accent); box-sizing: border-box; pointer-events: none;
+  opacity: 0; transform: scale(.6); transition: opacity .12s, transform .12s;
 }
-.trend-dot.active { transform: scale(1.6); }
+/* مینیمال: نقطه‌ها پنهان؛ فقط نقطه‌ی زیر نشانگر (و نقطه‌ی تنها) دیده می‌شود */
+.trend-dot.active { opacity: 1; transform: scale(1); box-shadow: 0 0 0 4px var(--accent-soft); }
+.trend-dot.solo { opacity: 1; transform: scale(.8); }
+html[data-theme="dark"] .trend-dot { background: #0F1B33; }
+.trend-guide { position: absolute; top: 0; bottom: 0; width: 0; border-inline-start: 1px dashed var(--accent); opacity: .45; pointer-events: none; }
+.trend-guide[hidden] { display: none; }
 .trend-tip {
   position: absolute; transform: translate(-50%, calc(-100% - 12px));
   background: var(--ink); color: var(--surface-solid, #fff);
@@ -3151,7 +3156,7 @@ window.APP_CONFIG = Object.freeze({
     if (seg.length) segments.push(seg);
     const pt = (i) => `${xs[i].toFixed(2)},${trendY(values[i], max).toFixed(2)}`;
     // smooth: منحنی یکنوا (بدون بیرون‌زدگی از بالا/پایین نقطه‌ها) به‌جای خط شکسته
-    const segPath = (s) => (opts.smooth && s.length > 2
+    const segPath = (s) => (opts.smooth !== false && s.length > 2
       ? monotonePath(s.map((i) => [xs[i], trendY(values[i], max)]))
       : s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' '));
     const line = segments.map(segPath).join(' ');
@@ -3179,6 +3184,7 @@ window.APP_CONFIG = Object.freeze({
             <path d="${area}" fill="url(#${id}-fill)" />
             <path d="${line}" class="trend-line" />
           </svg>
+          <span class="trend-guide" id="${id}-guide" hidden></span>
           ${dots}
           <div class="trend-tip" id="${id}-tip" hidden><b></b><span></span></div>
         </div>
@@ -3197,6 +3203,7 @@ window.APP_CONFIG = Object.freeze({
     const max = Math.max(...values.filter((_, i) => !asc[i].empty), 1);
     const n = values.length;
     const tip = $(`${id}-tip`);
+    const guide = $(`${id}-guide`);
     const dots = plot.querySelectorAll('.trend-dot');
     let current = -1;
 
@@ -3204,6 +3211,7 @@ window.APP_CONFIG = Object.freeze({
       current = i;
       const x = (i / (n - 1)) * 100;
       dots.forEach((d, k) => d.classList.toggle('active', k === i));
+      if (guide) { guide.hidden = asc[i].empty; guide.style.left = `${x}%`; }
       tip.hidden = false;
       tip.querySelector('b').textContent = asc[i].empty ? 'بدون داده' : `${formatNum(values[i])} ${unit}`;
       tip.querySelector('span').textContent = faDigits(asc[i].report_date_jalali) + (asc[i].note ? ` · ${asc[i].note}` : '');
@@ -3230,6 +3238,7 @@ window.APP_CONFIG = Object.freeze({
     function hide() {
       current = -1;
       tip.hidden = true;
+      if (guide) guide.hidden = true;
       dots.forEach((d) => d.classList.remove('active'));
     }
     function indexAt(clientX) {
