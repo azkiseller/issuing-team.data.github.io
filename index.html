@@ -1427,6 +1427,73 @@ body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]) { di
 /* ---------- کارشناس حذف‌شده (آمارش برای حقوق مانده) ---------- */
 .archived-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: var(--ink-soft); background: var(--surface-tint); border: 1px dashed var(--line); white-space: nowrap; }
 
+/* =====================================================================
+   منوی کناری شیشه‌ای (شناور، شفاف با blur) + حالت جمع‌شده‌ی آیکونی
+   ===================================================================== */
+:root { --side-glass: rgba(255,255,255,.38); --side-edge: rgba(255,255,255,.65); --side-shadow: 0 24px 60px -28px rgba(22,86,245,.45); --side-chip: rgba(255,255,255,.55); }
+html[data-theme="dark"] { --side-glass: rgba(16,24,48,.42); --side-edge: rgba(255,255,255,.09); --side-shadow: 0 24px 60px -28px rgba(0,0,0,.7); --side-chip: rgba(255,255,255,.06); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --side-glass: rgba(16,24,48,.42); --side-edge: rgba(255,255,255,.09); --side-shadow: 0 24px 60px -28px rgba(0,0,0,.7); --side-chip: rgba(255,255,255,.06); } }
+
+@media (min-width: 901px) {
+  body.with-sidebar #app-screen { grid-template-columns: 248px minmax(0, 1fr); }
+  .sidebar {
+    margin: 12px; margin-inline-end: 0; top: 12px; height: calc(100vh - 24px);
+    padding: 18px 14px; border-radius: 24px;
+    background: var(--side-glass);
+    -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%);
+    border: 1px solid var(--side-edge); box-shadow: var(--side-shadow);
+    transition: padding .28s cubic-bezier(.4, 0, .2, 1);
+  }
+  body.with-sidebar.side-collapsed #app-screen { grid-template-columns: 96px minmax(0, 1fr); }
+  body.side-collapsed .sidebar { padding: 18px 10px; }
+  body.side-collapsed .side-head { flex-direction: column; gap: 12px; }
+  /* لوگو در حالت جمع‌شده: فقط ماسکوت (بخش چپ تصویر لوگو) */
+  body.side-collapsed .side-brand { display: block !important; animation: none; }
+  body.side-collapsed .side-brand img { height: 38px; width: 44px; object-fit: cover; object-position: left center; border-radius: 12px; }
+  body.side-collapsed .side-link { width: 56px; min-height: 52px; border-radius: 16px; }
+  body.side-collapsed .side-link svg { width: 24px; height: 24px; }
+  body.side-collapsed .side-collapse svg { transform: scaleX(-1); }
+  /* کارت کاربر در حالت جمع‌شده: آواتار + دو دکمه‌ی آیکونی */
+  body.side-collapsed .side-user { display: flex !important; flex-direction: column; align-items: center; gap: 8px; padding: 10px 6px; border-radius: 18px; background: var(--side-chip); border: 1px solid var(--side-edge); }
+  body.side-collapsed .side-user > .user-acts { display: flex !important; flex-direction: column; gap: 6px; margin: 0; }
+  body.side-collapsed .side-user .user-acts button { width: 40px; height: 40px; padding: 0; justify-content: center; }
+  body.side-collapsed .side-user .user-acts button span { display: none; }
+}
+
+.side-head { padding-bottom: 14px; border-bottom: 1px solid var(--side-edge); }
+.side-collapse { background: var(--side-chip); border-color: var(--side-edge); border-radius: 12px; transition: background .15s ease, color .15s ease; }
+.side-collapse:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.side-group-title { letter-spacing: .02em; }
+.side-link { border-radius: 14px; }
+.side-link:hover { background: var(--side-chip); color: var(--ink); box-shadow: inset 0 0 0 1px var(--side-edge); }
+.side-link[aria-current="page"] { box-shadow: 0 10px 22px -10px rgba(22,86,245,.65), inset 0 1px 0 rgba(255,255,255,.25); }
+
+/* کارت کاربر پایین منو */
+.side-user { background: var(--side-chip); border: 1px solid var(--side-edge); border-radius: 18px; padding: 12px; gap: 6px 10px;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.side-user .avatar { width: 40px; height: 40px; font-size: 15px; box-shadow: 0 8px 18px -8px rgba(22,86,245,.6), 0 0 0 3px var(--side-edge); }
+.side-user .user-acts { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--side-edge); }
+.user-acts button.ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 10px;
+  border-radius: 11px; background: var(--side-chip); border: 1px solid var(--side-edge);
+  font: 600 12.5px var(--font); color: var(--ink-soft); cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.user-acts button.ghost svg { width: 16px; height: 16px; flex: none; }
+.user-acts button.ghost#pw-btn:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.user-acts button.ghost#logout-btn:hover { color: var(--danger); background: var(--danger-soft); border-color: transparent; }
+.user-acts button.ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.side-user .user-acts #logout-btn, .side-user .user-acts #pw-btn { grid-column: auto; margin: 0; justify-self: stretch; white-space: nowrap; }
+.top-user .user-acts button.ghost { min-height: 32px; }
+
+/* موبایل: کشوی شیشه‌ای */
+@media (max-width: 900px) {
+  .sidebar { background: var(--side-glass); -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%);
+    border-inline-start: 1px solid var(--side-edge); border-radius: 24px 0 0 24px; }
+  html[data-theme="dark"] .sidebar { background: var(--side-glass); }
+  body.side-open-state .side-scrim { background: rgba(5,10,25,.28); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+}
+@media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }
+
 </style>
 </head>
 <body>
@@ -2008,7 +2075,13 @@ window.APP_CONFIG = Object.freeze({
     [...left.children].forEach((el) => userBox.appendChild(el));
     const acts = document.createElement('div');
     acts.className = 'user-acts';
-    acts.append($('pw-btn'), $('logout-btn'));
+    // آیکون + متن؛ در حالت جمع‌شده فقط آیکون (با title)
+    const pwBtn = $('pw-btn'), outBtn = $('logout-btn');
+    pwBtn.innerHTML = `${sideIcon('<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/>')}<span>تغییر رمز</span>`;
+    outBtn.innerHTML = `${sideIcon('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/>')}<span>خروج</span>`;
+    pwBtn.title = 'تغییر رمز'; outBtn.title = 'خروج';
+    pwBtn.setAttribute('aria-label', 'تغییر رمز'); outBtn.setAttribute('aria-label', 'خروج');
+    acts.append(pwBtn, outBtn);
     userBox.appendChild(acts);
     if (['operator', 'team_lead', 'supervisor'].includes(profile.role)) {
       // اپراتور، سرگروه و سرپرست: کارت پروفایل پایین منوی کناری (پایین سمت راست صفحه)
