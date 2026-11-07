@@ -1553,7 +1553,35 @@ body.with-sidebar header.topbar {
 /* ---------- Newjoiner (سرگروه: ۳ روز اول در تیم) ---------- */
 .newjoiner-badge { display: inline-block; margin-inline-start: 8px; padding: 1px 9px; border-radius: 999px; font: 800 10.5px var(--font); letter-spacing: .02em;
   color: #fff; background: linear-gradient(135deg, #F59E0B, #EF6C1A); box-shadow: 0 4px 10px -5px rgba(239,108,26,.7); vertical-align: middle; white-space: nowrap; }
-.tm-add .bug-form { padding: 4px 0 0; }
+/* Training: فرم افزودن کاربر صدور */
+.tm-card { max-width: 760px; padding: 0; overflow: visible; }
+.tm-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 16px; border-bottom: 1px solid var(--line); }
+.tm-ico { flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--accent-soft, rgba(29,111,255,.1)); color: var(--accent-strong); }
+.tm-ico svg { width: 20px; height: 20px; }
+.tm-title { font-size: 15px; font-weight: 800; color: var(--ink); }
+.tm-sub { margin-top: 4px; font-size: 12.5px; line-height: 1.8; color: var(--ink-soft); }
+.tm-form { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; padding: 18px 22px 20px; }
+.tm-field { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.tm-field label { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+.tm-field .tree-search { margin-bottom: 0; width: 100%; height: 42px; box-sizing: border-box; }
+.tm-field small { font-size: 11.5px; color: var(--ink-faint); }
+.tm-pass { position: relative; }
+.tm-pass .tree-search { padding-left: 92px; }
+.tm-pass button { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); height: 30px; padding: 0 12px;
+  border: 0; border-radius: 9px; cursor: pointer; font: 700 12px var(--font); color: var(--accent-strong);
+  background: var(--accent-soft, rgba(29,111,255,.1)); }
+.tm-pass button:hover { filter: brightness(.95); }
+.tm-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding-top: 16px; border-top: 1px dashed var(--line); flex-wrap: wrap; }
+.tm-actions .bug-msg { flex: 1; min-width: 0; line-height: 1.8; }
+.tm-actions .bug-submit { order: -1; }
+.tm-creds { display: block; margin-top: 2px; color: var(--ink); font-weight: 600; }
+.tm-creds bdi { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; color: var(--accent-strong); }
+@media (max-width: 640px) {
+  .tm-form { grid-template-columns: 1fr; }
+  .tm-actions .bug-submit { width: 100%; }
+}
 
 </style>
 </head>
@@ -4748,28 +4776,43 @@ window.APP_CONFIG = Object.freeze({
     const m = state.manage || { options: [] };
     const d = state.tmDraft || (state.tmDraft = { lead: '', name: '', user: '', pass: '' });
     root.innerHTML = `
-      <div class="panel pe-box tm-add">
-        <div class="pe-title">${sideIcon(SIDE_ICONS.manage)}<span>افزودن کاربر صدور</span></div>
-        <p class="modal-text">کاربر جدید با نام کاربری و رمز اولیه وارد داشبورد می‌شود و زیر سرگروهِ انتخاب‌شده قرار می‌گیرد. نام کامل باید دقیقاً همان نامی باشد که در گزارش متابیس/ازکی‌ایجنت آمده.</p>
-        <form class="bug-form" id="tm-form" autocomplete="off" novalidate>
-          <label>سرگروه
+      <div class="panel tm-card">
+        <div class="tm-head">
+          <span class="tm-ico">${sideIcon(SIDE_ICONS.manage)}</span>
+          <div>
+            <div class="tm-title">افزودن کاربر صدور</div>
+            <div class="tm-sub">کاربر با نام کاربری و رمز اولیه وارد داشبورد می‌شود و زیر سرگروهِ انتخاب‌شده قرار می‌گیرد.</div>
+          </div>
+        </div>
+        <form class="tm-form" id="tm-form" autocomplete="off" novalidate>
+          <div class="tm-field">
+            <label for="tm-lead">سرگروه</label>
             <select class="tree-search" id="tm-lead">
               <option value="">انتخاب سرگروه...</option>
               ${m.options.map((o) => `<option value="${esc(o.id)}"${o.id === d.lead ? ' selected' : ''}>${esc(o.full_name || '—')}</option>`).join('')}
             </select>
-          </label>
-          <label>نام و نام خانوادگی
+          </div>
+          <div class="tm-field">
+            <label for="tm-name">نام و نام خانوادگی</label>
             <input class="tree-search" id="tm-name" type="text" maxlength="80" autocomplete="off" value="${esc(d.name)}">
-          </label>
-          <label>نام کاربری <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+            <small>دقیقاً همان نامی که در گزارش متابیس/ازکی‌ایجنت آمده</small>
+          </div>
+          <div class="tm-field">
+            <label for="tm-user">نام کاربری</label>
             <input class="tree-search" id="tm-user" type="text" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="a.ahmadi" value="${esc(d.user)}">
-          </label>
-          <label>رمز اولیه <span class="opt">(حداقل ۸ کاراکتر)</span>
-            <span class="pw-row"><input class="tree-search" id="tm-pass" type="text" dir="ltr" autocomplete="off" value="${esc(d.pass)}"><button type="button" class="mg-btn" id="tm-gen">ساخت رمز</button></span>
-          </label>
-          <div class="full bug-actions">
+            <small>حروف انگلیسی کوچک، عدد و نقطه</small>
+          </div>
+          <div class="tm-field">
+            <label for="tm-pass">رمز اولیه</label>
+            <div class="tm-pass">
+              <input class="tree-search" id="tm-pass" type="text" dir="ltr" autocomplete="off" value="${esc(d.pass)}">
+              <button type="button" id="tm-gen">ساخت رمز</button>
+            </div>
+            <small>حداقل ۸ کاراکتر</small>
+          </div>
+          <div class="tm-actions">
+            <span class="bug-msg ${state.tmMsg ? state.tmMsg.kind : ''}" id="tm-msg" role="status" aria-live="polite">${state.tmMsg ? esc(state.tmMsg.text) : ''}${state.tmMsg && state.tmMsg.user ? `<span class="tm-creds">نام کاربری: <bdi dir="ltr">${esc(state.tmMsg.user)}</bdi> · رمز: <bdi dir="ltr">${esc(state.tmMsg.pass)}</bdi></span>` : ''}</span>
             <button type="submit" class="bug-submit" id="tm-submit">ساخت کاربر صدور</button>
-            <span class="bug-msg ${state.tmMsg ? state.tmMsg.kind : ''}" id="tm-msg" role="status" aria-live="polite">${state.tmMsg ? esc(state.tmMsg.text) : ''}</span>
           </div>
         </form>
       </div>`;
@@ -4794,7 +4837,7 @@ window.APP_CONFIG = Object.freeze({
       if (error) { console.error(error); return setMsg(rpcErrorText(error, 'ساخت کاربر ناموفق بود.'), 'err'); }
       const leadName = ((m.options || []).find((o) => o.id === d.lead) || {}).full_name || '';
       state.tmDraft = { lead: d.lead, name: '', user: '', pass: '' };
-      state.tmMsg = { text: `«${name}» در تیم ${leadName} ساخته شد. نام کاربری: ${user} · رمز: ${pass}`, kind: 'ok' };
+      state.tmMsg = { text: `«${name}» در تیم ${leadName} ساخته شد.`, kind: 'ok', user, pass };
       renderTrainingManage(root);
     });
   }
