@@ -1548,6 +1548,7 @@ body.with-sidebar header.topbar {
 .tx-form .tb-type-field { grid-column: span 2; }
 .au-tabs.tb-types button { white-space: nowrap; padding: 0 8px; }
 @media (max-width: 640px) { .tx-form .tb-type-field { grid-column: 1 / -1; } }
+.tb-counts { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 10px; }
 
 </style>
 </head>
@@ -3847,7 +3848,17 @@ window.APP_CONFIG = Object.freeze({
   async function loadBugsPage() {
     const root = $('bugs-root');
     if (!root || !state.profile) return;
-    const { data, error } = await fetchBugs();
+    const isLead = state.profile.role === 'team_lead';
+    const [{ data, error }, tr] = await Promise.all([
+      fetchBugs(),
+      // سرگروه: باگ‌هایی که Training برای اعضای تیمش ثبت کرده (RLS: فقط تیم خودش و پارتنرش)
+      isLead ? sb.from('training_bugs')
+        .select('id, operator_id, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, created_at')
+        .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
+        .order('created_at', { ascending: false })
+        .limit(1000) : Promise.resolve({ data: [] }),
+    ]);
+    if (tr && tr.error) console.error('training_bugs query failed', tr.error);
     const live = $('bugs-root');
     if (!live) return;
     if (error) {
@@ -3857,7 +3868,10 @@ window.APP_CONFIG = Object.freeze({
     }
     state.bugs = data;
     if (state.profile.role === 'operator') live.innerHTML = renderBugsOperator(data);
-    else renderBugsLead(live, data);
+    else {
+      renderBugsLead(live, data);
+      if (isLead) live.insertAdjacentHTML('beforeend', trainingBugsForLeadHtml((tr && tr.data) || []));
+    }
   }
   function renderBugsOperator(rows) {
     const n = rows.length;
@@ -4740,6 +4754,33 @@ window.APP_CONFIG = Object.freeze({
       await renderTrainingExperts();
       toast('باگ حذف شد.');
     }));
+  }
+
+  // سرگروه: باگ‌های Training برای اعضای تیمش (فقط مشاهده)
+  function trainingBugsForLeadHtml(rows) {
+    const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
+    const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const by = {};
+    rows.forEach((r) => { by[r.bug_type] = (by[r.bug_type] || 0) + 1; });
+    const counts = TB_TYPES.filter((t) => by[t.id]).map((t) => `<span class="tb-chip ${t.id}">${t.label}: ${formatNum(by[t.id])}</span>`).join(' ');
+    const body = rows.slice().sort((a, b) => (Number(b.bug_date_sort) - Number(a.bug_date_sort)) || (a.created_at < b.created_at ? 1 : -1)).map((r) => `
+      <tr>
+        <td>${esc(faDigits(r.bug_date_jalali))}</td>
+        <td class="nm">${esc(nameOf(r.operator_id))}</td>
+        <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
+        <td class="num tb-amount">${rial(r.amount)}</td>
+        <td class="bug-order">${esc(r.order_number || '—')}</td>
+        <td>${esc(r.company || '—')}</td>
+        <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
+      </tr>`).join('');
+    return `
+      <div class="bug-sub">باگ‌های ثبت‌شده توسط Training <span class="mg-count">${formatNum(rows.length)} باگ · جمع ${rial(total)}</span></div>
+      ${counts ? `<div class="tb-counts">${counts}</div>` : ''}
+      <div class="panel perf-wrap">
+        ${body ? `<table class="perf-table bug-table">
+          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th></tr></thead>
+          <tbody>${body}</tbody></table>` : `<div class="empty-state">در ${esc(CURRENT_PERIOD.label)} برای اعضای تیم شما باگی توسط Training ثبت نشده است</div>`}
+      </div>`;
   }
 
   // سرپرست: کاربران Training (ساخت، ریست رمز)
