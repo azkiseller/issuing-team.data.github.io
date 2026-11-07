@@ -1583,6 +1583,32 @@ body.with-sidebar header.topbar {
   .tm-actions .bug-submit { width: 100%; }
 }
 
+/* کاربر صدور: تب‌های باگ */
+.ob-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 14px;
+  background: var(--side-chip, rgba(255,255,255,.5)); border: 1px solid var(--line); }
+.ob-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 0; border-radius: 10px; cursor: pointer;
+  font: 700 13px var(--font); color: var(--ink-soft); background: transparent; }
+.ob-tab:hover { color: var(--ink); }
+.ob-tab.active { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); box-shadow: 0 6px 16px -8px rgba(0,120,255,.6); }
+.ob-n { min-width: 22px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; text-align: center;
+  background: var(--accent-soft); color: var(--accent-strong); }
+.ob-tab.active .ob-n { background: rgba(255,255,255,.25); color: #fff; }
+.ob-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.ob-card { padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line);
+  border-top: 3px solid var(--line); display: grid; gap: 4px; }
+.ob-card.financial { border-top-color: var(--danger); }
+.ob-card.non_financial { border-top-color: var(--warn); }
+.ob-card.effective { border-top-color: var(--accent-strong); }
+.ob-card.total { border-top-color: var(--ink-soft); }
+.ob-card-t { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+.ob-card-n { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.3; }
+.ob-card-n.ob-money { font-size: 19px; padding-top: 5px; }
+.ob-card-s { font-size: 11.5px; color: var(--ink-faint); }
+@media (max-width: 760px) {
+  .ob-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ob-tabs { display: flex; } .ob-tab { flex: 1; justify-content: center; padding: 8px 10px; }
+}
+
 </style>
 </head>
 <body>
@@ -3863,10 +3889,11 @@ window.APP_CONFIG = Object.freeze({
     const root = $('bugs-root');
     if (!root || !state.profile) return;
     const isLead = state.profile.role === 'team_lead';
+    const isOp = state.profile.role === 'operator';
     const [{ data, error }, tr] = await Promise.all([
       fetchBugs(),
-      // سرگروه: باگ‌هایی که Training برای اعضای تیمش ثبت کرده (RLS: فقط تیم خودش و پارتنرش)
-      isLead ? sb.from('training_bugs')
+      // سرگروه: باگ‌های Training اعضای تیمش | کاربر صدور: باگ‌های Training خودش (RLS)
+      (isLead || isOp) ? sb.from('training_bugs')
         .select('id, operator_id, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, created_at')
         .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
         .order('created_at', { ascending: false })
@@ -3881,11 +3908,71 @@ window.APP_CONFIG = Object.freeze({
       return;
     }
     state.bugs = data;
-    if (state.profile.role === 'operator') live.innerHTML = renderBugsOperator(data);
-    else {
+    if (isOp) {
+      state.opTrainingBugs = (tr && tr.data) || [];
+      renderBugsOperatorTabs(live);
+    } else {
       renderBugsLead(live, data);
       if (isLead) live.insertAdjacentHTML('beforeend', trainingBugsForLeadHtml((tr && tr.data) || []));
     }
+  }
+  // کاربر صدور: دو تب — باگ‌های Training (بار مالی / بدون بار مالی / مؤثر) و باگ‌های عملکردی
+  function renderBugsOperatorTabs(root) {
+    const perf = state.bugs || [];
+    const tr = state.opTrainingBugs || [];
+    const tab = state.opBugTab || 'training';
+    root.innerHTML = `
+      <div class="ob-tabs" role="tablist">
+        <button type="button" role="tab" class="ob-tab ${tab === 'training' ? 'active' : ''}" data-obtab="training" aria-selected="${tab === 'training'}">باگ‌های Training <span class="ob-n">${formatNum(tr.length)}</span></button>
+        <button type="button" role="tab" class="ob-tab ${tab === 'perf' ? 'active' : ''}" data-obtab="perf" aria-selected="${tab === 'perf'}">باگ‌های عملکردی <span class="ob-n">${formatNum(perf.length)}</span></button>
+      </div>
+      ${tab === 'training' ? renderTrainingBugsOperator(tr, perf.length) : renderBugsOperator(perf)}`;
+    root.querySelectorAll('[data-obtab]').forEach((b) => b.addEventListener('click', () => {
+      state.opBugTab = b.getAttribute('data-obtab');
+      renderBugsOperatorTabs(root);
+    }));
+  }
+  function renderTrainingBugsOperator(rows, perfCount) {
+    const cnt = { financial: 0, non_financial: 0, effective: 0 };
+    const sum = { financial: 0, non_financial: 0, effective: 0 };
+    rows.forEach((r) => { if (cnt[r.bug_type] != null) { cnt[r.bug_type] += 1; sum[r.bug_type] += Number(r.amount) || 0; } });
+    const converted = bugSplit(perfCount).free;
+    const total = sum.financial + sum.effective;
+    const card = (cls, title, n, sub) => `
+      <div class="ob-card ${cls}">
+        <div class="ob-card-t">${title}</div>
+        <div class="ob-card-n">${formatNum(n)}</div>
+        <div class="ob-card-s">${sub}</div>
+      </div>`;
+    const nfSub = converted
+      ? `<bdi>${formatNum(cnt.non_financial)} از <bdi>Training</bdi></bdi> + <bdi>${formatNum(converted)} از تبدیل عملکردی</bdi>`
+      : 'ثبت‌شده توسط Training';
+    const body = rows.slice().sort((a, b) => (Number(b.bug_date_sort) - Number(a.bug_date_sort)) || (a.created_at < b.created_at ? 1 : -1)).map((r) => `
+      <tr>
+        <td>${esc(faDigits(r.bug_date_jalali))}</td>
+        <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
+        <td class="num tb-amount">${rial(r.amount)}</td>
+        <td class="bug-order">${esc(r.order_number || '—')}</td>
+        <td>${esc(r.company || '—')}</td>
+        <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
+      </tr>`).join('');
+    return `
+      <div class="ob-cards">
+        ${card('financial', 'بار مالی', cnt.financial, rial(sum.financial))}
+        ${card('non_financial', 'بدون بار مالی', cnt.non_financial + converted, nfSub)}
+        ${card('effective', 'مؤثر', cnt.effective, rial(sum.effective))}
+        <div class="ob-card total">
+          <div class="ob-card-t">جمع مبلغ دوره</div>
+          <div class="ob-card-n ob-money">${formatNum(total)}</div>
+          <div class="ob-card-s">ریال · بار مالی + مؤثر</div>
+        </div>
+      </div>
+      <div class="bug-sub">باگ‌های ثبت‌شده توسط Training در ${esc(CURRENT_PERIOD.label)}</div>
+      <div class="panel perf-wrap">
+        ${body ? `<table class="perf-table bug-table">
+          <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th></tr></thead>
+          <tbody>${body}</tbody></table>` : '<div class="empty-state">در این دوره باگی توسط Training برای شما ثبت نشده است 👏</div>'}
+      </div>`;
   }
   function renderBugsOperator(rows) {
     const n = rows.length;
