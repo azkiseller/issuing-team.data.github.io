@@ -1369,21 +1369,48 @@ body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]) { di
   .mg-table select.tree-search { width: 100%; }
 }
 
-/* ---------- خروجی اکسل با بازه‌ی دلخواه ---------- */
-.pe-box { padding: 16px 18px; margin-bottom: 14px; display: grid; gap: 12px; }
+/* ---------- خروجی اکسل با بازه‌ی دلخواه (تقویم همان تقویم «کارکرد روزانه») ---------- */
+.pe-box { padding: 16px 18px; margin-bottom: 16px; display: grid; gap: 12px; overflow: visible; position: relative; z-index: 5; }
 .pe-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--ink); }
 .pe-title svg { width: 18px; height: 18px; color: var(--accent-strong); }
 .pe-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.pe-fields label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-.pe-date { width: 132px; margin-bottom: 0; text-align: center; letter-spacing: .02em; }
-.pe-presets { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 6px; }
+.pe-fields .df-btn { min-width: 150px; }
+.pe-presets { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; }
 .pe-box .perf-export { margin-inline-start: auto; }
 .pe-box .bug-msg:empty { display: none; }
 @media (max-width: 560px) {
-  .pe-fields label { flex: 1 1 130px; }
-  .pe-date { width: 100%; }
+  .pe-fields .df-field { flex: 1 1 140px; }
+  .pe-fields .df-btn { min-width: 0; width: 100%; }
   .pe-box .perf-export { width: 100%; justify-content: center; margin-inline-start: 0; }
 }
+
+/* ---------- مدیریت تیم: افزودن کاربر ---------- */
+.mg-tools { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.mg-tools .mg-search { width: 220px; }
+.mg-add { padding: 9px 16px; font-size: 12.5px; }
+.mg-badge { display: inline-block; min-width: 20px; padding: 0 6px; margin-inline-start: 4px; border-radius: 999px; background: rgba(255,255,255,.28); font-size: 11px; line-height: 18px; text-align: center; }
+.au-list { max-height: min(46vh, 340px); overflow-y: auto; display: grid; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.au-item { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 8px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.au-item:hover { background: var(--accent-soft); }
+.au-item[hidden] { display: none; }
+.au-item input { width: 18px; height: 18px; accent-color: var(--accent-deep); flex: none; }
+.au-count { font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+@media (max-width: 640px) { .mg-tools { width: 100%; flex-wrap: wrap; } .mg-tools .mg-search { width: 100%; } .mg-add { width: 100%; justify-content: center; } }
+
+/* ---------- شرکت‌های سرگروه: اعضای فعال تیم در هر شرکت ---------- */
+.tc-sub { margin: 4px 0 12px; font-size: 14px; font-weight: 800; color: var(--ink); }
+.tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-items: start; }
+.tc-card { padding: 14px 16px; }
+.tc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.tc-name { font-size: 15px; font-weight: 800; color: var(--ink); }
+.tc-count { margin-inline-start: auto; font-size: 12px; font-weight: 700; color: var(--good); }
+.tc-head .co-time { font-size: 11.5px; }
+.tc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tc-list li { position: relative; padding-inline-start: 14px; font-size: 13px; color: var(--ink-soft); }
+.tc-list li::before { content: ''; position: absolute; inset-inline-start: 2px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+.tc-empty { font-size: 12.5px; color: var(--ink-faint); padding: 4px 0; }
+.pulse-dot.off { background: var(--ink-faint); box-shadow: none; animation: none; }
+.trend-tip .tt-detail li small { font-size: 10.5px; font-weight: 600; opacity: .75; }
 
 </style>
 </head>
@@ -1749,6 +1776,31 @@ window.APP_CONFIG = Object.freeze({
     treeIds: new Set(),
   };
 
+  // صفحه‌ی شرکت‌های سرگروه: هر شرکتِ گروه با اسم اعضای تیم که الان در آن فعال (و مجاز به صدور) هستند
+  function teamCompanyCardsHtml(scope) {
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id));
+    const activeIn = {};
+    ops.forEach((p) => {
+      const st = state.statusByOperator[p.id];
+      if (!isFullyActive(st)) return;
+      splitCompanies(st.companies).forEach((c) => { (activeIn[normCompany(c)] = activeIn[normCompany(c)] || []).push(p); });
+    });
+    const totalActive = ops.filter((p) => isFullyActive(state.statusByOperator[p.id])).length;
+    const cards = scope.map((c) => {
+      const people = (activeIn[normCompany(c)] || []).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+      return `
+        <div class="panel tc-card">
+          <div class="tc-head">
+            <span class="pulse-dot sm${people.length ? '' : ' off'}"></span><b class="tc-name">${esc(c)}</b>
+            <span class="tc-count">${formatNum(people.length)} نفر فعال</span>${companyTimeTag(c)}
+          </div>
+          ${people.length ? `<ul class="tc-list">${people.map((p) => `<li>${esc(p.full_name || '—')}</li>`).join('')}</ul>`
+            : '<div class="tc-empty">الان کسی از تیم در این شرکت فعال نیست</div>'}
+        </div>`;
+    }).join('');
+    return `<div class="tc-sub">اعضای فعال تیم در هر شرکت <span class="mg-count">${formatNum(totalActive)} از ${formatNum(ops.length)} نفر الان فعال‌اند</span></div>
+      <div class="tc-grid">${cards}</div>`;
+  }
   function isFullyActive(st) {
     return !!(st && st.is_active === true && st.is_active_to_issue === true);
   }
@@ -2989,8 +3041,22 @@ window.APP_CONFIG = Object.freeze({
       };
     });
   }
+  // جزئیات هر ربع ساعت: کاربران فعال به تفکیک شرکت (میانگین روزهای اخیر، و امروز)
+  function hourlyCompanyDetail(rows) {
+    const by = {};
+    (rows || []).forEach((r) => {
+      const a = Number(r.avg_active) || 0, t = r.today == null ? null : Number(r.today);
+      if (a > 0 || t > 0) (by[r.slot] = by[r.slot] || []).push({ c: r.company, a, t });
+    });
+    const f1 = (n) => formatNum(Math.round(n * 10) / 10);
+    return (i) => {
+      const list = (by[i] || []).sort((x, y) => y.a - x.a).slice(0, 12);
+      if (!list.length) return '';
+      return `<ul>${list.map((x) => `<li><span>${esc(x.c)}</span><b>${x.t != null ? `<small>(امروز ${f1(x.t)})</small> ` : ''}${f1(x.a)}</b></li>`).join('')}</ul>`;
+    };
+  }
   function renderHourlyActive(rows) {
-    const title = 'میانگین کاربران فعال در ساعات روز';
+    const title = state.viewerRole === 'team_lead' ? 'میانگین کاربران فعال تیم در ساعات روز' : 'میانگین کاربران فعال در ساعات روز';
     if (!rows.length) {
       return `<div class="panel chart trend"><div class="trend-head"><div class="label">${title}</div></div>
         <div class="empty-state">داده از هر ۱۵ دقیقه جمع‌آوری می‌شود و نمودار از ساعت‌های بعد پر می‌شود.</div></div>`;
@@ -3375,13 +3441,13 @@ window.APP_CONFIG = Object.freeze({
       </tr>`;
     const rows = active.concat(idle).map((x, i) => cell(Object.assign(x, { i }))).join('');
     root.innerHTML = `
+      ${SUPERVISOR_ROLES.includes(state.viewerRole) || state.viewerRole === 'team_lead' ? perfExportHtml() : ''}
       <div class="perf-bar">
         <div class="view-tabs" role="tablist" aria-label="بازه">
           ${PERF_RANGES.map((r) => `<button type="button" role="tab" data-perf="${r.id}" aria-selected="${r.id === range}">${r.label}</button>`).join('')}
         </div>
         <div class="perf-range">${esc(bounds.text)}</div>
       </div>
-      ${SUPERVISOR_ROLES.includes(state.viewerRole) || state.viewerRole === 'team_lead' ? perfExportHtml() : ''}
       <div class="perf-legend" aria-hidden="true">
         <span><i class="good"></i>بهتر (تعداد بیشتر / زمان کمتر)</span><span><i class="warn"></i>متوسط</span><span><i class="bad"></i>ضعیف‌تر</span>
         <span>ترتیب: ۷۵٪ تعداد صدور + ۲۵٪ زمان صدور (زمانِ کم‌صدورها به میانگین گروه نزدیک می‌شود)</span>
@@ -3905,10 +3971,10 @@ window.APP_CONFIG = Object.freeze({
       .filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && (p.full_name || '').trim() !== BOT_NAME)
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
     const shown = q ? ops.filter((p) => (p.full_name || '').includes(q)) : ops;
-    const optLabel = (o) => (o.role === 'supervisor' ? `بدون سرگروه (زیر ${o.full_name || 'سرپرست'})` : o.full_name || '—');
     const moveSelect = (p) => `
       <select class="tree-search mg-move" data-op="${esc(p.id)}" aria-label="انتقال ${esc(p.full_name || '')} به تیم">
-        ${m.options.map((o) => `<option value="${esc(o.id)}"${o.id === p.reports_to ? ' selected' : ''}>${esc(optLabel(o))}</option>`).join('')}
+        ${m.options.some((o) => o.id === p.reports_to) ? '' : '<option value="" selected>—</option>'}
+        ${m.options.map((o) => `<option value="${esc(o.id)}"${o.id === p.reports_to ? ' selected' : ''}>${esc(o.full_name || '—')}</option>`).join('')}
       </select>`;
     const rows = shown.map((p) => `
       <tr>
@@ -3920,32 +3986,20 @@ window.APP_CONFIG = Object.freeze({
           <button type="button" class="bug-del" data-delop="${esc(p.id)}">حذف</button>
         </td>
       </tr>`).join('');
-    const leads = m.options.filter((o) => o.role === 'team_lead');
-    const unRows = (m.unassigned || []).map((u) => `
-      <tr>
-        <td class="nm">${esc(u.full_name || '—')}</td>
-        <td class="mg-acts">${isLead
-          ? `<button type="button" class="mg-btn mg-primary" data-claim="${esc(u.id)}">افزودن به تیم من</button>`
-          : `<select class="tree-search mg-assign" data-op="${esc(u.id)}" aria-label="سرگروه برای ${esc(u.full_name || '')}">
-               <option value="">انتخاب سرگروه...</option>
-               ${leads.map((o) => `<option value="${esc(o.id)}">${esc(o.full_name || '—')}</option>`).join('')}
-             </select>`}</td>
-      </tr>`).join('');
+    const unCount = (m.unassigned || []).length;
     root2.innerHTML = `
       ${m.error ? '<div class="panel"><div class="empty-state">خواندن اطلاعات مدیریت تیم ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>' : ''}
       <div class="mg-head">
         <div class="bug-sub">اپراتورهای ${isLead ? 'تیم من' : 'زیرمجموعه'} <span class="mg-count">${formatNum(ops.length)} نفر</span></div>
-        <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام..." value="${esc(q)}" aria-label="جستجوی اپراتور">
+        <div class="mg-tools">
+          <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام..." value="${esc(q)}" aria-label="جستجوی اپراتور">
+          <button type="button" class="mg-btn mg-primary mg-add" id="mg-add">+ افزودن کاربر به تیم${unCount ? ` <span class="mg-badge">${formatNum(unCount)}</span>` : ''}</button>
+        </div>
       </div>
       <div class="panel perf-wrap">
         ${rows ? `<table class="perf-table mg-table">
           <thead><tr><th>اپراتور</th><th>تیم فعلی</th><th>انتقال به</th><th></th></tr></thead>
           <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
-      </div>
-      <div class="bug-sub">افراد بدون سرگروه <span class="mg-count">${formatNum((m.unassigned || []).length)} نفر</span></div>
-      <div class="panel perf-wrap">
-        ${unRows ? `<table class="perf-table mg-table"><thead><tr><th>نام</th><th></th></tr></thead><tbody>${unRows}</tbody></table>`
-          : '<div class="empty-state">همه‌ی اپراتورها سرگروه دارند</div>'}
       </div>
       <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. حذف کاربر برگشت‌پذیر نیست و همه‌ی آمار صدور و حقوق او هم پاک می‌شود.</div>`;
     bindManagePage(root2);
@@ -3969,7 +4023,7 @@ window.APP_CONFIG = Object.freeze({
         const id = sel.getAttribute('data-op');
         const chosen = sel.value;
         const target = (state.manage.options || []).find((o) => o.id === chosen);
-        const label = target ? (target.role === 'supervisor' ? 'بدون سرگروه' : `تیم ${target.full_name}`) : '';
+        const label = target ? `تیم ${target.full_name}` : '';
         openModal({
           title: 'انتقال اپراتور',
           confirmText: 'انتقال',
@@ -3983,21 +4037,8 @@ window.APP_CONFIG = Object.freeze({
         sel.value = initial; // تا تأیید نشده، انتخاب قبلی بماند
       });
     });
-    root.querySelectorAll('[data-claim]').forEach((b) => b.addEventListener('click', async () => {
-      const id = b.getAttribute('data-claim');
-      b.disabled = true;
-      const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: state.profile.id });
-      if (error) { console.error(error); b.disabled = false; return toast(rpcErrorText(error, 'افزودن ناموفق بود.'), 'err'); }
-      await afterManageChange(`«${nameOf(id)}» به تیم شما اضافه شد.`);
-    }));
-    root.querySelectorAll('.mg-assign').forEach((sel) => sel.addEventListener('change', async () => {
-      if (!sel.value) return;
-      const id = sel.getAttribute('data-op');
-      sel.disabled = true;
-      const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: sel.value });
-      if (error) { console.error(error); sel.disabled = false; sel.value = ''; return toast(rpcErrorText(error, 'ثبت سرگروه ناموفق بود.'), 'err'); }
-      await afterManageChange(`سرگروه «${nameOf(id)}» ثبت شد.`);
-    }));
+    const add = $('mg-add');
+    if (add) add.addEventListener('click', openAddUsersModal);
     root.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
       const id = b.getAttribute('data-reset');
       openModal({
@@ -4038,27 +4079,149 @@ window.APP_CONFIG = Object.freeze({
     }));
   }
 
+  // افزودن کاربرهای بدون سرگروه به تیم (چند انتخابی). سرگروه: به تیم خودش؛ سرپرست: اول سرگروه را انتخاب می‌کند
+  function openAddUsersModal() {
+    const m = state.manage || { options: [], unassigned: [] };
+    const isLead = state.profile.role === 'team_lead';
+    const list = (m.unassigned || []).slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    openModal({
+      title: 'افزودن کاربر به تیم',
+      confirmText: list.length ? 'افزودن به تیم' : 'بستن',
+      body: `
+        ${isLead || !list.length ? '' : `<label class="modal-field">سرگروه
+          <select class="tree-search" id="au-lead"><option value="">انتخاب سرگروه...</option>
+            ${m.options.map((o) => `<option value="${esc(o.id)}">${esc(o.full_name || '—')}</option>`).join('')}
+          </select></label>`}
+        ${list.length ? `
+          <p class="modal-text">کاربرهای بدون سرگروه؛ هر تعداد را که می‌خواهید انتخاب کنید.</p>
+          <input class="tree-search" id="au-search" type="search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
+          <div class="au-list" id="au-list">
+            ${list.map((u) => `<label class="au-item" data-name="${esc(u.full_name || '')}"><input type="checkbox" value="${esc(u.id)}"><span>${esc(u.full_name || '—')}</span></label>`).join('')}
+          </div>
+          <div class="au-count" id="au-count">هنوز کسی انتخاب نشده</div>`
+        : '<p class="modal-text">الان کاربری بدون سرگروه وجود ندارد.</p>'}`,
+      onOpen: (dlg) => {
+        const search = dlg.querySelector('#au-search');
+        const count = dlg.querySelector('#au-count');
+        if (search) search.addEventListener('input', () => {
+          const q = search.value.trim();
+          dlg.querySelectorAll('.au-item').forEach((it) => { it.hidden = !!q && !it.getAttribute('data-name').includes(q); });
+        });
+        dlg.querySelectorAll('.au-item input').forEach((c) => c.addEventListener('change', () => {
+          const n = dlg.querySelectorAll('.au-item input:checked').length;
+          count.textContent = n ? `${formatNum(n)} نفر انتخاب شده` : 'هنوز کسی انتخاب نشده';
+        }));
+      },
+      onConfirm: async (dlg) => {
+        if (!list.length) return true;
+        const lead = isLead ? state.profile.id : (dlg.querySelector('#au-lead') || {}).value;
+        const ids = [...dlg.querySelectorAll('.au-item input:checked')].map((c) => c.value);
+        if (!lead) throw new Error('سرگروه را انتخاب کنید.');
+        if (!ids.length) throw new Error('حداقل یک نفر را انتخاب کنید.');
+        const failed = [];
+        for (const id of ids) {
+          const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: lead });
+          if (error) { console.error(error); failed.push(id); }
+        }
+        const ok = ids.length - failed.length;
+        if (!ok) throw new Error('افزودن ناموفق بود. دوباره تلاش کنید.');
+        const leadName = isLead ? 'تیم شما' : `تیم ${((m.options || []).find((o) => o.id === lead) || {}).full_name || ''}`;
+        await afterManageChange(`${formatNum(ok)} نفر به ${leadName} اضافه شد${failed.length ? ` (${formatNum(failed.length)} نفر ناموفق)` : ''}.`);
+      },
+    });
+  }
+
   // ---------------------------------------------------------------
   // خروجی اکسل عملکرد با بازه‌ی دلخواه (سرپرست: همه؛ سرگروه: تیم خودش — محدوده را RLS تعیین می‌کند)
   // ---------------------------------------------------------------
-  function parseJalaliInput(v) {
-    const m = toEnDigits(v).trim().match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
-    if (!m) return null;
-    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
-    if (y < 1390 || y > 1500 || mo < 1 || mo > 12 || d < 1 || d > jalaliMonthLength(y, mo)) return null;
-    return y * 10000 + mo * 100 + d;
+  // تقویم شمسی (همان ظاهر تقویم «کارکرد روزانه»): روی دکمه‌ی تاریخ کلیک → ماه/سال و روزها؛ روزهای بعد از امروز غیرفعال
+  let jdpClose = null;
+  function closeJalaliPicker() { if (jdpClose) jdpClose(); }
+  function openJalaliPicker(btn, { value, max = TODAY_SORT, onPick }) {
+    closeJalaliPicker();
+    let vy = Math.floor(value / 10000), vm = Math.floor(value / 100) % 100;
+    const pop = document.createElement('div');
+    pop.className = 'df-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'انتخاب تاریخ');
+    btn.parentNode.appendChild(pop);
+    btn.setAttribute('aria-expanded', 'true');
+    const chev = (pts) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="${pts}"/></svg>`;
+    const render = () => {
+      const len = jalaliMonthLength(vy, vm), offset = jalaliWeekday(vy, vm, 1); // شنبه = ۰
+      let years = '';
+      for (let y = TODAY[0] - 3; y <= TODAY[0]; y++) years += `<option value="${y}"${y === vy ? ' selected' : ''}>${faDigits(y)}</option>`;
+      const months = PERSIAN_MONTHS.map((n, k) => `<option value="${k + 1}"${k + 1 === vm ? ' selected' : ''}>${n}</option>`).join('');
+      let cells = '';
+      for (let k = 0; k < offset; k++) cells += '<span></span>';
+      for (let d = 1; d <= len; d++) {
+        const sort = vy * 10000 + vm * 100 + d;
+        cells += `<button type="button" class="df-day${sort === value ? ' sel' : ''}${sort === TODAY_SORT ? ' today' : ''}" data-d="${sort}"${sort > max ? ' disabled' : ''}>${faDigits(d)}</button>`;
+      }
+      pop.innerHTML = `
+        <div class="df-head">
+          <button type="button" class="df-nav" data-nav="-1" aria-label="ماه قبل">${chev('9 6 15 12 9 18')}</button>
+          <select data-role="m" aria-label="ماه">${months}</select>
+          <select data-role="y" aria-label="سال">${years}</select>
+          <button type="button" class="df-nav" data-nav="1" aria-label="ماه بعد">${chev('15 6 9 12 15 18')}</button>
+        </div>
+        <div class="df-grid">${['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map((w) => `<span class="df-wd">${w}</span>`).join('')}${cells}</div>
+        <div class="df-foot">
+          <button type="button" class="df-small" data-d="${Math.min(TODAY_SORT, max)}">امروز</button>
+          <button type="button" class="df-small" data-close="1">بستن</button>
+        </div>`;
+    };
+    render();
+    (pop.querySelector('.df-day.sel') || pop.querySelector('.df-day:not([disabled])') || pop).focus();
+    const outside = (e) => { if (!pop.contains(e.target) && !btn.contains(e.target)) jdpClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') { jdpClose(); btn.focus(); } };
+    pop.addEventListener('change', (e) => {
+      const r = e.target.getAttribute('data-role');
+      if (r === 'm') vm = Number(e.target.value);
+      if (r === 'y') vy = Number(e.target.value);
+      render();
+    });
+    pop.addEventListener('click', (e) => {
+      const nav = e.target.closest('[data-nav]');
+      if (nav) {
+        vm += Number(nav.getAttribute('data-nav'));
+        if (vm < 1) { vm = 12; vy -= 1; }
+        if (vm > 12) { vm = 1; vy += 1; }
+        render();
+        return;
+      }
+      if (e.target.closest('[data-close]')) { jdpClose(); btn.focus(); return; }
+      const b = e.target.closest('[data-d]');
+      if (b && !b.disabled) { onPick(Number(b.getAttribute('data-d'))); jdpClose(); btn.focus(); }
+    });
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', onKey);
+    jdpClose = () => {
+      pop.remove();
+      btn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', onKey);
+      jdpClose = null;
+    };
   }
   const sortLabel = (s) => jLabel(sortToJ(s));
   function perfExportHtml() {
     const pp = prevPeriodInfo();
-    const from = state.peFrom || sortLabel(CURRENT_PERIOD.startSort);
-    const to = state.peTo || sortLabel(TODAY_SORT);
+    if (!state.peFrom) state.peFrom = Number(CURRENT_PERIOD.startSort);
+    if (!state.peTo) state.peTo = TODAY_SORT;
+    const dateBtn = (id, v, label) => `
+      <div class="df-field">
+        <span class="df-label" id="${id}-lbl">${label}</span>
+        <button type="button" class="df-btn" id="${id}" aria-haspopup="dialog" aria-expanded="false" aria-describedby="${id}-lbl">
+          <span>${esc(sortLabel(v))}</span>${CAL_ICON}
+        </button>
+      </div>`;
     return `
       <div class="panel pe-box" id="pe-box">
         <div class="pe-title">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>خروجی اکسل عملکرد و حقوق</span></div>
         <div class="pe-fields">
-          <label>از تاریخ<input class="tree-search pe-date" id="pe-from" inputmode="numeric" dir="ltr" placeholder="۱۴۰۵/۰۷/۲۱" value="${esc(from)}"></label>
-          <label>تا تاریخ<input class="tree-search pe-date" id="pe-to" inputmode="numeric" dir="ltr" placeholder="۱۴۰۵/۰۸/۲۰" value="${esc(to)}"></label>
+          ${dateBtn('pe-from', state.peFrom, 'از تاریخ')}
+          ${dateBtn('pe-to', state.peTo, 'تا تاریخ')}
           <div class="pe-presets" role="group" aria-label="بازه‌های آماده">
             <button type="button" class="mg-btn" data-pe="cur">دوره‌ی جاری</button>
             <button type="button" class="mg-btn" data-pe="prev">دوره‌ی قبل (${esc(pp.label)})</button>
@@ -4072,20 +4235,24 @@ window.APP_CONFIG = Object.freeze({
     const f = $('pe-from'), t = $('pe-to'), go = $('pe-go'), msg = $('pe-msg');
     if (!f || !go) return;
     const setMsg = (text, kind) => { msg.textContent = text || ''; msg.className = 'bug-msg ' + (kind || ''); };
-    f.addEventListener('input', () => { state.peFrom = f.value; });
-    t.addEventListener('input', () => { state.peTo = t.value; });
+    const paint = () => {
+      f.querySelector('span').textContent = sortLabel(state.peFrom);
+      t.querySelector('span').textContent = sortLabel(state.peTo);
+    };
+    f.addEventListener('click', () => openJalaliPicker(f, { value: state.peFrom, onPick: (v) => {
+      state.peFrom = v; if (state.peTo < v) state.peTo = v; paint(); setMsg('');
+    } }));
+    t.addEventListener('click', () => openJalaliPicker(t, { value: state.peTo, onPick: (v) => {
+      state.peTo = v; if (state.peFrom > v) state.peFrom = v; paint(); setMsg('');
+    } }));
     document.querySelectorAll('[data-pe]').forEach((b) => b.addEventListener('click', () => {
       const pp = prevPeriodInfo();
-      const [a, c] = b.getAttribute('data-pe') === 'prev' ? [pp.startSort, pp.endSort] : [Number(CURRENT_PERIOD.startSort), TODAY_SORT];
-      f.value = state.peFrom = sortLabel(a);
-      t.value = state.peTo = sortLabel(c);
-      setMsg('');
+      [state.peFrom, state.peTo] = b.getAttribute('data-pe') === 'prev' ? [pp.startSort, pp.endSort] : [Number(CURRENT_PERIOD.startSort), TODAY_SORT];
+      paint(); setMsg('');
     }));
     go.addEventListener('click', async () => {
-      const a = parseJalaliInput(f.value), c = parseJalaliInput(t.value);
-      if (!a || !c) return setMsg('تاریخ را به شکل ۱۴۰۵/۰۷/۲۱ وارد کنید.', 'err');
+      const a = state.peFrom, c = state.peTo;
       if (a > c) return setMsg('«از تاریخ» باید قبل از «تا تاریخ» باشد.', 'err');
-      if (c > TODAY_SORT) return setMsg('«تا تاریخ» نمی‌تواند بعد از امروز باشد.', 'err');
       if (jalaliDaysBetween(sortToJ(a), sortToJ(c)) > 400) return setMsg('بازه حداکثر ۴۰۰ روز می‌تواند باشد.', 'err');
       const label = go.querySelector('span');
       go.disabled = true; label.textContent = 'در حال دریافت...'; setMsg('');
@@ -4093,7 +4260,7 @@ window.APP_CONFIG = Object.freeze({
         const rows = await fetchPeriodTargets(a, c);
         const raw = {};
         rows.forEach((r) => { (raw[r.operator_id] = raw[r.operator_id] || []).push(r); });
-        const name = (s) => toEnDigits(sortLabel(s)).replace(/\//g, '-');
+        const name = (v) => toEnDigits(sortLabel(v)).replace(/\//g, '-');
         exportPerfXlsx('month', {
           raw,
           bounds: { from: a, to: c, text: `از ${sortLabel(a)} تا ${sortLabel(c)}` },
@@ -4137,7 +4304,7 @@ window.APP_CONFIG = Object.freeze({
     if (!silent && !content.querySelector('.sk')) showSkeleton(4);
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
-    const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes] = await Promise.all([
+    const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes, hourlyCoRes] = await Promise.all([
       sb.from('profiles').select('id, full_name, role, reports_to, unit'),
       // صفحه‌به‌صفحه (سقف ۱۰۰۰ ردیف در هر درخواست)؛ در تازه‌سازی فقط روزهای تغییرکرده
       loadPeriodTargets(silent ? changedFrom : null),
@@ -4151,7 +4318,7 @@ window.APP_CONFIG = Object.freeze({
         ? Promise.resolve({ data: [] })
         : sb.from('team_lead_partners').select('profile_id, partner_id'),
       // میانگین کاربران فعال در هر ساعت روز (فقط سرپرست/مدیر؛ از عکس‌های ۱۵ دقیقه‌ای، ۳۰ روز اخیر)
-      SUPERVISOR_ROLES.includes(profile.role)
+      SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead'
         ? sb.rpc('active_hourly_profile', { p_days: HOURLY_DAYS })
         : Promise.resolve({ data: null }),
       // شاخص‌های عملکرد دوره‌ی جاری (RLS: سرگروه فقط فردی/جفت/شیفت/کل خودش)
@@ -4160,6 +4327,10 @@ window.APP_CONFIG = Object.freeze({
         : Promise.resolve({ data: [] }),
       // زمان صدور هر شرکت در دوره‌ی جاری (RLS: فقط زیرمجموعه‌ی خود کاربر)
       sb.rpc('company_issuance_time', { p_start: CURRENT_PERIOD.startSort, p_end: CURRENT_PERIOD.endSort }),
+      // همان نمودار ساعتی به تفکیک شرکت (برای جزئیات هر ربع ساعت)
+      SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead'
+        ? sb.rpc('active_hourly_companies', { p_days: HOURLY_DAYS })
+        : Promise.resolve({ data: null }),
     ]);
     state.companyTime = {};
     ((companyTimeRes && companyTimeRes.data) || []).forEach((c) => {
@@ -4296,10 +4467,8 @@ window.APP_CONFIG = Object.freeze({
     const companyStats = companyRes.data || [];
     const myScope = state.scopeByLead[profile.id] || [];
     if (profile.role === 'team_lead' && myScope.length) {
-      // ترتیب و لیست شرکت‌ها از جدول team_lead_company_scope؛ شرکت بدون آمار = ۰
-      const countBy = {};
-      companyStats.forEach((c) => { countBy[c.company] = c.active_count; });
-      companyStatsHtml = companyPillsHtml(myScope.map((c) => ({ company: c, active_count: countBy[c] || 0 })));
+      // هر شرکتِ گروه (به ترتیب team_lead_company_scope) با اسم اعضای تیم که الان در آن فعال‌اند
+      companyStatsHtml = teamCompanyCardsHtml(myScope);
     } else if (companyStats.length && Object.keys(state.scopeByLead).length) {
       companyStatsHtml = renderCompanyGroups(companyStats); // سرپرست/مدیر: گروه‌بندی بر اساس گروه‌های شرکتی سرگروه‌ها
     } else if (companyStats.length) {
@@ -4354,7 +4523,10 @@ window.APP_CONFIG = Object.freeze({
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot', { detail: botDayDetail(botRows, botCompanyRows) }); bindBotPanel(); }
     bindCompanyGroups();
     if (hasHourly) {
-      if (hourlyRes.data.length) bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', { unit: 'کاربر فعال' });
+      if (hourlyRes.data.length) {
+        const coRows = (hourlyCoRes && hourlyCoRes.data) || [];
+        bindTrendChart(hourlySeries(hourlyRes.data), 'hourly', coRows.length ? { unit: 'کاربر فعال', detail: hourlyCompanyDetail(coRows) } : { unit: 'کاربر فعال' });
+      }
     }
     if (state.sidebar) flattenToggles();
     else if (hasHourly) {
