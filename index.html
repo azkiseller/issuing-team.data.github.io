@@ -1307,6 +1307,84 @@ html[data-theme="dark"] .trend-tip .tt-detail { border-top-color: rgba(15,27,51,
 .trend-tip .tt-time .clk { width: 12px; height: 12px; }
 .trend-plot .trend-tip svg { position: static; inset: auto; width: 12px; height: 12px; overflow: visible; flex: none; }
 
+/* ---------- حساب کاربری: تغییر رمز کنار خروج ---------- */
+.user-acts { display: flex; align-items: center; gap: 14px; }
+.side-user .user-acts { grid-column: 1 / -1; margin-top: 4px; }
+.side-user .user-acts #logout-btn { margin-top: 0; }
+.top-user .user-acts { margin-inline-start: 6px; }
+button.ghost#pw-btn:hover { color: var(--accent-strong); }
+
+/* ---------- پنجره‌ی ساده (dialog) و پیام کوتاه ---------- */
+.app-modal { border: 0; padding: 0; background: transparent; max-width: min(440px, calc(100vw - 32px)); width: 100%; }
+.app-modal::backdrop { background: rgba(8, 15, 35, .45); backdrop-filter: blur(2px); }
+.modal-card { display: grid; gap: 14px; padding: 22px 22px 18px; border-radius: var(--radius); background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 24px 60px -20px rgba(8,15,35,.45); }
+.modal-title { margin: 0; font-size: 17px; font-weight: 800; }
+.modal-body { display: grid; gap: 12px; }
+.modal-text { margin: 0; font-size: 13.5px; line-height: 1.9; color: var(--ink-soft); }
+.modal-field { display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.modal-field .tree-search { margin-bottom: 0; }
+.modal-field .opt { font-weight: 500; color: var(--ink-faint); }
+.modal-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.modal-check input { width: 18px; height: 18px; accent-color: var(--danger); }
+.modal-msg:empty { display: none; }
+.modal-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.modal-cancel { font: 600 13px var(--font); color: var(--ink-soft); background: none; border: 0; cursor: pointer; padding: 8px 6px; }
+.modal-cancel:hover { color: var(--ink); }
+.bug-submit.danger { background: linear-gradient(135deg, #E0453F, #B92F2A); box-shadow: 0 6px 16px -8px rgba(224,69,63,.6); }
+.pw-row { display: flex; gap: 8px; align-items: center; }
+.pw-row .tree-search { flex: 1; margin-bottom: 0; }
+.app-toast { position: fixed; inset-inline: 0; bottom: 24px; margin: 0 auto; width: max-content; max-width: calc(100vw - 32px); z-index: 60;
+  padding: 10px 18px; border-radius: 999px; font: 700 13px var(--font); color: #fff; background: var(--good); box-shadow: 0 10px 30px -10px rgba(8,15,35,.5);
+  animation: toast-in .22s ease both; transition: opacity .4s ease, transform .4s ease; }
+.app-toast.err { background: var(--danger); }
+.app-toast.out { opacity: 0; transform: translateY(8px); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .app-toast { animation: none; transition: none; } }
+
+/* ---------- مدیریت تیم ---------- */
+body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]) { display: none !important; }
+.mg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 10px; }
+.mg-head .bug-sub { margin: 0; }
+.mg-search { max-width: 240px; margin-bottom: 0; }
+.mg-count { font-size: 12px; font-weight: 600; color: var(--ink-faint); margin-inline-start: 6px; }
+.mg-table select.tree-search { margin-bottom: 0; min-width: 170px; max-width: 240px; padding-block: 6px; font-size: 12.5px; }
+.mg-acts { white-space: nowrap; text-align: left; }
+.mg-acts > * + * { margin-inline-start: 6px; }
+.mg-btn { font: 600 12px var(--font); color: var(--accent-strong); background: var(--accent-soft); border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; white-space: nowrap; }
+.mg-btn:hover { filter: brightness(1.08); }
+.mg-btn.mg-primary { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); padding: 6px 14px; }
+.mg-btn:disabled { opacity: .6; cursor: progress; }
+.mg-btn:focus-visible, .bug-del:focus-visible, .modal-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .mg-search { max-width: none; width: 100%; }
+  table.perf-table.mg-table { min-width: 0; }
+  .mg-table, .mg-table tbody { display: block; }
+  .mg-table thead { display: none; }
+  .mg-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .mg-table tr:last-child { border-bottom: 0; }
+  .mg-table td { padding: 0 !important; border: 0 !important; }
+  .mg-table select.tree-search { max-width: none; }
+  .mg-table td.tm { grid-column: 1 / -1; order: 2; font-size: 12px; color: var(--ink-faint); }
+  .mg-table td:has(select) { grid-column: 1 / -1; order: 3; }
+  .mg-table select.tree-search { width: 100%; }
+}
+
+/* ---------- خروجی اکسل با بازه‌ی دلخواه ---------- */
+.pe-box { padding: 16px 18px; margin-bottom: 14px; display: grid; gap: 12px; }
+.pe-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--ink); }
+.pe-title svg { width: 18px; height: 18px; color: var(--accent-strong); }
+.pe-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.pe-fields label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.pe-date { width: 132px; margin-bottom: 0; text-align: center; letter-spacing: .02em; }
+.pe-presets { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 6px; }
+.pe-box .perf-export { margin-inline-start: auto; }
+.pe-box .bug-msg:empty { display: none; }
+@media (max-width: 560px) {
+  .pe-fields label { flex: 1 1 130px; }
+  .pe-date { width: 100%; }
+  .pe-box .perf-export { width: 100%; justify-content: center; margin-inline-start: 0; }
+}
+
 </style>
 </head>
 <body>
@@ -1355,6 +1433,7 @@ html[data-theme="dark"] .trend-tip .tt-detail { border-top-color: rgba(15,27,51,
       <div class="topbar-right">
         <div class="operator-status-badges" id="operator-status-badges"></div>
         <div class="sync-note" id="sync-note"></div>
+        <button class="ghost" id="pw-btn" type="button">تغییر رمز</button>
         <button class="ghost" id="logout-btn" type="button">خروج</button>
       </div>
     </header>
@@ -1705,6 +1784,7 @@ window.APP_CONFIG = Object.freeze({
     await boot();
   });
 
+  $('pw-btn').addEventListener('click', () => openPasswordModal());
   $('logout-btn').addEventListener('click', async () => {
     try { await sb.auth.signOut(); } catch (e) {}
     location.reload();
@@ -1769,7 +1849,7 @@ window.APP_CONFIG = Object.freeze({
     renderTopbar(profile, manager);
     if (usesSidebar(profile)) initSidebar(profile);
     $('period-label').textContent = `دوره‌ی جاری: ${CURRENT_PERIOD.label}`;
-    loadSyncStatus().then((ts) => { lastSyncedAt = ts; });
+    loadSyncStatus().then((s) => { lastSyncedAt = s.changedAt; });
 
     if (profile.role === 'operator') await renderOperatorView(profile);
     else await renderManagerialView(profile);
@@ -1786,6 +1866,7 @@ window.APP_CONFIG = Object.freeze({
     perf: '<path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/>',
     bugs: '<path d="M9 9h6v7a3 3 0 0 1-6 0V9z"/><path d="M10 9V7a2 2 0 0 1 4 0v2M5 12h4M15 12h4M6 7l3 2M18 7l-3 2M6 19l3-2.5M18 19l-3-2.5"/>',
     kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
+    manage: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.3 0 2.5.3 3.5.9"/><circle cx="18" cy="17" r="2.2"/><path d="M18 12.6v1.6M18 19.8v1.6M14.2 17h1.6M20.2 17h1.6M15.3 14.3l1.1 1.1M19.6 18.6l1.1 1.1M15.3 19.7l1.1-1.1M19.6 15.4l1.1-1.1"/>',
     days: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/>',
   };
   // roles: کدام نقش‌ها این بخش را دارند (خالی = همه)
@@ -1795,6 +1876,7 @@ window.APP_CONFIG = Object.freeze({
     { id: 'companies', label: 'شرکت‌ها' },
     { id: 'perf', label: 'عملکرد تیم', notFor: ['operator'] },
     { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator'], labels: { operator: 'باگ‌های من' } },
+    { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
   ];
@@ -1840,7 +1922,10 @@ window.APP_CONFIG = Object.freeze({
     const userBox = document.createElement('div');
     userBox.className = 'top-user';
     [...left.children].forEach((el) => userBox.appendChild(el));
-    userBox.appendChild($('logout-btn'));
+    const acts = document.createElement('div');
+    acts.className = 'user-acts';
+    acts.append($('pw-btn'), $('logout-btn'));
+    userBox.appendChild(acts);
     if (['operator', 'team_lead', 'supervisor'].includes(profile.role)) {
       // اپراتور، سرگروه و سرپرست: کارت پروفایل پایین منوی کناری (پایین سمت راست صفحه)
       userBox.className = 'side-user';
@@ -1932,19 +2017,31 @@ window.APP_CONFIG = Object.freeze({
   }
 
   let lastSyncedAt = null;
+  // یک درخواست کوچک: آخرین اجرای ورک‌فلو + آخرین «تغییر واقعی داده» + کوچک‌ترین روزِ تغییرکرده از دفعه‌ی قبل.
+  // ورک‌فلو ردیف‌های بدون تغییر را نمی‌نویسد، پس اگر چیزی عوض نشده باشد صفحه دوباره دانلود نمی‌شود.
   async function loadSyncStatus() {
-    const { data } = await sb.from('sync_status').select('last_synced_at').eq('id', 1).maybeSingle();
+    let syncAt = null, changedAt = null, fromSort = null;
+    let r;
+    try { r = await sb.rpc('poll_sync', { p_since: lastSyncedAt }); } catch (e) { r = { error: e }; }
+    if (r && !r.error && r.data) {
+      syncAt = r.data.last_synced_at || null;
+      changedAt = r.data.last_changed_at || syncAt;
+      fromSort = r.data.from_sort || null;
+    } else {
+      const { data } = await sb.from('sync_status').select('last_synced_at').eq('id', 1).maybeSingle();
+      syncAt = changedAt = (data && data.last_synced_at) || null;
+    }
     const note = $('sync-note');
-    note.textContent = (data && data.last_synced_at)
-      ? `آخرین به‌روزرسانی: ${new Date(data.last_synced_at).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}`
+    note.textContent = syncAt
+      ? `آخرین به‌روزرسانی: ${new Date(syncAt).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' })}`
       : '';
-    state.syncAt = (data && data.last_synced_at) || null;
+    state.syncAt = syncAt;
     renderStaleBanner();
-    return (data && data.last_synced_at) || null;
+    return { changedAt, fromSort };
   }
 
   // --- هشدار داده‌ی قدیمی: اگر ورک‌فلو مدتی چیزی ننوشته، کاربر بداند عددها تازه نیستند
-  const STALE_SYNC_MS = 4 * 60 * 60 * 1000;   // تارگت‌ها هر ۲ ساعت؛ ۴ ساعت = دست‌کم یک اجرای جاافتاده
+  const STALE_SYNC_MS = 60 * 60 * 1000;       // تارگت‌ها هر ۱۵ دقیقه (۸ صبح تا ۱۲ شب)؛ ۱ ساعت = چند اجرای جاافتاده
   const STALE_STATUS_MS = 60 * 60 * 1000;     // وضعیت فعال هر ۱۵ دقیقه؛ ۱ ساعت = چند اجرای جاافتاده
   function agoLabel(ms) {
     const h = Math.floor(ms / 3600000);
@@ -1955,7 +2052,9 @@ window.APP_CONFIG = Object.freeze({
   function renderStaleBanner() {
     const now = Date.now();
     const lines = [];
-    if (state.syncAt) {
+    // ورک‌فلو شب‌ها (۰۰:۰۰ تا ۰۸:۰۰) اجرا نمی‌شود؛ تا ۰۸:۳۰ هشدارِ قدیمی بودن نشان داده نمی‌شود
+    const tehranHM = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).replace(':', '')) % 2400;
+    if (state.syncAt && tehranHM >= 830) {
       const age = now - new Date(state.syncAt).getTime();
       if (age > STALE_SYNC_MS) lines.push(`آمار صدور و حقوق ${agoLabel(age)} است که به‌روز نشده؛ عددها ممکن است قدیمی باشند.`);
     }
@@ -1992,10 +2091,12 @@ window.APP_CONFIG = Object.freeze({
     if (t[0] * 10000 + t[1] * 100 + t[2] !== TODAY_SORT) { location.reload(); return; } // روز عوض شده
     refreshing = true;
     try {
-      const ts = await loadSyncStatus();
-      if (ts && ts !== lastSyncedAt) {
-        lastSyncedAt = ts;
-        await refreshView();
+      const s = await loadSyncStatus();
+      if (s.changedAt && s.changedAt !== lastSyncedAt) {
+        const hadBase = !!lastSyncedAt;
+        lastSyncedAt = s.changedAt;
+        // فقط روزهای تغییرکرده دوباره خوانده می‌شوند (اگر معلوم نباشد، کل دوره)
+        await refreshView(hadBase ? s.fromSort : null);
       }
     } catch (e) {
       console.error('auto refresh failed', e);
@@ -2003,11 +2104,11 @@ window.APP_CONFIG = Object.freeze({
       refreshing = false;
     }
   }
-  async function refreshView() {
+  async function refreshView(changedFrom = null) {
     const scrollY = window.scrollY;
     window.__revealInstant = true; // موشن ورود در به‌روزرسانی خودکار اجرا نشود
     const before = snapshotValues();
-    try { await refreshViewInner(); } finally { setTimeout(() => { window.__revealInstant = false; }, 0); }
+    try { await refreshViewInner(changedFrom); } finally { setTimeout(() => { window.__revealInstant = false; }, 0); }
     window.scrollTo(0, scrollY);
     markChanges(before);
   }
@@ -2056,14 +2157,14 @@ window.APP_CONFIG = Object.freeze({
       setTimeout(() => { t.el.classList.remove('chg-up', 'chg-down'); tag.remove(); }, 8000);
     });
   }
-  async function refreshViewInner() {
+  async function refreshViewInner(changedFrom = null) {
     if (state.profile.role === 'operator') {
       const monthOpen = !!document.querySelector('#month-card-detail.open');
       await renderOperatorView(state.profile, { keepMonthOpen: monthOpen });
     } else {
       const openIds = [...document.querySelectorAll('#tree-root .tree-row.open')].map((r) => r.getAttribute('data-id'));
       const search = state.search, companyFilter = state.companyFilter;
-      await renderManagerialView(state.profile, { silent: true });
+      await renderManagerialView(state.profile, { silent: true, changedFrom });
       state.search = search; state.companyFilter = companyFilter;
       if (search) $('tree-search').value = search;
       if (companyFilter && $('company-filter')) $('company-filter').value = companyFilter;
@@ -3279,8 +3380,8 @@ window.APP_CONFIG = Object.freeze({
           ${PERF_RANGES.map((r) => `<button type="button" role="tab" data-perf="${r.id}" aria-selected="${r.id === range}">${r.label}</button>`).join('')}
         </div>
         <div class="perf-range">${esc(bounds.text)}</div>
-        ${SUPERVISOR_ROLES.includes(state.viewerRole) ? `<button type="button" class="perf-export" id="perf-export" title="دانلود عملکرد و حقوق بازه‌ی انتخاب‌شده">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>خروجی اکسل</span></button><button type="button" class="perf-export alt" id="perf-export-prev" title="دانلود عملکرد و حقوق کل دوره‌ی قبل">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>اکسل دوره‌ی قبل (${esc(prevPeriodInfo().label)})</span></button>` : ''}
       </div>
+      ${SUPERVISOR_ROLES.includes(state.viewerRole) || state.viewerRole === 'team_lead' ? perfExportHtml() : ''}
       <div class="perf-legend" aria-hidden="true">
         <span><i class="good"></i>بهتر (تعداد بیشتر / زمان کمتر)</span><span><i class="warn"></i>متوسط</span><span><i class="bad"></i>ضعیف‌تر</span>
         <span>ترتیب: ۷۵٪ تعداد صدور + ۲۵٪ زمان صدور (زمانِ کم‌صدورها به میانگین گروه نزدیک می‌شود)</span>
@@ -3293,10 +3394,7 @@ window.APP_CONFIG = Object.freeze({
         </table>` : '<div class="empty-state">اپراتوری برای نمایش وجود ندارد</div>'}
       </div>
       ${active.length ? '' : '<div class="trend-foot">در این بازه هنوز صدوری ثبت نشده است.</div>'}`;
-    const xb = $('perf-export');
-    if (xb) xb.addEventListener('click', () => { try { exportPerfXlsx(range); } catch (e) { console.error(e); alert('ساخت فایل اکسل ناموفق بود. صفحه را دوباره بارگذاری کنید.'); } });
-    const xp = $('perf-export-prev');
-    if (xp) xp.addEventListener('click', () => exportPrevPeriod(xp));
+    bindPerfExport();
     root.querySelectorAll('[data-perf]').forEach((btn) => btn.addEventListener('click', () => {
       state.perfRange = btn.getAttribute('data-perf');
       renderPerf();
@@ -3401,25 +3499,6 @@ window.APP_CONFIG = Object.freeze({
       if (!data || data.length < PAGE) break;
     }
     return out;
-  }
-  async function exportPrevPeriod(btn) {
-    const pp = prevPeriodInfo();
-    const labelEl = btn.querySelector('span');
-    const old = labelEl.textContent;
-    btn.disabled = true; labelEl.textContent = 'در حال دریافت...';
-    try {
-      const rows = await fetchPeriodTargets(pp.startSort, pp.endSort);
-      const raw = {};
-      rows.forEach((r) => { (raw[r.operator_id] = raw[r.operator_id] || []).push(r); });
-      exportPerfXlsx('month', {
-        raw,
-        bounds: { from: pp.startSort, to: pp.endSort, text: `دوره‌ی ${pp.label}: از ${jLabel(sortToJ(pp.startSort))} تا ${jLabel(sortToJ(pp.endSort))}` },
-        label: `دوره-${pp.label.replace(/\s+/g, '-')}`,
-      });
-    } catch (e) {
-      console.error('prev period export failed', e);
-      alert('دریافت اطلاعات دوره‌ی قبل ناموفق بود. دوباره تلاش کنید.');
-    } finally { btn.disabled = false; labelEl.textContent = old; }
   }
   // عملکرد و حقوق هر اپراتور در بازه‌ی انتخاب‌شده؛ حقوق همان daily_salary روزانه‌ی محاسبه‌شده توسط سامانه است (همان مبنای «تیم من»)
   function exportPerfXlsx(range, opts) {
@@ -3681,20 +3760,387 @@ window.APP_CONFIG = Object.freeze({
     if (state.bugMsg && $('bug-msg')) $('bug-msg').className = 'bug-msg ' + (state.bugMsg.kind || '');
   }
 
-  async function renderManagerialView(profile, { silent = false } = {}) {
+  // ---------------------------------------------------------------
+  // پنجره‌ی ساده (dialog) + پیام کوتاه
+  // ---------------------------------------------------------------
+  function toast(text, kind = 'ok') {
+    document.querySelectorAll('.app-toast').forEach((t) => t.remove());
+    const el = document.createElement('div');
+    el.className = `app-toast ${kind}`;
+    el.setAttribute('role', 'status');
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.classList.add('out'), 3200);
+    setTimeout(() => el.remove(), 3700);
+  }
+  // onConfirm(dialog): اگر Error بیندازد، متنش داخل پنجره نشان داده می‌شود و پنجره باز می‌ماند
+  function openModal({ title, body, confirmText = 'تأیید', danger = false, onConfirm, onOpen }) {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'app-modal';
+    dlg.innerHTML = `
+      <form class="modal-card" novalidate>
+        <h2 class="modal-title">${esc(title)}</h2>
+        <div class="modal-body">${body}</div>
+        <div class="modal-msg bug-msg" role="status" aria-live="polite"></div>
+        <div class="modal-actions">
+          <button type="submit" class="bug-submit${danger ? ' danger' : ''}">${esc(confirmText)}</button>
+          <button type="button" class="modal-cancel">انصراف</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dlg);
+    const form = dlg.querySelector('form');
+    const msg = dlg.querySelector('.modal-msg');
+    const ok = form.querySelector('[type="submit"]');
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    dlg.querySelector('.modal-cancel').addEventListener('click', close);
+    dlg.addEventListener('cancel', (e) => { e.preventDefault(); if (!ok.disabled) close(); });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = ''; msg.className = 'modal-msg bug-msg';
+      ok.disabled = true;
+      try {
+        const r = await onConfirm(dlg);
+        if (r !== false) close();
+      } catch (err) {
+        msg.textContent = (err && err.message) || 'انجام نشد. دوباره تلاش کنید.';
+        msg.className = 'modal-msg bug-msg err';
+      } finally {
+        if (dlg.isConnected) ok.disabled = false;
+      }
+    });
+    dlg.showModal();
+    if (onOpen) onOpen(dlg);
+    const first = dlg.querySelector('input:not([type="checkbox"]), select');
+    if (first) first.focus();
+    return dlg;
+  }
+  // پیام خطای RPC (raise exception در SQL) به فارسی
+  function rpcErrorText(error, fallback) {
+    const m = String((error && error.message) || '');
+    return /[؀-ۿ]/.test(m) ? m : fallback;
+  }
+  function randomPassword(len = 10) {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const buf = new Uint32Array(len);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, (n) => chars[n % chars.length]).join('');
+  }
+
+  // ---------------------------------------------------------------
+  // تغییر رمز توسط خود کاربر (رمز فعلی دوباره بررسی می‌شود)
+  // ---------------------------------------------------------------
+  function openPasswordModal() {
+    openModal({
+      title: 'تغییر رمز عبور',
+      confirmText: 'ذخیره‌ی رمز جدید',
+      body: `
+        <label class="modal-field">رمز فعلی<input class="tree-search" type="password" id="pw-cur" autocomplete="current-password"></label>
+        <label class="modal-field">رمز جدید <span class="opt">(حداقل ۸ کاراکتر)</span><input class="tree-search" type="password" id="pw-new" autocomplete="new-password" minlength="8"></label>
+        <label class="modal-field">تکرار رمز جدید<input class="tree-search" type="password" id="pw-new2" autocomplete="new-password"></label>`,
+      onConfirm: async (dlg) => {
+        const cur = dlg.querySelector('#pw-cur').value;
+        const nw = dlg.querySelector('#pw-new').value;
+        const nw2 = dlg.querySelector('#pw-new2').value;
+        if (!cur) throw new Error('رمز فعلی را وارد کنید.');
+        if (nw.length < 8) throw new Error('رمز جدید باید حداقل ۸ کاراکتر باشد.');
+        if (nw !== nw2) throw new Error('رمز جدید و تکرار آن یکی نیستند.');
+        if (nw === cur) throw new Error('رمز جدید باید با رمز فعلی فرق داشته باشد.');
+        const { data: sess } = await sb.auth.getSession();
+        const email = sess && sess.session && sess.session.user && sess.session.user.email;
+        if (!email) throw new Error('نشست شما منقضی شده؛ یک بار خارج و دوباره وارد شوید.');
+        const check = await sb.auth.signInWithPassword({ email, password: cur }).catch(() => ({ error: { message: 'network' } }));
+        if (check.error) {
+          throw new Error(/invalid/i.test(check.error.message || '') ? 'رمز فعلی اشتباه است.'
+            : /rate|too many/i.test(check.error.message || '') ? 'تعداد تلاش‌ها زیاد بود؛ چند دقیقه بعد امتحان کنید.'
+            : 'بررسی رمز فعلی ناموفق بود. اتصال را بررسی کنید.');
+        }
+        const { error } = await sb.auth.updateUser({ password: nw });
+        if (error) {
+          console.error('updateUser failed', error);
+          throw new Error(error.code === 'weak_password' ? 'رمز جدید ضعیف است؛ رمز طولانی‌تر یا ترکیبی‌تری انتخاب کنید.'
+            : error.code === 'same_password' ? 'رمز جدید باید با رمز فعلی فرق داشته باشد.'
+            : 'تغییر رمز ناموفق بود. دوباره تلاش کنید.');
+        }
+        toast('رمز عبور شما تغییر کرد.');
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // مدیریت تیم (سرگروه: اپراتورهای تیم خودش؛ سرپرست سلر: همه)
+  //   جابه‌جایی به تیم دیگر، آوردن افراد بدون سرگروه، ریست رمز، حذف کامل
+  // ---------------------------------------------------------------
+  const canManageTeam = (p) => !!p && (p.role === 'team_lead' || (p.role === 'supervisor' && (p.unit || 'seller') === 'seller'));
+  async function loadManageData(force) {
+    if (state.manage && state.manage.loaded && !force) return;
+    const [opt, un] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators')]);
+    state.manage = Object.assign(state.manage || {}, {
+      loaded: !opt.error,
+      error: opt.error || un.error || null,
+      options: opt.data || [],
+      unassigned: un.data || [],
+    });
+    if (opt.error) console.error('team_lead_options failed', opt.error);
+    if (un.error) console.error('unassigned_operators failed', un.error);
+  }
+  async function afterManageChange(text) {
+    toast(text);
+    await loadManageData(true);
+    await renderManagerialView(state.profile, { silent: true, changedFrom: 'cache' });
+  }
+  async function renderManagePage() {
+    const root = $('manage-root');
+    if (!root) return;
+    if (!state.manage || !state.manage.loaded) {
+      root.innerHTML = '<div class="panel"><div class="empty-state">در حال بارگذاری...</div></div>';
+      await loadManageData();
+    }
+    const root2 = $('manage-root');
+    if (!root2) return;
+    const m = state.manage || { options: [], unassigned: [] };
+    const me = state.profile;
+    const isLead = me.role === 'team_lead';
+    const q = (state.manageSearch || '').trim();
+    const ops = state.visibleProfiles
+      .filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && (p.full_name || '').trim() !== BOT_NAME)
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const shown = q ? ops.filter((p) => (p.full_name || '').includes(q)) : ops;
+    const optLabel = (o) => (o.role === 'supervisor' ? `بدون سرگروه (زیر ${o.full_name || 'سرپرست'})` : o.full_name || '—');
+    const moveSelect = (p) => `
+      <select class="tree-search mg-move" data-op="${esc(p.id)}" aria-label="انتقال ${esc(p.full_name || '')} به تیم">
+        ${m.options.map((o) => `<option value="${esc(o.id)}"${o.id === p.reports_to ? ' selected' : ''}>${esc(optLabel(o))}</option>`).join('')}
+      </select>`;
+    const rows = shown.map((p) => `
+      <tr>
+        <td class="nm">${esc(p.full_name || '—')}</td>
+        <td class="tm">${esc(teamLabelOf(p.id))}</td>
+        <td>${m.options.length ? moveSelect(p) : '—'}</td>
+        <td class="mg-acts">
+          <button type="button" class="mg-btn" data-reset="${esc(p.id)}">ریست رمز</button>
+          <button type="button" class="bug-del" data-delop="${esc(p.id)}">حذف</button>
+        </td>
+      </tr>`).join('');
+    const leads = m.options.filter((o) => o.role === 'team_lead');
+    const unRows = (m.unassigned || []).map((u) => `
+      <tr>
+        <td class="nm">${esc(u.full_name || '—')}</td>
+        <td class="mg-acts">${isLead
+          ? `<button type="button" class="mg-btn mg-primary" data-claim="${esc(u.id)}">افزودن به تیم من</button>`
+          : `<select class="tree-search mg-assign" data-op="${esc(u.id)}" aria-label="سرگروه برای ${esc(u.full_name || '')}">
+               <option value="">انتخاب سرگروه...</option>
+               ${leads.map((o) => `<option value="${esc(o.id)}">${esc(o.full_name || '—')}</option>`).join('')}
+             </select>`}</td>
+      </tr>`).join('');
+    root2.innerHTML = `
+      ${m.error ? '<div class="panel"><div class="empty-state">خواندن اطلاعات مدیریت تیم ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>' : ''}
+      <div class="mg-head">
+        <div class="bug-sub">اپراتورهای ${isLead ? 'تیم من' : 'زیرمجموعه'} <span class="mg-count">${formatNum(ops.length)} نفر</span></div>
+        <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام..." value="${esc(q)}" aria-label="جستجوی اپراتور">
+      </div>
+      <div class="panel perf-wrap">
+        ${rows ? `<table class="perf-table mg-table">
+          <thead><tr><th>اپراتور</th><th>تیم فعلی</th><th>انتقال به</th><th></th></tr></thead>
+          <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
+      </div>
+      <div class="bug-sub">افراد بدون سرگروه <span class="mg-count">${formatNum((m.unassigned || []).length)} نفر</span></div>
+      <div class="panel perf-wrap">
+        ${unRows ? `<table class="perf-table mg-table"><thead><tr><th>نام</th><th></th></tr></thead><tbody>${unRows}</tbody></table>`
+          : '<div class="empty-state">همه‌ی اپراتورها سرگروه دارند</div>'}
+      </div>
+      <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. حذف کاربر برگشت‌پذیر نیست و همه‌ی آمار صدور و حقوق او هم پاک می‌شود.</div>`;
+    bindManagePage(root2);
+  }
+  function bindManagePage(root) {
+    const nameOf = (id) => {
+      const p = state.profileById[id] || ((state.manage && state.manage.unassigned) || []).find((u) => u.id === id);
+      return (p && p.full_name) || 'این کاربر';
+    };
+    const search = $('mg-search');
+    if (search) {
+      search.addEventListener('input', () => {
+        state.manageSearch = search.value;
+        const pos = search.selectionStart;
+        renderManagePage().then(() => { const s = $('mg-search'); if (s) { s.focus(); try { s.setSelectionRange(pos, pos); } catch (e) {} } });
+      });
+    }
+    root.querySelectorAll('.mg-move').forEach((sel) => {
+      const initial = sel.value;
+      sel.addEventListener('change', () => {
+        const id = sel.getAttribute('data-op');
+        const chosen = sel.value;
+        const target = (state.manage.options || []).find((o) => o.id === chosen);
+        const label = target ? (target.role === 'supervisor' ? 'بدون سرگروه' : `تیم ${target.full_name}`) : '';
+        openModal({
+          title: 'انتقال اپراتور',
+          confirmText: 'انتقال',
+          body: `<p class="modal-text">«${esc(nameOf(id))}» به ${esc(label)} منتقل شود؟${state.profile.role === 'team_lead' ? ' بعد از انتقال دیگر در تیم شما دیده نمی‌شود.' : ''}</p>`,
+          onConfirm: async () => {
+            const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: chosen });
+            if (error) { console.error(error); throw new Error(rpcErrorText(error, 'انتقال ناموفق بود.')); }
+            await afterManageChange(`«${nameOf(id)}» به ${label} منتقل شد.`);
+          },
+        });
+        sel.value = initial; // تا تأیید نشده، انتخاب قبلی بماند
+      });
+    });
+    root.querySelectorAll('[data-claim]').forEach((b) => b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-claim');
+      b.disabled = true;
+      const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: state.profile.id });
+      if (error) { console.error(error); b.disabled = false; return toast(rpcErrorText(error, 'افزودن ناموفق بود.'), 'err'); }
+      await afterManageChange(`«${nameOf(id)}» به تیم شما اضافه شد.`);
+    }));
+    root.querySelectorAll('.mg-assign').forEach((sel) => sel.addEventListener('change', async () => {
+      if (!sel.value) return;
+      const id = sel.getAttribute('data-op');
+      sel.disabled = true;
+      const { error } = await sb.rpc('team_move_operator', { p_operator: id, p_new_lead: sel.value });
+      if (error) { console.error(error); sel.disabled = false; sel.value = ''; return toast(rpcErrorText(error, 'ثبت سرگروه ناموفق بود.'), 'err'); }
+      await afterManageChange(`سرگروه «${nameOf(id)}» ثبت شد.`);
+    }));
+    root.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-reset');
+      openModal({
+        title: `ریست رمز «${nameOf(id)}»`,
+        confirmText: 'ثبت رمز جدید',
+        body: `
+          <p class="modal-text">رمز جدید را به خود اپراتور بدهید؛ بعد از ورود می‌تواند از «تغییر رمز» آن را عوض کند.</p>
+          <label class="modal-field">رمز جدید <span class="opt">(حداقل ۸ کاراکتر)</span>
+            <span class="pw-row"><input class="tree-search" type="text" id="rp-new" autocomplete="off" dir="ltr" minlength="8"><button type="button" class="mg-btn" id="rp-gen">ساخت رمز</button></span>
+          </label>`,
+        onOpen: (dlg) => dlg.querySelector('#rp-gen').addEventListener('click', () => { const i = dlg.querySelector('#rp-new'); i.value = randomPassword(); i.select(); }),
+        onConfirm: async (dlg) => {
+          const pw = dlg.querySelector('#rp-new').value.trim();
+          if (pw.length < 8) throw new Error('رمز باید حداقل ۸ کاراکتر باشد.');
+          const { error } = await sb.rpc('team_reset_password', { p_operator: id, p_password: pw });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ریست رمز ناموفق بود.')); }
+          toast(`رمز «${nameOf(id)}» عوض شد.`);
+        },
+      });
+    }));
+    root.querySelectorAll('[data-delop]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-delop');
+      openModal({
+        title: `حذف «${nameOf(id)}»`,
+        confirmText: 'حذف کامل',
+        danger: true,
+        body: `
+          <p class="modal-text">حساب ورود، پروفایل و <b>همه‌ی آمار صدور، حقوق، تفکیک شرکت و باگ‌های</b> این کاربر برای همیشه پاک می‌شود و برگشت‌پذیر نیست.</p>
+          <label class="modal-check"><input type="checkbox" id="del-ok"> می‌دانم و می‌خواهم حذف شود</label>`,
+        onConfirm: async (dlg) => {
+          if (!dlg.querySelector('#del-ok').checked) throw new Error('برای حذف، تیک تأیید را بزنید.');
+          const name = nameOf(id);
+          const { error } = await sb.rpc('team_delete_operator', { p_operator: id });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'حذف ناموفق بود.')); }
+          await afterManageChange(`«${name}» حذف شد.`);
+        },
+      });
+    }));
+  }
+
+  // ---------------------------------------------------------------
+  // خروجی اکسل عملکرد با بازه‌ی دلخواه (سرپرست: همه؛ سرگروه: تیم خودش — محدوده را RLS تعیین می‌کند)
+  // ---------------------------------------------------------------
+  function parseJalaliInput(v) {
+    const m = toEnDigits(v).trim().match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    if (y < 1390 || y > 1500 || mo < 1 || mo > 12 || d < 1 || d > jalaliMonthLength(y, mo)) return null;
+    return y * 10000 + mo * 100 + d;
+  }
+  const sortLabel = (s) => jLabel(sortToJ(s));
+  function perfExportHtml() {
+    const pp = prevPeriodInfo();
+    const from = state.peFrom || sortLabel(CURRENT_PERIOD.startSort);
+    const to = state.peTo || sortLabel(TODAY_SORT);
+    return `
+      <div class="panel pe-box" id="pe-box">
+        <div class="pe-title">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>خروجی اکسل عملکرد و حقوق</span></div>
+        <div class="pe-fields">
+          <label>از تاریخ<input class="tree-search pe-date" id="pe-from" inputmode="numeric" dir="ltr" placeholder="۱۴۰۵/۰۷/۲۱" value="${esc(from)}"></label>
+          <label>تا تاریخ<input class="tree-search pe-date" id="pe-to" inputmode="numeric" dir="ltr" placeholder="۱۴۰۵/۰۸/۲۰" value="${esc(to)}"></label>
+          <div class="pe-presets" role="group" aria-label="بازه‌های آماده">
+            <button type="button" class="mg-btn" data-pe="cur">دوره‌ی جاری</button>
+            <button type="button" class="mg-btn" data-pe="prev">دوره‌ی قبل (${esc(pp.label)})</button>
+          </div>
+          <button type="button" class="perf-export" id="pe-go">${sideIcon('<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>')}<span>دانلود اکسل</span></button>
+        </div>
+        <div class="bug-msg" id="pe-msg" role="status" aria-live="polite"></div>
+      </div>`;
+  }
+  function bindPerfExport() {
+    const f = $('pe-from'), t = $('pe-to'), go = $('pe-go'), msg = $('pe-msg');
+    if (!f || !go) return;
+    const setMsg = (text, kind) => { msg.textContent = text || ''; msg.className = 'bug-msg ' + (kind || ''); };
+    f.addEventListener('input', () => { state.peFrom = f.value; });
+    t.addEventListener('input', () => { state.peTo = t.value; });
+    document.querySelectorAll('[data-pe]').forEach((b) => b.addEventListener('click', () => {
+      const pp = prevPeriodInfo();
+      const [a, c] = b.getAttribute('data-pe') === 'prev' ? [pp.startSort, pp.endSort] : [Number(CURRENT_PERIOD.startSort), TODAY_SORT];
+      f.value = state.peFrom = sortLabel(a);
+      t.value = state.peTo = sortLabel(c);
+      setMsg('');
+    }));
+    go.addEventListener('click', async () => {
+      const a = parseJalaliInput(f.value), c = parseJalaliInput(t.value);
+      if (!a || !c) return setMsg('تاریخ را به شکل ۱۴۰۵/۰۷/۲۱ وارد کنید.', 'err');
+      if (a > c) return setMsg('«از تاریخ» باید قبل از «تا تاریخ» باشد.', 'err');
+      if (c > TODAY_SORT) return setMsg('«تا تاریخ» نمی‌تواند بعد از امروز باشد.', 'err');
+      if (jalaliDaysBetween(sortToJ(a), sortToJ(c)) > 400) return setMsg('بازه حداکثر ۴۰۰ روز می‌تواند باشد.', 'err');
+      const label = go.querySelector('span');
+      go.disabled = true; label.textContent = 'در حال دریافت...'; setMsg('');
+      try {
+        const rows = await fetchPeriodTargets(a, c);
+        const raw = {};
+        rows.forEach((r) => { (raw[r.operator_id] = raw[r.operator_id] || []).push(r); });
+        const name = (s) => toEnDigits(sortLabel(s)).replace(/\//g, '-');
+        exportPerfXlsx('month', {
+          raw,
+          bounds: { from: a, to: c, text: `از ${sortLabel(a)} تا ${sortLabel(c)}` },
+          label: `${name(a)}-تا-${name(c)}`,
+        });
+        setMsg(`فایل بازه‌ی ${sortLabel(a)} تا ${sortLabel(c)} ساخته شد.`, 'ok');
+      } catch (e) {
+        console.error('perf export failed', e);
+        setMsg('دریافت اطلاعات یا ساخت فایل ناموفق بود. دوباره تلاش کنید.', 'err');
+      } finally { go.disabled = false; label.textContent = 'دانلود اکسل'; }
+    });
+  }
+
+  // تارگت‌های دوره: بار اول کامل؛ در تازه‌سازی خودکار فقط از «روزِ تغییرکرده» به بعد و ادغام با نسخه‌ی قبلی
+  const TARGET_COLS = 'operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes';
+  async function loadPeriodTargets(changedFrom) {
+    const query = (from) => fetchAllRows((q) => q.from('daily_targets')
+      .select(TARGET_COLS)
+      .gte('report_date_sort', from)
+      .lte('report_date_sort', CURRENT_PERIOD.endSort)
+      .order('report_date_sort', { ascending: false })
+      .order('operator_id', { ascending: true }));
+    const start = String(CURRENT_PERIOD.startSort);
+    if (changedFrom === 'cache' && state.targetCache) return { data: state.targetCache, error: null };
+    if (changedFrom === 'cache') changedFrom = null;
+    if (changedFrom && state.targetCache && String(changedFrom) > start) {
+      const from = String(changedFrom);
+      const res = await query(from);
+      if (res.error) return res;
+      const merged = state.targetCache.filter((r) => String(r.report_date_sort) < from).concat(res.data || []);
+      merged.sort((a, b) => (a.report_date_sort < b.report_date_sort ? 1 : a.report_date_sort > b.report_date_sort ? -1 : String(a.operator_id).localeCompare(String(b.operator_id))));
+      state.targetCache = merged;
+      return { data: merged, error: null };
+    }
+    const res = await query(start);
+    if (!res.error) state.targetCache = res.data || [];
+    return res;
+  }
+  async function renderManagerialView(profile, { silent = false, changedFrom = null } = {}) {
     const content = $('content-area');
     if (!silent && !content.querySelector('.sk')) showSkeleton(4);
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes] = await Promise.all([
       sb.from('profiles').select('id, full_name, role, reports_to, unit'),
-      // صفحه‌به‌صفحه: API هر درخواست را به ۱۰۰۰ ردیف محدود می‌کند و یک دوره برای همه‌ی زیرمجموعه بیشتر از این است
-      fetchAllRows((q) => q.from('daily_targets')
-        .select('operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes')
-        .gte('report_date_sort', CURRENT_PERIOD.startSort)
-        .lte('report_date_sort', CURRENT_PERIOD.endSort)
-        .order('report_date_sort', { ascending: false })
-        .order('operator_id', { ascending: true })),
+      // صفحه‌به‌صفحه (سقف ۱۰۰۰ ردیف در هر درخواست)؛ در تازه‌سازی فقط روزهای تغییرکرده
+      loadPeriodTargets(silent ? changedFrom : null),
       sb.from('issuer_active_status').select('operator_id, is_active, is_active_to_issue, status, companies, all_companies, updated_at'),
       // آمار شرکت‌ها: RLS خودش تعیین می‌کنه چه شرکت‌هایی دیده بشه
       sb.from('company_active_status').select('company, active_count').order('active_count', { ascending: false }),
@@ -3881,6 +4327,7 @@ window.APP_CONFIG = Object.freeze({
       ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
       ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
+      ${state.sidebar && canManageTeam(profile) ? '<div data-page="manage" id="manage-root"></div>' : ''}
       <div data-page="team">
       <div class="filters">
         <input type="search" class="tree-search" id="tree-search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
@@ -3902,6 +4349,7 @@ window.APP_CONFIG = Object.freeze({
     renderTree(state.treeRootId);
     if (state.sidebar) renderPerf();
     if (state.sidebar && profile.role === 'team_lead') loadBugsPage();
+    if (state.sidebar && canManageTeam(profile)) renderManagePage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot', { detail: botDayDetail(botRows, botCompanyRows) }); bindBotPanel(); }
     bindCompanyGroups();
