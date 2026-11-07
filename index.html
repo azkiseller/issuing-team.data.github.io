@@ -4182,6 +4182,7 @@ window.APP_CONFIG = Object.freeze({
         <div class="mg-tools">
           <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام..." value="${esc(q)}" aria-label="جستجوی اپراتور">
           <button type="button" class="mg-btn mg-primary mg-add" id="mg-add">+ افزودن کاربر به تیم</button>
+          ${SUPERVISOR_ROLES.includes(me.role) ? '<button type="button" class="mg-btn mg-primary mg-add" id="tr-add">+ تعریف کاربر Training</button>' : ''}
         </div>
       </div>
       <div class="panel perf-wrap">
@@ -4682,10 +4683,7 @@ window.APP_CONFIG = Object.freeze({
   function trainingUsersHtml() {
     const list = (state.manage && state.manage.training) || [];
     return `
-      <div class="mg-head">
-        <div class="bug-sub">کاربران Training <span class="mg-count">${formatNum(list.length)} نفر</span></div>
-        <div class="mg-tools"><button type="button" class="mg-btn mg-primary mg-add" id="tr-add">+ تعریف کاربر Training</button></div>
-      </div>
+      <div class="bug-sub">کاربران Training <span class="mg-count">${formatNum(list.length)} نفر</span></div>
       <div class="panel perf-wrap">
         ${list.length ? `<table class="perf-table mg-table">
           <thead><tr><th>نام</th><th>نام کاربری</th><th></th></tr></thead>
