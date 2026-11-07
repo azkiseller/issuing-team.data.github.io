@@ -1550,6 +1550,11 @@ body.with-sidebar header.topbar {
 @media (max-width: 640px) { .tx-form .tb-type-field { grid-column: 1 / -1; } }
 .tb-counts { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 10px; }
 
+/* ---------- Newjoiner (سرگروه: ۳ روز اول در تیم) ---------- */
+.newjoiner-badge { display: inline-block; margin-inline-start: 8px; padding: 1px 9px; border-radius: 999px; font: 800 10.5px var(--font); letter-spacing: .02em;
+  color: #fff; background: linear-gradient(135deg, #F59E0B, #EF6C1A); box-shadow: 0 4px 10px -5px rgba(239,108,26,.7); vertical-align: middle; white-space: nowrap; }
+.tm-add .bug-form { padding: 4px 0 0; }
+
 </style>
 </head>
 <body>
@@ -2082,9 +2087,9 @@ window.APP_CONFIG = Object.freeze({
     { id: 'overview', label: 'نمای کلی', notFor: ['training'] },
     { id: 'team', label: 'تیم من', notFor: ['operator'], labels: { training: 'کارشناسان' } },
     { id: 'companies', label: 'شرکت‌ها', notFor: ['training'] },
-    { id: 'perf', label: 'عملکرد تیم', notFor: ['operator'] },
+    { id: 'perf', label: 'عملکرد تیم', notFor: ['operator', 'training'] },
     { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator'], labels: { operator: 'باگ‌های من' } },
-    { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor'] },
+    { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor', 'training'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
   ];
@@ -2263,31 +2268,12 @@ window.APP_CONFIG = Object.freeze({
     if (h >= 1) return `${formatNum(h)} ساعت`;
     return `${formatNum(Math.max(1, Math.floor(ms / 60000)))} دقیقه`;
   }
+  // هشدار «به‌روز نشده» دیگر نمایش داده نمی‌شود؛ زمان «آخرین به‌روزرسانی» بالای صفحه کافی است
   function renderStaleBanner() {
-    const now = Date.now();
-    const lines = [];
-    // ورک‌فلو شب‌ها (۰۰:۰۰ تا ۰۸:۰۰) اجرا نمی‌شود؛ تا ۰۸:۳۰ هشدارِ قدیمی بودن نشان داده نمی‌شود
-    const tehranHM = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).replace(':', '')) % 2400;
-    if (state.syncAt && tehranHM >= 830) {
-      const age = now - new Date(state.syncAt).getTime();
-      if (age > STALE_SYNC_MS) lines.push(`آمار صدور و حقوق ${agoLabel(age)} است که به‌روز نشده؛ عددها ممکن است قدیمی باشند.`);
-    }
-    if (state.statusAt) {
-      const age = now - new Date(state.statusAt).getTime();
-      if (age > STALE_STATUS_MS) lines.push(`وضعیت فعال/غیرفعال ${agoLabel(age)} است که به‌روز نشده.`);
-    }
-    let el = $('stale-banner');
-    if (!lines.length) { if (el) el.remove(); return; }
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'stale-banner';
-      el.className = 'stale-banner';
-      el.setAttribute('role', 'status');
-      const main = document.querySelector('main');
-      main.insertBefore(el, main.firstChild);
-    }
-    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></svg><div>${lines.map((l) => `<div>${esc(l)}</div>`).join('')}</div>`;
+    const old = $('stale-banner');
+    if (old) old.remove();
   }
+
   // زمان آخرین به‌روزرسانی وضعیت فعال = تازه‌ترین updated_at
   function noteStatusAt(rows) {
     const ts = (rows || []).map((r) => r && r.updated_at).filter(Boolean).sort().pop();
@@ -4157,7 +4143,7 @@ window.APP_CONFIG = Object.freeze({
   // مدیریت تیم (سرگروه: اپراتورهای تیم خودش؛ سرپرست سلر: همه)
   //   جابه‌جایی به تیم دیگر، آوردن افراد بدون سرگروه، ریست رمز، حذف کامل
   // ---------------------------------------------------------------
-  const canManageTeam = (p) => !!p && (p.role === 'team_lead' || (p.role === 'supervisor' && (p.unit || 'seller') === 'seller'));
+  const canManageTeam = (p) => !!p && (p.role === 'team_lead' || p.role === 'training' || (p.role === 'supervisor' && (p.unit || 'seller') === 'seller'));
   async function loadManageData(force) {
     if (state.manage && state.manage.loaded && !force) return;
     const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
@@ -4187,6 +4173,7 @@ window.APP_CONFIG = Object.freeze({
     }
     const root2 = $('manage-root');
     if (!root2) return;
+    if (state.profile.role === 'training') return renderTrainingManage(root2);
     const m = state.manage || { options: [], unassigned: [] };
     const me = state.profile;
     const isLead = me.role === 'team_lead';
@@ -4202,7 +4189,7 @@ window.APP_CONFIG = Object.freeze({
       </select>`;
     const rows = shown.map((p) => `
       <tr>
-        <td class="nm">${esc(p.full_name || '—')}</td>
+        <td class="nm">${esc(p.full_name || '—')}${newJoinerBadge(p)}</td>
         <td class="tm">${esc(teamLabelOf(p.id))}</td>
         <td>${m.options.length ? moveSelect(p) : '—'}</td>
         <td class="mg-acts">
@@ -4756,6 +4743,62 @@ window.APP_CONFIG = Object.freeze({
     }));
   }
 
+  // Training: «مدیریت تیم» فقط برای افزودن کاربر صدور (بدون نمایش لیست افراد)
+  function renderTrainingManage(root) {
+    const m = state.manage || { options: [] };
+    const d = state.tmDraft || (state.tmDraft = { lead: '', name: '', user: '', pass: '' });
+    root.innerHTML = `
+      <div class="panel pe-box tm-add">
+        <div class="pe-title">${sideIcon(SIDE_ICONS.manage)}<span>افزودن کاربر صدور</span></div>
+        <p class="modal-text">کاربر جدید با نام کاربری و رمز اولیه وارد داشبورد می‌شود و زیر سرگروهِ انتخاب‌شده قرار می‌گیرد. نام کامل باید دقیقاً همان نامی باشد که در گزارش متابیس/ازکی‌ایجنت آمده.</p>
+        <form class="bug-form" id="tm-form" autocomplete="off" novalidate>
+          <label>سرگروه
+            <select class="tree-search" id="tm-lead">
+              <option value="">انتخاب سرگروه...</option>
+              ${m.options.map((o) => `<option value="${esc(o.id)}"${o.id === d.lead ? ' selected' : ''}>${esc(o.full_name || '—')}</option>`).join('')}
+            </select>
+          </label>
+          <label>نام و نام خانوادگی
+            <input class="tree-search" id="tm-name" type="text" maxlength="80" autocomplete="off" value="${esc(d.name)}">
+          </label>
+          <label>نام کاربری <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+            <input class="tree-search" id="tm-user" type="text" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="a.ahmadi" value="${esc(d.user)}">
+          </label>
+          <label>رمز اولیه <span class="opt">(حداقل ۸ کاراکتر)</span>
+            <span class="pw-row"><input class="tree-search" id="tm-pass" type="text" dir="ltr" autocomplete="off" value="${esc(d.pass)}"><button type="button" class="mg-btn" id="tm-gen">ساخت رمز</button></span>
+          </label>
+          <div class="full bug-actions">
+            <button type="submit" class="bug-submit" id="tm-submit">ساخت کاربر صدور</button>
+            <span class="bug-msg ${state.tmMsg ? state.tmMsg.kind : ''}" id="tm-msg" role="status" aria-live="polite">${state.tmMsg ? esc(state.tmMsg.text) : ''}</span>
+          </div>
+        </form>
+      </div>`;
+    const map = { 'tm-lead': 'lead', 'tm-name': 'name', 'tm-user': 'user', 'tm-pass': 'pass' };
+    Object.keys(map).forEach((id) => { const el = $(id); const sync = () => { d[map[id]] = el.value; }; el.addEventListener('input', sync); el.addEventListener('change', sync); });
+    $('tm-gen').addEventListener('click', () => { const i = $('tm-pass'); i.value = d.pass = randomPassword(); i.select(); });
+    const setMsg = (text, kind) => { const m2 = $('tm-msg'); m2.textContent = text || ''; m2.className = 'bug-msg ' + (kind || ''); state.tmMsg = text ? { text, kind } : null; };
+    $('tm-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = d.name.trim().replace(/\s+/g, ' ');
+      const user = toEnDigits(d.user).trim().toLowerCase();
+      const pass = d.pass.trim();
+      if (!d.lead) return setMsg('سرگروه را انتخاب کنید.', 'err');
+      if (name.length < 3) return setMsg('نام و نام خانوادگی را کامل وارد کنید.', 'err');
+      if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(user)) return setMsg('نام کاربری فقط حروف انگلیسی کوچک، عدد، نقطه، خط تیره یا زیرخط (۳ تا ۴۰ کاراکتر).', 'err');
+      if (pass.length < 8) return setMsg('رمز اولیه باید حداقل ۸ کاراکتر باشد.', 'err');
+      const btn = $('tm-submit');
+      btn.disabled = true;
+      setMsg('در حال ساخت...', '');
+      const { error } = await sb.rpc('team_create_operator', { p_full_name: name, p_username: user, p_password: pass, p_lead: d.lead });
+      btn.disabled = false;
+      if (error) { console.error(error); return setMsg(rpcErrorText(error, 'ساخت کاربر ناموفق بود.'), 'err'); }
+      const leadName = ((m.options || []).find((o) => o.id === d.lead) || {}).full_name || '';
+      state.tmDraft = { lead: d.lead, name: '', user: '', pass: '' };
+      state.tmMsg = { text: `«${name}» در تیم ${leadName} ساخته شد. نام کاربری: ${user} · رمز: ${pass}`, kind: 'ok' };
+      renderTrainingManage(root);
+    });
+  }
+
   // سرگروه: باگ‌های Training برای اعضای تیمش (فقط مشاهده)
   function trainingBugsForLeadHtml(rows) {
     const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
@@ -4871,7 +4914,7 @@ window.APP_CONFIG = Object.freeze({
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes, hourlyCoRes] = await Promise.all([
-      sb.from('profiles').select('id, full_name, role, reports_to, unit, deleted_at'),
+      sb.from('profiles').select('id, full_name, role, reports_to, unit, deleted_at, team_joined_at'),
       // صفحه‌به‌صفحه (سقف ۱۰۰۰ ردیف در هر درخواست)؛ در تازه‌سازی فقط روزهای تغییرکرده
       loadPeriodTargets(silent ? changedFrom : null),
       sb.from('issuer_active_status').select('operator_id, is_active, is_active_to_issue, status, companies, all_companies, updated_at'),
@@ -5323,6 +5366,15 @@ window.APP_CONFIG = Object.freeze({
     return String(c || '').replace(/[\u200c\u200f]/g, ' ').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
   }
 
+  // سرگروه: کسی که در ۳ روز اخیر به تیم اضافه شده (ساخت کاربر یا انتقال به تیم)
+  const NEWJOINER_DAYS = 3;
+  function isNewJoiner(p) {
+    return !!(p && p.role === 'operator' && p.team_joined_at && Date.now() - new Date(p.team_joined_at).getTime() < NEWJOINER_DAYS * 86400000);
+  }
+  function newJoinerBadge(p) {
+    if (state.viewerRole !== 'team_lead' || !isNewJoiner(p)) return '';
+    return `<span class="newjoiner-badge" title="در ${faDigits(NEWJOINER_DAYS)} روز اخیر به تیم اضافه شده">Newjoiner</span>`;
+  }
   function buildNodeHtml(id, idx, opts) {
     const p = state.profileById[id];
     const kids = state.childrenOf[id] || [];
@@ -5361,7 +5413,7 @@ window.APP_CONFIG = Object.freeze({
       <div class="tree-node" style="--i:${idx || 0}">
         <div class="tree-row ${isLeaf ? 'clickable-leaf' : ''} role-${esc(p.role)}" data-id="${esc(id)}" data-leaf="${isLeaf}" tabindex="0" role="button" aria-expanded="false">
           ${lead}
-          <span class="name">${esc(p.role === 'team_lead' && state.viewerRole === 'team_lead' ? `تیم ${p.full_name || ''}` : (p.full_name || '—'))}</span>
+          <span class="name">${esc(p.role === 'team_lead' && state.viewerRole === 'team_lead' ? `تیم ${p.full_name || ''}` : (p.full_name || '—'))}</span>${newJoinerBadge(p)}
           <span class="tree-role">${esc(ROLE_LABELS[p.role] || p.role)}</span>
           ${opts && opts.team ? `<span class="team-badge" title="تیم">${esc(opts.team)}</span>` : ''}
           <span class="tree-badges">${timeBadge(state.subtreeTime[id], isLeaf ? 'میانگین زمان صدور این کاربر در دوره‌ی جاری' : 'میانگین زمان صدور زیرمجموعه در دوره‌ی جاری')}${activeBadge}${companiesBadge}${todayBadge}${lastBadge}</span>
