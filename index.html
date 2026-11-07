@@ -1412,6 +1412,9 @@ body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]) { di
 .pulse-dot.off { background: var(--ink-faint); box-shadow: none; animation: none; }
 .trend-tip .tt-detail li small { font-size: 10.5px; font-weight: 600; opacity: .75; }
 
+/* ---------- کارشناس حذف‌شده (آمارش برای حقوق مانده) ---------- */
+.archived-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: var(--ink-soft); background: var(--surface-tint); border: 1px dashed var(--line); white-space: nowrap; }
+
 </style>
 </head>
 <body>
@@ -1778,7 +1781,7 @@ window.APP_CONFIG = Object.freeze({
 
   // صفحه‌ی شرکت‌های سرگروه: هر شرکتِ گروه با اسم اعضای تیم که الان در آن فعال (و مجاز به صدور) هستند
   function teamCompanyCardsHtml(scope) {
-    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id));
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at);
     const activeIn = {};
     ops.forEach((p) => {
       const st = state.statusByOperator[p.id];
@@ -3386,6 +3389,13 @@ window.APP_CONFIG = Object.freeze({
     const b = (opts && opts.bounds) || perfBounds(range);
     const rawBy = (opts && opts.raw) || state.rawTargetsByOperator;
     const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id));
+    if (opts && opts.raw) {
+      // بازه‌ی دلخواه: کارشناس حذف‌شده‌ی همین تیم که در آن بازه آمار دارد هم برای حقوق می‌آید
+      const seen = new Set(ops.map((p) => p.id));
+      (state.archivedProfiles || []).forEach((p) => {
+        if (!seen.has(p.id) && rawBy[p.id] && (state.treeIds.has(p.reports_to) || p.reports_to === state.profile.id)) ops.push(p);
+      });
+    }
     const list = ops.map((p) => {
       let count = 0, tw = 0, tc = 0, salary = 0, days = 0;
       (rawBy[p.id] || []).forEach((r) => {
@@ -3397,10 +3407,10 @@ window.APP_CONFIG = Object.freeze({
         if (c > 0) days += 1;
         if (r.avg_issuance_minutes != null && c > 0) { tw += Number(r.avg_issuance_minutes) * c; tc += c; }
       });
-      return { id: p.id, name: p.full_name || '—', team: teamLabelOf(p.id), count, salary, days, time: tc > 0 ? tw / tc : null };
+      return { id: p.id, name: (p.full_name || '—') + (p.deleted_at ? ' (حذف‌شده)' : ''), deleted: !!p.deleted_at, team: teamLabelOf(p.id), count, salary, days, time: tc > 0 ? tw / tc : null };
     });
     const active = list.filter((x) => x.count > 0);
-    const idle = list.filter((x) => x.count <= 0).sort((a, c) => a.name.localeCompare(c.name, 'fa'));
+    const idle = list.filter((x) => x.count <= 0 && !x.deleted).sort((a, c) => a.name.localeCompare(c.name, 'fa'));
     // هر دو شاخص رتبه می‌گیرند (تعداد بیشتر = بهتر، زمان کمتر = بهتر؛ بدون زمان = آخر) و جمع دو رتبه ترتیب نهایی را می‌سازد
     const withT = active.filter((x) => x.time != null);
     const cRank = competitionRanks(active, 'count', -1);
@@ -3690,7 +3700,7 @@ window.APP_CONFIG = Object.freeze({
   function renderBugsLead(root, rows) {
     const profile = state.profile;
     const d = state.bugDraft || (state.bugDraft = { operator: '', day: String(TODAY_SORT), category: BUG_CATEGORIES[0], order: '', company: '', hint: '' });
-    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id))
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at)
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
     const days = periodDaysUntilToday().slice().reverse();
     const companies = bugCompanyOptions(profile);
@@ -3968,7 +3978,7 @@ window.APP_CONFIG = Object.freeze({
     const isLead = me.role === 'team_lead';
     const q = (state.manageSearch || '').trim();
     const ops = state.visibleProfiles
-      .filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && (p.full_name || '').trim() !== BOT_NAME)
+      .filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at && (p.full_name || '').trim() !== BOT_NAME)
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
     const shown = q ? ops.filter((p) => (p.full_name || '').includes(q)) : ops;
     const moveSelect = (p) => `
@@ -4001,7 +4011,7 @@ window.APP_CONFIG = Object.freeze({
           <thead><tr><th>اپراتور</th><th>تیم فعلی</th><th>انتقال به</th><th></th></tr></thead>
           <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
       </div>
-      <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. حذف کاربر برگشت‌پذیر نیست و همه‌ی آمار صدور و حقوق او هم پاک می‌شود.</div>`;
+      <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. با حذف، حساب و پروفایل کارشناس پاک می‌شود ولی آمار صدور و حقوقش برای محاسبه‌ی حقوق می‌ماند.</div>`;
     bindManagePage(root2);
   }
   function bindManagePage(root) {
@@ -4066,8 +4076,9 @@ window.APP_CONFIG = Object.freeze({
         confirmText: 'حذف کامل',
         danger: true,
         body: `
-          <p class="modal-text">حساب ورود، پروفایل و <b>همه‌ی آمار صدور، حقوق، تفکیک شرکت و باگ‌های</b> این کاربر برای همیشه پاک می‌شود و برگشت‌پذیر نیست.</p>
-          <label class="modal-check"><input type="checkbox" id="del-ok"> می‌دانم و می‌خواهم حذف شود</label>`,
+          <p class="modal-text">حساب ورود و پروفایل این کارشناس پاک می‌شود و دیگر نمی‌تواند وارد داشبورد شود؛ از لیست‌ها و شمارش کاربران فعال هم حذف می‌شود.</p>
+          <p class="modal-text"><b>آمار صدور و حقوقش پاک نمی‌شود</b> و برای محاسبه‌ی حقوق در «تیم من»، «عملکرد تیم» و خروجی اکسل با برچسب «حذف‌شده» می‌ماند.</p>
+          <label class="modal-check"><input type="checkbox" id="del-ok"> مطمئنم، حذف شود</label>`,
         onConfirm: async (dlg) => {
           if (!dlg.querySelector('#del-ok').checked) throw new Error('برای حذف، تیک تأیید را بزنید.');
           const name = nameOf(id);
@@ -4305,7 +4316,7 @@ window.APP_CONFIG = Object.freeze({
 
     // هر سه کوئری توسط RLS به «خود کاربر + زیرمجموعه‌اش» محدود می‌شن
     const [profilesRes, targetsRes, statusRes, companyRes, scopeRes, partnerRes, hourlyRes, kpiRes, companyTimeRes, hourlyCoRes] = await Promise.all([
-      sb.from('profiles').select('id, full_name, role, reports_to, unit'),
+      sb.from('profiles').select('id, full_name, role, reports_to, unit, deleted_at'),
       // صفحه‌به‌صفحه (سقف ۱۰۰۰ ردیف در هر درخواست)؛ در تازه‌سازی فقط روزهای تغییرکرده
       loadPeriodTargets(silent ? changedFrom : null),
       sb.from('issuer_active_status').select('operator_id, is_active, is_active_to_issue, status, companies, all_companies, updated_at'),
@@ -4353,7 +4364,10 @@ window.APP_CONFIG = Object.freeze({
       : [];
 
     // --- ساختار درخت
-    state.visibleProfiles = (profilesRes.data || []).filter((p) => !bot || p.id !== bot.id);
+    // کارشناس حذف‌شده (بایگانی): حسابش پاک شده ولی آمارش برای حقوق می‌ماند؛ فقط اگر در دوره‌ی جاری آمار دارد در درخت می‌آید
+    const withRows = new Set((targetsRes.data || []).map((r) => r.operator_id));
+    state.archivedProfiles = (profilesRes.data || []).filter((p) => p.deleted_at);
+    state.visibleProfiles = (profilesRes.data || []).filter((p) => (!bot || p.id !== bot.id) && (!p.deleted_at || withRows.has(p.id)));
     state.profileById = {};
     state.childrenOf = {};
     state.visibleProfiles.forEach((p) => {
@@ -4417,7 +4431,10 @@ window.APP_CONFIG = Object.freeze({
     // --- وضعیت فعال/غیرفعال
     state.statusByOperator = {};
     noteStatusAt(statusRes.data);
-    (statusRes.data || []).forEach((r) => { if (!bot || r.operator_id !== bot.id) state.statusByOperator[r.operator_id] = r; });
+    (statusRes.data || []).forEach((r) => {
+      const p = state.profileById[r.operator_id];
+      if ((!bot || r.operator_id !== bot.id) && !(p && p.deleted_at)) state.statusByOperator[r.operator_id] = r;
+    });
 
     // --- عملکرد و حقوق
     state.targetsByOperator = {};
@@ -4441,7 +4458,7 @@ window.APP_CONFIG = Object.freeze({
     computeAggregates();
 
     // در حالت دو تیم، خودِ دو سرگروه جزو «زیرمجموعه» شمرده نمی‌شوند
-    const totalTeam = [...state.treeIds].filter((id) => !isVirtualId(id) && !(partner && (id === profile.id || id === partner.id))).length;
+    const totalTeam = [...state.treeIds].filter((id) => !isVirtualId(id) && !(state.profileById[id] || {}).deleted_at && !(partner && (id === profile.id || id === partner.id))).length;
     const grandTotal = state.subtreeTotal[summaryId] || 0;
     const grandTotalSalary = state.subtreeSalary[summaryId] || 0;
     const myActive = state.activeCountBySubtree[summaryId] || 0;
@@ -4762,7 +4779,9 @@ window.APP_CONFIG = Object.freeze({
 
     // نقطه‌ی وضعیت فقط برای خودِ اپراتورها؛ سرگروهِ بدون زیرمجموعه هم فلش می‌گیره
     const lead = (isLeaf && p.role === 'operator')
-      ? `<span class="leaf-dot"></span><span class="status-dot ${active ? '' : 'inactive'}" title="${active ? 'فعال' : 'غیرفعال'}"></span>`
+      ? (p.deleted_at
+        ? '<span class="leaf-dot"></span><span class="archived-badge" title="حساب این کارشناس حذف شده؛ آمارش برای حقوق نگه داشته شده">حذف‌شده</span>'
+        : `<span class="leaf-dot"></span><span class="status-dot ${active ? '' : 'inactive'}" title="${active ? 'فعال' : 'غیرفعال'}"></span>`)
       : '<span class="chevron">◀</span>';
 
     const activeBadge = (!isLeaf && (p.role === 'team_lead' || p.role === 'team_pair'))
