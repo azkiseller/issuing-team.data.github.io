@@ -4584,7 +4584,8 @@ window.APP_CONFIG = Object.freeze({
     let summaryId = profile.id;
     if (partner) {
       summaryId = makePair(profile.id, partner.id);
-      state.childrenOf[TREE_ROOT_ID] = [summaryId];
+      // در «تیم من» دو تیم جدا زیر هم (اول تیم خودِ سرگروه)؛ نود «تیم X و Y» فقط برای جمع کارت‌های بالا می‌ماند
+      state.childrenOf[TREE_ROOT_ID] = [profile.id, partner.id];
       state.treeRootId = TREE_ROOT_ID;
     } else {
       state.treeRootId = profile.id;
@@ -4987,7 +4988,7 @@ window.APP_CONFIG = Object.freeze({
       <div class="tree-node" style="--i:${idx || 0}">
         <div class="tree-row ${isLeaf ? 'clickable-leaf' : ''} role-${esc(p.role)}" data-id="${esc(id)}" data-leaf="${isLeaf}" tabindex="0" role="button" aria-expanded="false">
           ${lead}
-          <span class="name">${esc(p.full_name || '—')}</span>
+          <span class="name">${esc(p.role === 'team_lead' && state.viewerRole === 'team_lead' ? `تیم ${p.full_name || ''}` : (p.full_name || '—'))}</span>
           <span class="tree-role">${esc(ROLE_LABELS[p.role] || p.role)}</span>
           ${opts && opts.team ? `<span class="team-badge" title="تیم">${esc(opts.team)}</span>` : ''}
           <span class="tree-badges">${timeBadge(state.subtreeTime[id], isLeaf ? 'میانگین زمان صدور این کاربر در دوره‌ی جاری' : 'میانگین زمان صدور زیرمجموعه در دوره‌ی جاری')}${activeBadge}${companiesBadge}${todayBadge}${lastBadge}</span>
