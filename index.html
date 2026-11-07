@@ -1293,13 +1293,6 @@ html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,1
 @keyframes chg-out { to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .chg-up, .chg-down, .chg-tag { animation: none; } }
 
-/* ---------- نوار هدف امروز در ردیف‌های درخت ---------- */
-.tree-row { position: relative; }
-.goal-bar { position: absolute; inset-inline: 16px; bottom: 5px; height: 3px; border-radius: 3px; background: var(--surface-tint); overflow: hidden; pointer-events: auto; }
-.goal-bar i { position: absolute; inset-block: 0; inset-inline-start: 0; width: var(--p); border-radius: inherit; background: var(--bar); transition: width .6s cubic-bezier(.4,0,.2,1); }
-.goal-bar.good { --bar: var(--good); } .goal-bar.warn { --bar: var(--warn); } .goal-bar.bad { --bar: var(--danger); }
-.tree-row:has(> .goal-bar) { padding-bottom: 17px; }
-
 /* ---------- تفکیک شرکتی در تولتیپ نمودار روزانه‌ی بات ---------- */
 .trend-tip .tt-detail:empty { display: none; }
 .trend-tip .tt-detail { align-self: stretch; min-width: 140px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.18); }
@@ -3156,7 +3149,7 @@ window.APP_CONFIG = Object.freeze({
     if (seg.length) segments.push(seg);
     const pt = (i) => `${xs[i].toFixed(2)},${trendY(values[i], max).toFixed(2)}`;
     // smooth: منحنی یکنوا (بدون بیرون‌زدگی از بالا/پایین نقطه‌ها) به‌جای خط شکسته
-    const segPath = (s) => (opts.smooth !== false && s.length > 2
+    const segPath = (s) => (opts.smooth && s.length > 2
       ? monotonePath(s.map((i) => [xs[i], trendY(values[i], max)]))
       : s.map((i, k) => `${k === 0 ? 'M' : 'L'}${pt(i)}`).join(' '));
     const line = segments.map(segPath).join(' ');
@@ -4867,16 +4860,6 @@ window.APP_CONFIG = Object.freeze({
     return String(c || '').replace(/[\u200c\u200f]/g, ' ').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
   }
 
-  // نوار باریک «صدور امروز / هدف امروز» پایین هر ردیف درخت
-  function goalBarHtml(id) {
-    const n = state.subtreeGoalN && state.subtreeGoalN[id];
-    if (!n) return '';
-    const done = state.subtreeToday[id] || 0, goal = n * DAY_GOAL;
-    const pct = Math.round(done / goal * 100);
-    const cls = pct >= 100 ? 'good' : pct >= 50 ? 'warn' : 'bad';
-    return `<span class="goal-bar ${cls}" style="--p:${Math.min(100, pct)}%" title="صدور امروز: ${formatNum(done)} از هدف ${formatNum(goal)} (${formatNum(pct)}٪)"><i></i></span>`;
-  }
-
   function buildNodeHtml(id, idx, opts) {
     const p = state.profileById[id];
     const kids = state.childrenOf[id] || [];
@@ -4924,7 +4907,6 @@ window.APP_CONFIG = Object.freeze({
             <span class="tree-total">${totalLabel}</span>
             <span class="tree-total salary">${salaryLabel}</span>
           </div>
-          ${goalBarHtml(id)}
         </div>
         <div class="${isLeaf ? 'leaf-detail' : 'tree-children'}"><div class="${isLeaf ? 'leaf-detail-inner' : 'tree-children-inner'}"></div></div>
       </div>
