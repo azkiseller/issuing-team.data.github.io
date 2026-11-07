@@ -1520,6 +1520,35 @@ body.with-sidebar header.topbar {
 .tb-chip.effective { color: var(--accent-strong); background: var(--accent-soft); }
 .tb-amount { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
 
+/* ---------- Training: فهرست کارشناسان + ثبت باگ زیر هر ردیف ---------- */
+.tx-filters { margin-bottom: 6px; }
+.tx-list { display: grid; gap: 10px; }
+.tx-row { padding: 0; overflow: visible; }
+.tx-row.open { box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow, 0 8px 24px -16px rgba(15,27,51,.35)); }
+.tx-main { display: flex; align-items: center; gap: 14px; padding: 12px 16px; flex-wrap: wrap; }
+.tx-who { display: grid; gap: 3px; min-width: 0; flex: 1 1 200px; }
+.tx-name { font-size: 14.5px; font-weight: 800; color: var(--ink); }
+.tx-lead { font-size: 12px; color: var(--ink-faint); }
+.tx-stats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tx-stat { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--surface-tint); }
+.tx-stat small { font-size: 11px; color: var(--ink-faint); }
+.tx-stat b { font-size: 14px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tx-bugcount { padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: var(--danger); background: var(--danger-soft); }
+.tx-toggle { padding: 8px 18px; font-size: 12.5px; flex: none; }
+.tx-panel { border-top: 1px solid var(--line); padding: 4px 0 12px; animation: df-in .16s ease-out; }
+.tx-form { padding: 14px 16px; }
+.tx-amount[readonly] { background: var(--surface-tint); color: var(--ink-soft); cursor: not-allowed; font-weight: 800; }
+.tx-bugs-head { margin: 4px 16px 8px; font-size: 13px; font-weight: 800; color: var(--ink); }
+.tx-panel .perf-wrap { margin: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.au-tabs.tb-types { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 640px) {
+  .tx-main { gap: 10px; }
+  .tx-toggle { width: 100%; justify-content: center; text-align: center; }
+}
+.tx-form .tb-type-field { grid-column: span 2; }
+.au-tabs.tb-types button { white-space: nowrap; padding: 0 8px; }
+@media (max-width: 640px) { .tx-form .tb-type-field { grid-column: 1 / -1; } }
+
 </style>
 </head>
 <body>
@@ -2049,11 +2078,11 @@ window.APP_CONFIG = Object.freeze({
   };
   // roles: کدام نقش‌ها این بخش را دارند (خالی = همه)
   const SIDE_PAGES = [
-    { id: 'overview', label: 'نمای کلی' },
+    { id: 'overview', label: 'نمای کلی', notFor: ['training'] },
     { id: 'team', label: 'تیم من', notFor: ['operator'], labels: { training: 'کارشناسان' } },
-    { id: 'companies', label: 'شرکت‌ها' },
+    { id: 'companies', label: 'شرکت‌ها', notFor: ['training'] },
     { id: 'perf', label: 'عملکرد تیم', notFor: ['operator'] },
-    { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator', 'training'], labels: { operator: 'باگ‌های من' } },
+    { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator'], labels: { operator: 'باگ‌های من' } },
     { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
@@ -3818,14 +3847,6 @@ window.APP_CONFIG = Object.freeze({
   async function loadBugsPage() {
     const root = $('bugs-root');
     if (!root || !state.profile) return;
-    if (state.profile.role === 'training') {
-      const res = await fetchTrainingBugs();
-      const el = $('bugs-root');
-      if (!el) return;
-      if (res.error) { console.error('training_bugs query failed', res.error); el.innerHTML = '<div class="panel"><div class="empty-state">خواندن باگ‌ها ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>'; return; }
-      renderBugsTraining(el, res.data);
-      return;
-    }
     const { data, error } = await fetchBugs();
     const live = $('bugs-root');
     if (!live) return;
@@ -4504,179 +4525,221 @@ window.APP_CONFIG = Object.freeze({
   }
 
   // ---------------------------------------------------------------
-  // باگ‌های Training: بار مالی / بدون بار مالی / مؤثر، با مبلغ (ریال)، شماره سفارش و توضیحات — برای همه‌ی کارشناسان
+  // Training: صفحه‌ی «کارشناسان» — فهرست ساده (سرگروه، تعداد صدور) + ثبت باگ زیر هر کارشناس
+  //   نوع باگ ← مبلغ: بار مالی = دلخواه | بدون بار مالی = ۰ (قفل) | مؤثر = ۱۵٬۰۰۰٬۰۰۰ ریال (قفل)
   // ---------------------------------------------------------------
   const TB_TYPES = [
     { id: 'financial', label: 'بار مالی' },
     { id: 'non_financial', label: 'بدون بار مالی' },
     { id: 'effective', label: 'مؤثر' },
   ];
+  const TB_FIXED_AMOUNT = { non_financial: 0, effective: 15000000 };
   const tbLabel = (t) => (TB_TYPES.find((x) => x.id === t) || { label: t }).label;
   const digitsOnly = (v) => toEnDigits(v).replace(/[^\d]/g, '');
-  async function fetchTrainingBugs() {
+  const rial = (n) => (n == null ? '—' : `${formatNum(n)} ریال`);
+  async function loadTrainingBugs() {
     const { data, error } = await sb.from('training_bugs')
       .select('id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, created_at')
       .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
       .order('created_at', { ascending: false })
-      .limit(2000);
-    return { data: data || [], error };
+      .limit(3000);
+    if (error) console.error('training_bugs query failed', error);
+    state.tbRows = data || [];
+    state.tbError = error || null;
   }
-  function renderBugsTraining(root, rows) {
-    const me = state.profile;
-    const d = state.tbDraft || (state.tbDraft = { operator: '', day: String(TODAY_SORT), type: 'financial', amount: '', order: '', company: '', desc: '' });
-    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at && (p.full_name || '').trim() !== BOT_NAME)
-      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+  async function renderTrainingExperts() {
+    const root = $('tx-root');
+    if (!root) return;
+    if (!state.tbRows) await loadTrainingBugs();
+    const live = $('tx-root');
+    if (!live) return;
+    const q = (state.txSearch || '').trim();
+    const leadFilter = state.txLead || '';
+    const leadOf = (p) => { const l = state.profileById[p.reports_to]; return l && l.role === 'team_lead' ? l : null; };
+    const ops = state.visibleProfiles.filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at && (p.full_name || '').trim() !== BOT_NAME);
+    const leads = [...new Map(ops.map(leadOf).filter(Boolean).map((l) => [l.id, l])).values()].sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const bugsBy = {};
+    state.tbRows.forEach((r) => { (bugsBy[r.operator_id] = bugsBy[r.operator_id] || []).push(r); });
+    const shown = ops
+      .filter((p) => (!q || (p.full_name || '').includes(q)) && (!leadFilter || p.reports_to === leadFilter))
+      .sort((a, b) => ((leadOf(a) || {}).full_name || 'ی').localeCompare((leadOf(b) || {}).full_name || 'ی', 'fa') || (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const row = (p) => {
+      const t = state.targetsByOperator[p.id];
+      const lead = leadOf(p);
+      const nb = (bugsBy[p.id] || []).length;
+      const open = state.txOpen === p.id;
+      return `
+        <div class="panel tx-row${open ? ' open' : ''}" data-op="${esc(p.id)}">
+          <div class="tx-main">
+            <div class="tx-who">
+              <b class="tx-name">${esc(p.full_name || '—')}</b>
+              <span class="tx-lead">سرگروه: ${esc(lead ? lead.full_name : '—')}</span>
+            </div>
+            <div class="tx-stats">
+              <span class="tx-stat" title="تعداد صدور در ${esc(CURRENT_PERIOD.label)}"><small>صدور دوره</small><b>${formatNum(t ? t.total : 0)}</b></span>
+              <span class="tx-stat" title="تعداد صدور امروز"><small>امروز</small><b>${formatNum(t ? t.todayCount : 0)}</b></span>
+              ${nb ? `<span class="tx-bugcount" title="باگ‌های ثبت‌شده در این دوره">${formatNum(nb)} باگ</span>` : ''}
+            </div>
+            <button type="button" class="mg-btn ${open ? '' : 'mg-primary'} tx-toggle" data-txbug="${esc(p.id)}" aria-expanded="${open}">${open ? 'بستن' : 'ثبت باگ'}</button>
+          </div>
+          ${open ? txPanelHtml(p, bugsBy[p.id] || []) : ''}
+        </div>`;
+    };
+    live.innerHTML = `
+      <div class="filters tx-filters">
+        <input type="search" class="tree-search" id="tx-search" placeholder="جستجوی نام کارشناس..." value="${esc(q)}" aria-label="جستجوی نام کارشناس">
+        <select class="tree-search" id="tx-lead" aria-label="فیلتر سرگروه">
+          <option value="">همه‌ی سرگروه‌ها</option>
+          ${leads.map((l) => `<option value="${esc(l.id)}"${l.id === leadFilter ? ' selected' : ''}>${esc(l.full_name || '—')}</option>`).join('')}
+        </select>
+      </div>
+      <div class="section-label">${formatNum(shown.length)} کارشناس · ${esc(CURRENT_PERIOD.label)}${state.tbError ? ' · خواندن باگ‌ها ناموفق بود' : ''}</div>
+      <div class="tx-list">${shown.length ? shown.map(row).join('') : '<div class="panel"><div class="empty-state">کارشناسی پیدا نشد</div></div>'}</div>`;
+    bindTrainingExperts(live);
+  }
+  function txPanelHtml(p, bugs) {
+    const d = (state.txDrafts = state.txDrafts || {})[p.id] || (state.txDrafts[p.id] = { day: String(TODAY_SORT), type: 'financial', amount: '', order: '', company: '', desc: '' });
     const days = periodDaysUntilToday().slice().reverse();
-    const companies = bugCompanyOptions(me);
-    const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
-    const sel = (v, cur) => (String(v) === String(cur) ? ' selected' : '');
-    const money = (n) => (n == null ? '—' : `${formatNum(n)} ریال`);
-    // خلاصه‌ی دوره به ازای هر کارشناس
-    const by = {};
-    rows.forEach((r) => {
-      const b = (by[r.operator_id] = by[r.operator_id] || { financial: 0, non_financial: 0, effective: 0, amount: 0 });
-      b[r.bug_type] = (b[r.bug_type] || 0) + 1;
-      b.amount += Number(r.amount) || 0;
-    });
-    const summary = Object.keys(by).sort((a, b) => by[b].amount - by[a].amount || nameOf(a).localeCompare(nameOf(b), 'fa')).map((id) => `
-      <tr>
-        <td class="nm">${esc(nameOf(id))}</td>
-        <td class="tm">${esc(teamLabelOf(id))}</td>
-        <td class="num">${by[id].financial ? `<span class="tb-chip financial">${formatNum(by[id].financial)}</span>` : '—'}</td>
-        <td class="num">${by[id].non_financial ? `<span class="tb-chip non_financial">${formatNum(by[id].non_financial)}</span>` : '—'}</td>
-        <td class="num">${by[id].effective ? `<span class="tb-chip effective">${formatNum(by[id].effective)}</span>` : '—'}</td>
-        <td class="num tb-amount">${by[id].amount ? money(by[id].amount) : '—'}</td>
-      </tr>`).join('');
-    const totalAmount = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    const recent = rows.slice(0, 80).map((r) => `
+    const st = state.statusByOperator[p.id];
+    const mine = splitCompanies(st && (st.all_companies || st.companies));
+    const companies = [...new Set(mine.concat(bugCompanyOptions(state.profile)))];
+    const fixed = TB_FIXED_AMOUNT[d.type];
+    const amountVal = fixed != null ? formatNum(fixed) : (d.amount ? Number(d.amount).toLocaleString('en-US') : '');
+    const list = bugs.map((r) => `
       <tr>
         <td>${esc(faDigits(r.bug_date_jalali))}</td>
-        <td class="nm">${esc(nameOf(r.operator_id))}</td>
         <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
-        <td class="num tb-amount">${money(r.amount)}</td>
-        <td class="bug-order">${esc(r.order_number)}</td>
+        <td class="num tb-amount">${rial(r.amount)}</td>
+        <td class="bug-order">${esc(r.order_number || '—')}</td>
         <td>${esc(r.company || '—')}</td>
         <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
-        <td>${r.reported_by === me.id ? `<button type="button" class="bug-del" data-tbdel="${esc(r.id)}">حذف</button>` : ''}</td>
+        <td>${r.reported_by === state.profile.id ? `<button type="button" class="bug-del" data-tbdel="${esc(r.id)}">حذف</button>` : ''}</td>
       </tr>`).join('');
-    const amountShown = d.amount ? formatNum(Number(d.amount)) : '';
-    root.innerHTML = `
-      <div class="panel">
-        <form class="bug-form" id="tb-form" autocomplete="off" novalidate>
-          <label>کارشناس
-            <select class="tree-search" id="tb-operator">
-              <option value="">انتخاب کارشناس...</option>
-              ${ops.map((p) => `<option value="${esc(p.id)}"${sel(p.id, d.operator)}>${esc(p.full_name || '—')} — ${esc(teamLabelOf(p.id))}</option>`).join('')}
-            </select>
-          </label>
+    const total = bugs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    return `
+      <div class="tx-panel">
+        <form class="bug-form tx-form" data-form="${esc(p.id)}" autocomplete="off" novalidate>
           <label>تاریخ باگ
-            <select class="tree-search" id="tb-day">
-              ${days.map((x) => `<option value="${x.sort}"${sel(x.sort, d.day)}>${esc(faDigits(x.jalali))}${x.sort === TODAY_SORT ? ' (امروز)' : ''}</option>`).join('')}
+            <select class="tree-search" data-f="day">
+              ${days.map((x) => `<option value="${x.sort}"${String(x.sort) === String(d.day) ? ' selected' : ''}>${esc(faDigits(x.jalali))}${x.sort === TODAY_SORT ? ' (امروز)' : ''}</option>`).join('')}
             </select>
           </label>
-          <div class="full tb-type-field"><span class="tb-type-label">نوع باگ</span>
+          <div class="tb-type-field"><span class="tb-type-label">نوع باگ</span>
             <div class="au-tabs tb-types" role="radiogroup" aria-label="نوع باگ">
               ${TB_TYPES.map((t) => `<button type="button" role="radio" data-tbtype="${t.id}" aria-checked="${t.id === d.type}" aria-selected="${t.id === d.type}">${t.label}</button>`).join('')}
             </div>
           </div>
-          <label>مبلغ (ریال) <span class="opt" id="tb-amount-opt">${d.type === 'financial' ? '(الزامی)' : '(اختیاری)'}</span>
-            <input class="tree-search" id="tb-amount" type="text" inputmode="numeric" dir="ltr" maxlength="20" placeholder="مثلاً ۲,۵۰۰,۰۰۰" value="${esc(amountShown)}">
+          <label>مبلغ (ریال)
+            <input class="tree-search tx-amount" data-f="amount" type="text" inputmode="numeric" dir="ltr" maxlength="20" placeholder="مبلغ بار مالی" value="${esc(amountVal)}"${fixed != null ? ' readonly aria-readonly="true"' : ''}>
           </label>
           <label>شماره سفارش
-            <input class="tree-search" id="tb-order" type="text" inputmode="numeric" maxlength="40" dir="ltr" placeholder="مثلاً 123456" value="${esc(d.order)}">
+            <input class="tree-search" data-f="order" type="text" inputmode="numeric" dir="ltr" maxlength="40" placeholder="مثلاً 123456" value="${esc(d.order || '')}">
           </label>
-          <label>شرکت <span class="opt">(اختیاری)</span>
-            <input class="tree-search" id="tb-company" type="text" list="tb-companies" maxlength="80" placeholder="نام شرکت" value="${esc(d.company)}">
-            <datalist id="tb-companies">${companies.map((c) => `<option value="${esc(c)}"></option>`).join('')}</datalist>
+          <label>شرکت
+            <input class="tree-search" data-f="company" type="text" list="tx-co-${esc(p.id)}" maxlength="80" placeholder="نام شرکت" value="${esc(d.company)}">
+            <datalist id="tx-co-${esc(p.id)}">${companies.map((c) => `<option value="${esc(c)}"></option>`).join('')}</datalist>
           </label>
           <label class="full">توضیحات
-            <textarea class="tree-search" id="tb-desc" maxlength="1000" placeholder="شرح باگ و دلیل آن">${esc(d.desc)}</textarea>
+            <textarea class="tree-search" data-f="desc" maxlength="1000" placeholder="شرح باگ">${esc(d.desc)}</textarea>
           </label>
           <div class="full bug-actions">
-            <button type="submit" class="bug-submit" id="tb-submit">ثبت باگ</button>
-            <span class="bug-msg" id="tb-msg" role="status" aria-live="polite">${state.tbMsg ? esc(state.tbMsg.text) : ''}</span>
+            <button type="submit" class="bug-submit">ثبت باگ</button>
+            <span class="bug-msg ${state.txMsg && state.txMsg.op === p.id ? state.txMsg.kind : ''}" role="status" aria-live="polite">${state.txMsg && state.txMsg.op === p.id ? esc(state.txMsg.text) : ''}</span>
           </div>
         </form>
-      </div>
-      <div class="bug-sub">خلاصه‌ی ${esc(CURRENT_PERIOD.label)} <span class="mg-count">${formatNum(rows.length)} باگ · جمع مبلغ ${money(totalAmount)}</span></div>
-      <div class="panel perf-wrap">
-        ${summary ? `<table class="perf-table">
-          <thead><tr><th>کارشناس</th><th>تیم</th><th class="num">بار مالی</th><th class="num">بدون بار مالی</th><th class="num">مؤثر</th><th class="num">جمع مبلغ</th></tr></thead>
-          <tbody>${summary}</tbody></table>` : '<div class="empty-state">در این دوره هنوز باگی ثبت نشده است</div>'}
-      </div>
-      <div class="bug-sub">آخرین باگ‌های ثبت‌شده</div>
-      <div class="panel perf-wrap">
-        ${recent ? `<table class="perf-table bug-table">
-          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th></th></tr></thead>
-          <tbody>${recent}</tbody></table>` : '<div class="empty-state">—</div>'}
+        ${list ? `<div class="tx-bugs-head">باگ‌های ${esc(CURRENT_PERIOD.label)} <span class="mg-count">${formatNum(bugs.length)} باگ · جمع ${rial(total)}</span></div>
+          <div class="perf-wrap"><table class="perf-table bug-table">
+            <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th></th></tr></thead>
+            <tbody>${list}</tbody></table></div>` : ''}
       </div>`;
-    bindBugsTraining(root);
   }
-  function bindBugsTraining(root) {
-    const d = state.tbDraft;
-    const setMsg = (text, kind) => { const m = $('tb-msg'); if (m) { m.textContent = text; m.className = 'bug-msg ' + (kind || ''); } state.tbMsg = text ? { text, kind } : null; };
-    const map = { 'tb-operator': 'operator', 'tb-day': 'day', 'tb-order': 'order', 'tb-company': 'company', 'tb-desc': 'desc' };
-    Object.keys(map).forEach((id) => {
-      const el = $(id);
-      if (!el) return;
-      const sync = () => { d[map[id]] = el.value; if (state.tbMsg && state.tbMsg.kind === 'ok') setMsg('', ''); };
-      el.addEventListener('input', sync);
-      el.addEventListener('change', sync);
+  function bindTrainingExperts(root) {
+    const search = $('tx-search');
+    if (search) search.addEventListener('input', () => {
+      state.txSearch = search.value;
+      const pos = search.selectionStart;
+      renderTrainingExperts().then(() => { const s = $('tx-search'); if (s) { s.focus(); try { s.setSelectionRange(pos, pos); } catch (e) {} } });
     });
-    // مبلغ: فقط رقم، با جداکننده‌ی هزارگان هنگام تایپ
-    const amt = $('tb-amount');
-    amt.addEventListener('input', () => {
-      const raw = digitsOnly(amt.value).replace(/^0+(?=\d)/, '');
-      d.amount = raw;
-      amt.value = raw ? Number(raw).toLocaleString('en-US') : '';
-    });
-    root.querySelectorAll('[data-tbtype]').forEach((b) => b.addEventListener('click', () => {
-      d.type = b.getAttribute('data-tbtype');
-      root.querySelectorAll('[data-tbtype]').forEach((x) => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
-      $('tb-amount-opt').textContent = d.type === 'financial' ? '(الزامی)' : '(اختیاری)';
-    }));
-    $('tb-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const order = toEnDigits(d.order).trim();
-      const amount = d.amount ? Number(d.amount) : null;
-      if (!d.operator) return setMsg('کارشناس را انتخاب کنید.', 'err');
-      if (d.type === 'financial' && !amount) return setMsg('برای باگ بار مالی، مبلغ را وارد کنید.', 'err');
-      if (!order) return setMsg('شماره سفارش را وارد کنید.', 'err');
-      const day = Number(d.day);
-      const btn = $('tb-submit');
-      btn.disabled = true;
-      setMsg('در حال ثبت...', '');
-      const { error } = await sb.from('training_bugs').insert({
-        operator_id: d.operator,
-        reported_by: state.profile.id,
-        bug_type: d.type,
-        amount,
-        order_number: order,
-        company: String(d.company || '').trim() || null,
-        description: String(d.desc || '').trim() || null,
-        bug_date_sort: day,
-        bug_date_jalali: toEnDigits(jLabel(sortToJ(day))),
-        period_start_sort: Number(CURRENT_PERIOD.startSort),
+    const lead = $('tx-lead');
+    if (lead) lead.addEventListener('change', () => { state.txLead = lead.value; renderTrainingExperts(); });
+    root.querySelectorAll('[data-txbug]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-txbug');
+      state.txOpen = state.txOpen === id ? null : id;
+      state.txMsg = null;
+      renderTrainingExperts().then(() => {
+        const r = document.querySelector(`.tx-row[data-op="${CSS.escape(id)}"]`);
+        if (r && state.txOpen === id) r.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       });
-      if (error) {
-        console.error('training_bugs insert failed', error);
-        btn.disabled = false;
-        return setMsg(error.code === '42501' ? 'اجازه‌ی ثبت این باگ را ندارید.' : `ثبت ناموفق بود. (کد خطا: ${error.code || error.status || 'نامشخص'})`, 'err');
-      }
-      const who = state.profileById[d.operator];
-      d.order = ''; d.desc = ''; d.amount = '';
-      state.tbMsg = { text: `باگ «${tbLabel(d.type)}» برای ${(who && who.full_name) || 'کارشناس'} ثبت شد.`, kind: 'ok' };
-      await loadBugsPage();
+    }));
+    root.querySelectorAll('form.tx-form').forEach((form) => {
+      const op = form.getAttribute('data-form');
+      const d = state.txDrafts[op];
+      const msg = form.querySelector('.bug-msg');
+      const setMsg = (text, kind) => { msg.textContent = text || ''; msg.className = 'bug-msg ' + (kind || ''); state.txMsg = text ? { op, text, kind } : null; };
+      const amount = form.querySelector('[data-f="amount"]');
+      form.querySelectorAll('[data-f]').forEach((el) => {
+        const f = el.getAttribute('data-f');
+        if (f === 'amount') return;
+        el.addEventListener('input', () => { d[f] = el.value; });
+        el.addEventListener('change', () => { d[f] = el.value; });
+      });
+      amount.addEventListener('input', () => {
+        if (TB_FIXED_AMOUNT[d.type] != null) return;
+        const raw = digitsOnly(amount.value).replace(/^0+(?=\d)/, '');
+        d.amount = raw;
+        amount.value = raw ? Number(raw).toLocaleString('en-US') : '';
+      });
+      form.querySelectorAll('[data-tbtype]').forEach((t) => t.addEventListener('click', () => {
+        d.type = t.getAttribute('data-tbtype');
+        form.querySelectorAll('[data-tbtype]').forEach((x) => { const on = x === t; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-selected', String(on)); });
+        const fixed = TB_FIXED_AMOUNT[d.type];
+        if (fixed != null) { amount.value = formatNum(fixed); amount.readOnly = true; amount.setAttribute('aria-readonly', 'true'); }
+        else { amount.readOnly = false; amount.removeAttribute('aria-readonly'); amount.value = d.amount ? Number(d.amount).toLocaleString('en-US') : ''; amount.focus(); }
+        setMsg('');
+      }));
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fixed = TB_FIXED_AMOUNT[d.type];
+        const amt = fixed != null ? fixed : (d.amount ? Number(d.amount) : 0);
+        const order = toEnDigits(d.order || '').trim();
+        if (d.type === 'financial' && !(amt > 0)) return setMsg('برای باگ بار مالی، مبلغ را وارد کنید.', 'err');
+        if (!order) return setMsg('شماره سفارش را وارد کنید.', 'err');
+        const btn = form.querySelector('[type="submit"]');
+        btn.disabled = true;
+        setMsg('در حال ثبت...', '');
+        const day = Number(d.day);
+        const { error } = await sb.from('training_bugs').insert({
+          operator_id: op,
+          reported_by: state.profile.id,
+          bug_type: d.type,
+          amount: amt,
+          order_number: order,
+          company: String(d.company || '').trim() || null,
+          description: String(d.desc || '').trim() || null,
+          bug_date_sort: day,
+          bug_date_jalali: toEnDigits(jLabel(sortToJ(day))),
+          period_start_sort: Number(CURRENT_PERIOD.startSort),
+        });
+        if (error) {
+          console.error('training_bugs insert failed', error);
+          btn.disabled = false;
+          return setMsg(error.code === '42501' ? 'اجازه‌ی ثبت این باگ را ندارید.' : `ثبت ناموفق بود. (کد خطا: ${error.code || error.status || 'نامشخص'})`, 'err');
+        }
+        state.txDrafts[op] = { day: d.day, type: d.type, amount: '', order: '', company: '', desc: '' };
+        state.txMsg = { op, text: `باگ «${tbLabel(d.type)}» ثبت شد.`, kind: 'ok' };
+        await loadTrainingBugs();
+        await renderTrainingExperts();
+      });
     });
     root.querySelectorAll('[data-tbdel]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('این باگ حذف شود؟')) return;
       b.disabled = true;
       const { error } = await sb.from('training_bugs').delete().eq('id', b.getAttribute('data-tbdel'));
-      if (error) { console.error(error); b.disabled = false; return setMsg('حذف ناموفق بود.', 'err'); }
-      state.tbMsg = { text: 'باگ حذف شد.', kind: 'ok' };
-      await loadBugsPage();
+      if (error) { console.error(error); b.disabled = false; toast('حذف ناموفق بود.', 'err'); return; }
+      await loadTrainingBugs();
+      await renderTrainingExperts();
+      toast('باگ حذف شد.');
     }));
-    if (state.tbMsg && $('tb-msg')) $('tb-msg').className = 'bug-msg ' + (state.tbMsg.kind || '');
   }
 
   // سرپرست: کاربران Training (ساخت، ریست رمز)
@@ -4945,7 +5008,7 @@ window.APP_CONFIG = Object.freeze({
     if (profile.role === 'team_lead' && myScope.length) {
       // هر شرکتِ گروه (به ترتیب team_lead_company_scope) با اسم اعضای تیم که الان در آن فعال‌اند
       companyStatsHtml = companyCardsHtml(myScope);
-    } else if (SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'training') {
+    } else if (SUPERVISOR_ROLES.includes(profile.role)) {
       companyStatsHtml = companyCardsHtml(null, { showTeam: true }); // سرپرست: همه‌ی شرکت‌ها با نام تیم هر نفر
     } else if (companyStats.length && Object.keys(state.scopeByLead).length) {
       companyStatsHtml = renderCompanyGroups(companyStats);
@@ -4971,11 +5034,13 @@ window.APP_CONFIG = Object.freeze({
       <div id="tab-team" ${showKpiTab && !state.sidebar && state.activeTab === 'kpi' ? 'hidden' : ''}>
       ${state.sidebar ? `<div data-page="overview">${renderDailyTrendChart(dailySeries(teamRows), 'team-trend', `روند صدور روزانه‌ی زیرمجموعه در ${CURRENT_PERIOD.label}`)}</div>` : ''}
       ${bot ? `<div data-page="overview">${renderBotPanel(botRows, botCompanyRows)}</div>` : ''}
-      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) || ['team_lead', 'training'].includes(profile.role) ? renderCompanyTimeChart() : ''}</div>` : ''}
+      ${companyStatsHtml || state.sidebar ? `<div data-page="companies">${companyStatsHtml || '<div class="panel"><div class="empty-state">هنوز آماری برای شرکت‌ها ثبت نشده است</div></div>'}${SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead' ? renderCompanyTimeChart() : ''}</div>` : ''}
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
-      ${state.sidebar && ['team_lead', 'training'].includes(profile.role) ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
+      ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
       ${state.sidebar && canManageTeam(profile) ? '<div data-page="manage" id="manage-root"></div>' : ''}
       <div data-page="team">
+      ${profile.role === 'training' ? '<div id="tx-root"></div>' : ''}
+      <div ${profile.role === 'training' ? 'hidden' : ''}>
       <div class="filters">
         <input type="search" class="tree-search" id="tree-search" placeholder="جستجوی نام..." aria-label="جستجوی نام">
         ${companyOptions.length ? `
@@ -4988,6 +5053,7 @@ window.APP_CONFIG = Object.freeze({
       <div id="tree-root"></div>
       </div>
       </div>
+      </div>
       ${showKpiTab ? `<div id="tab-kpi" data-page="kpi" ${state.sidebar || state.activeTab === 'kpi' ? '' : 'hidden'}>${renderKpiTab(kpiRows)}</div>` : ''}
     `;
     if (showKpiTab && !state.sidebar) bindViewTabs();
@@ -4995,7 +5061,8 @@ window.APP_CONFIG = Object.freeze({
 
     renderTree(state.treeRootId);
     if (state.sidebar) renderPerf();
-    if (state.sidebar && ['team_lead', 'training'].includes(profile.role)) loadBugsPage();
+    if (state.sidebar && profile.role === 'team_lead') loadBugsPage();
+    if (profile.role === 'training') renderTrainingExperts();
     if (state.sidebar && canManageTeam(profile)) renderManagePage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot', { detail: botDayDetail(botRows, botCompanyRows) }); bindBotPanel(); }
