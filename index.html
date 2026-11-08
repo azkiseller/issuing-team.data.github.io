@@ -1344,7 +1344,8 @@ button.ghost#pw-btn:hover { color: var(--accent-strong); }
 @media (prefers-reduced-motion: reduce) { .app-toast { animation: none; transition: none; } }
 
 /* ---------- مدیریت تیم ---------- */
-body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]) { display: none !important; }
+body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]),
+body.with-sidebar[data-view="tbugs"] [data-page]:not([data-page="tbugs"]) { display: none !important; }
 .mg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 10px; }
 .mg-head .bug-sub { margin: 0; }
 .mg-search { max-width: 240px; margin-bottom: 0; }
@@ -1621,6 +1622,30 @@ body.with-sidebar header.topbar {
   .mg-table td.mg-user { grid-column: 1 / -1; order: 1; justify-self: start; }
 }
 .mg-setlogin { color: var(--warn); background: rgba(224,138,23,.14); border-color: rgba(224,138,23,.35); }
+
+/* باگ‌های ثبت‌شده توسط Training (به تفکیک کاربر) */
+.tbp-filters { display: grid; grid-template-columns: 2fr repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0 6px; }
+.tbp-filters .tree-search { margin-bottom: 0; }
+.tbp-list { display: grid; gap: 10px; }
+.tbp-group { padding: 0; overflow: hidden; }
+.tbp-head { width: 100%; display: grid; grid-template-columns: minmax(150px, 1.2fr) 2fr auto 18px; align-items: center; gap: 14px;
+  padding: 14px 18px; border: 0; background: transparent; cursor: pointer; text-align: start; font: inherit; color: var(--ink); }
+.tbp-head:hover { background: var(--surface-tint, rgba(255,255,255,.4)); }
+.tbp-who { display: grid; gap: 2px; min-width: 0; }
+.tbp-who b { font-size: 14px; font-weight: 800; }
+.tbp-who small, .tbp-sum small { font-size: 11.5px; color: var(--ink-faint); }
+.tbp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tbp-sum { display: grid; gap: 2px; text-align: left; }
+.tbp-sum b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tbp-chev { color: var(--ink-faint); transition: transform .2s; }
+.tbp-group.open .tbp-chev { transform: rotate(180deg); }
+.tbp-body { border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
+@media (max-width: 900px) {
+  .tbp-filters { grid-template-columns: 1fr 1fr; }
+  .tbp-filters #tbp-q { grid-column: 1 / -1; }
+  .tbp-head { grid-template-columns: minmax(0, 1fr) auto 18px; }
+  .tbp-chips { grid-column: 1 / -1; order: 3; }
+}
 
 </style>
 </head>
@@ -2147,6 +2172,7 @@ window.APP_CONFIG = Object.freeze({
     bugs: '<path d="M9 9h6v7a3 3 0 0 1-6 0V9z"/><path d="M10 9V7a2 2 0 0 1 4 0v2M5 12h4M15 12h4M6 7l3 2M18 7l-3 2M6 19l3-2.5M18 19l-3-2.5"/>',
     kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
     manage: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.3 0 2.5.3 3.5.9"/><circle cx="18" cy="17" r="2.2"/><path d="M18 12.6v1.6M18 19.8v1.6M14.2 17h1.6M20.2 17h1.6M15.3 14.3l1.1 1.1M19.6 18.6l1.1 1.1M15.3 19.7l1.1-1.1M19.6 15.4l1.1-1.1"/>',
+    tbugs: '<rect x="5" y="3.5" width="14" height="18" rx="2"/><path d="M9 3.5V2.5h6v1M8.5 9h7M8.5 13h7M8.5 17h4"/>',
     days: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/>',
   };
   // roles: کدام نقش‌ها این بخش را دارند (خالی = همه)
@@ -2156,6 +2182,7 @@ window.APP_CONFIG = Object.freeze({
     { id: 'companies', label: 'شرکت‌ها', notFor: ['training'] },
     { id: 'perf', label: 'عملکرد تیم', notFor: ['operator', 'training'] },
     { id: 'bugs', label: 'ثبت باگ', only: ['team_lead', 'operator'], labels: { operator: 'باگ‌های من' } },
+    { id: 'tbugs', label: 'باگ‌های ثبت‌شده', only: ['training', 'supervisor'] },
     { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor', 'training'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
@@ -2287,6 +2314,7 @@ window.APP_CONFIG = Object.freeze({
     });
     $('page-title').textContent = page.label;
     if (page.id === 'days') requestAnimationFrame(layoutDaysPath);
+    if (page.id === 'tbugs') renderTrainingBugsPage();
     try { localStorage.setItem('azki-side-page', page.id); } catch (e) {}
   }
 
@@ -4796,6 +4824,151 @@ window.APP_CONFIG = Object.freeze({
     if (error) console.error('training_bugs query failed', error);
     state.tbRows = data || [];
     state.tbError = error || null;
+    state.tbAll = null; // صفحه‌ی «باگ‌های ثبت‌شده» دفعه‌ی بعد تازه خوانده شود
+  }
+  // ===== باگ‌های ثبت‌شده توسط Training (برای Training و سرپرست): همه‌ی باگ‌ها به تفکیک کاربر =====
+  function periodLabelOf(startSort) {
+    const m = Math.floor(Number(startSort) / 100) % 100;
+    return `${PERSIAN_MONTHS[m % 12]} ماه`; // دوره از ۲۱ِ ماه m تا ۲۰ِ ماه بعد = «ماه بعد»
+  }
+  async function loadAllTrainingBugs() {
+    const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
+    const [b, tu] = await Promise.all([
+      sb.from('training_bugs')
+        .select('id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, period_start_sort, created_at')
+        .order('bug_date_sort', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(5000),
+      // سرپرست پروفایل کاربران Training را نمی‌بیند؛ نام ثبت‌کننده از این RPC می‌آید
+      isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] }),
+    ]);
+    if (b.error) console.error('training_bugs query failed', b.error);
+    state.tbAll = b.data || [];
+    state.tbAllError = b.error || null;
+    state.tbReporters = {};
+    (Array.isArray(tu && tu.data) ? tu.data : []).forEach((u) => { state.tbReporters[u.id] = u.full_name; });
+  }
+  async function renderTrainingBugsPage() {
+    const root = $('tbugs-root');
+    if (!root || !state.profile) return;
+    if (!state.tbAll) {
+      root.innerHTML = '<div class="panel"><div class="empty-state">در حال بارگذاری...</div></div>';
+      await loadAllTrainingBugs();
+    }
+    const live = $('tbugs-root');
+    if (!live) return;
+    const f = state.tbpFilter || (state.tbpFilter = { period: String(CURRENT_PERIOD.startSort), q: '', type: '', lead: '', reporter: '' });
+    const open = state.tbpOpen || (state.tbpOpen = {});
+    const all = state.tbAll || [];
+    const prof = (id) => state.profileById[id];
+    const opName = (id) => (prof(id) && prof(id).full_name) || 'کاربر حذف‌شده';
+    const leadOf = (id) => { const p = prof(id); const l = p && prof(p.reports_to); return l && l.role === 'team_lead' ? l : null; };
+    const repName = (id) => (id && ((prof(id) && prof(id).full_name) || state.tbReporters[id])) || '—';
+
+    // گزینه‌های فیلتر از کل داده
+    const periods = [...new Set(all.map((r) => String(r.period_start_sort)))].sort((a, b) => b - a);
+    if (!periods.includes(String(CURRENT_PERIOD.startSort))) periods.unshift(String(CURRENT_PERIOD.startSort));
+    const leads = [...new Map(all.map((r) => leadOf(r.operator_id)).filter(Boolean).map((l) => [l.id, l])).values()]
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const reporters = [...new Set(all.map((r) => r.reported_by).filter(Boolean))]
+      .map((id) => ({ id, name: repName(id) })).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+
+    const q = f.q.trim();
+    const rows = all.filter((r) => (f.period === 'all' || String(r.period_start_sort) === f.period)
+      && (!f.type || r.bug_type === f.type)
+      && (!f.lead || (leadOf(r.operator_id) || {}).id === f.lead)
+      && (!f.reporter || r.reported_by === f.reporter)
+      && (!q || opName(r.operator_id).includes(q) || String(r.order_number || '').includes(toEnDigits(q)) || String(r.company || '').includes(q)));
+
+    const sumBy = (list) => {
+      const o = { n: list.length, amount: 0, financial: 0, non_financial: 0, effective: 0 };
+      list.forEach((r) => { o.amount += Number(r.amount) || 0; if (o[r.bug_type] != null) o[r.bug_type] += 1; });
+      return o;
+    };
+    const tot = sumBy(rows);
+    const groups = {};
+    rows.forEach((r) => { (groups[r.operator_id] = groups[r.operator_id] || []).push(r); });
+    const ordered = Object.entries(groups).map(([id, list]) => ({ id, list, s: sumBy(list) }))
+      .sort((a, b) => (b.s.amount - a.s.amount) || (b.s.n - a.s.n) || opName(a.id).localeCompare(opName(b.id), 'fa'));
+    const typeChips = (s, cls = 'tb-chip') => TB_TYPES.filter((t) => s[t.id])
+      .map((t) => `<span class="${cls} ${t.id}">${t.label}: ${formatNum(s[t.id])}</span>`).join(' ');
+    const heroChips = TB_TYPES.filter((t) => tot[t.id])
+      .map((t) => `<span class="bug-chip ${t.id === 'non_financial' ? 'free' : 'tb-' + t.id}">${formatNum(tot[t.id])} باگ ${t.label}</span>`).join('')
+      || '<span class="bug-chip none">بدون باگ</span>';
+    const periodText = f.period === 'all' ? 'همه‌ی دوره‌ها' : periodLabelOf(f.period);
+    const sel = (id, label, opts, val) => `<select class="tree-search" id="${id}" aria-label="${label}">${opts.map(([v, t]) => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+
+    const groupHtml = (g) => {
+      const isOpen = !!open[g.id];
+      const l = leadOf(g.id);
+      const body = g.list.map((r) => `
+        <tr>
+          <td>${esc(faDigits(r.bug_date_jalali))}</td>
+          <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
+          <td class="num tb-amount">${rial(r.amount)}</td>
+          <td class="bug-order">${esc(r.order_number || '—')}</td>
+          <td>${esc(r.company || '—')}</td>
+          <td>${esc(repName(r.reported_by))}</td>
+          <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
+        </tr>`).join('');
+      return `
+        <div class="panel tbp-group ${isOpen ? 'open' : ''}">
+          <button type="button" class="tbp-head" data-tbp="${esc(g.id)}" aria-expanded="${isOpen}">
+            <span class="tbp-who"><b>${esc(opName(g.id))}</b><small>${l ? `تیم ${esc(l.full_name || '')}` : 'بدون سرگروه'}</small></span>
+            <span class="tbp-chips">${typeChips(g.s)}</span>
+            <span class="tbp-sum"><b>${formatNum(g.s.amount)}</b><small>ریال · ${formatNum(g.s.n)} باگ</small></span>
+            <span class="tbp-chev" aria-hidden="true">▾</span>
+          </button>
+          ${isOpen ? `<div class="perf-wrap tbp-body"><table class="perf-table bug-table">
+            <thead><tr><th>تاریخ</th><th>نوع باگ</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت بیمه</th><th>ثبت‌کننده</th><th>توضیحات</th></tr></thead>
+            <tbody>${body}</tbody></table></div>` : ''}
+        </div>`;
+    };
+
+    live.innerHTML = `
+      ${state.tbAllError ? '<div class="panel"><div class="empty-state">خواندن باگ‌ها ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>' : ''}
+      <div class="panel bug-hero">
+        <div>
+          <div class="label">باگ‌های ثبت‌شده توسط Training در ${esc(periodText)}</div>
+          <div class="bug-chips">${heroChips}</div>
+        </div>
+        <div class="tb-total">
+          <div class="tb-total-n">${formatNum(tot.amount)} <small>ریال</small></div>
+          <div class="bug-meter-note">${formatNum(tot.n)} باگ برای ${formatNum(ordered.length)} کاربر</div>
+        </div>
+      </div>
+      <div class="tbp-filters">
+        <input class="tree-search" id="tbp-q" type="search" placeholder="جستجوی کاربر، شماره سفارش یا شرکت..." value="${esc(f.q)}" aria-label="جستجو">
+        ${sel('tbp-period', 'دوره', [['all', 'همه‌ی دوره‌ها'], ...periods.map((p) => [p, periodLabelOf(p)])], f.period)}
+        ${sel('tbp-type', 'نوع باگ', [['', 'همه‌ی انواع'], ...TB_TYPES.map((t) => [t.id, t.label])], f.type)}
+        ${sel('tbp-lead', 'سرگروه', [['', 'همه‌ی تیم‌ها'], ...leads.map((l) => [l.id, `تیم ${l.full_name || '—'}`])], f.lead)}
+        ${sel('tbp-rep', 'ثبت‌کننده', [['', 'همه‌ی ثبت‌کننده‌ها'], ...reporters.map((r) => [r.id, r.name])], f.reporter)}
+      </div>
+      <div class="mg-head">
+        <div class="bug-sub">به تفکیک کاربر <span class="mg-count">${formatNum(ordered.length)} نفر</span></div>
+        ${ordered.length ? `<button type="button" class="mg-btn" id="tbp-all">${ordered.every((g) => open[g.id]) ? 'بستن همه' : 'باز کردن همه'}</button>` : ''}
+      </div>
+      ${ordered.length ? `<div class="tbp-list">${ordered.map(groupHtml).join('')}</div>`
+        : '<div class="panel"><div class="empty-state">باگی با این فیلترها ثبت نشده است</div></div>'}`;
+
+    const rerender = () => renderTrainingBugsPage();
+    const qi = $('tbp-q');
+    qi.addEventListener('input', () => {
+      f.q = qi.value; const pos = qi.selectionStart;
+      renderTrainingBugsPage().then(() => { const x = $('tbp-q'); if (x) { x.focus(); try { x.setSelectionRange(pos, pos); } catch (e) {} } });
+    });
+    [['tbp-period', 'period'], ['tbp-type', 'type'], ['tbp-lead', 'lead'], ['tbp-rep', 'reporter']].forEach(([id, k]) => {
+      $(id).addEventListener('change', (e) => { f[k] = e.target.value; rerender(); });
+    });
+    live.querySelectorAll('[data-tbp]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-tbp'); open[id] = !open[id]; rerender();
+    }));
+    const allBtn = $('tbp-all');
+    if (allBtn) allBtn.addEventListener('click', () => {
+      const openAll = !ordered.every((g) => open[g.id]);
+      ordered.forEach((g) => { open[g.id] = openAll; });
+      rerender();
+    });
   }
   async function renderTrainingExperts() {
     const root = $('tx-root');
@@ -5389,6 +5562,7 @@ window.APP_CONFIG = Object.freeze({
       ${state.sidebar ? '<div data-page="perf" id="perf-root"></div>' : ''}
       ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
       ${state.sidebar && canManageTeam(profile) ? '<div data-page="manage" id="manage-root"></div>' : ''}
+      ${state.sidebar && (profile.role === 'training' || SUPERVISOR_ROLES.includes(profile.role)) ? '<div data-page="tbugs" id="tbugs-root"></div>' : ''}
       <div data-page="team">
       ${profile.role === 'training' ? '<div id="tx-root"></div>' : ''}
       <div ${profile.role === 'training' ? 'hidden' : ''}>
@@ -5415,6 +5589,7 @@ window.APP_CONFIG = Object.freeze({
     if (state.sidebar && profile.role === 'team_lead') loadBugsPage();
     if (profile.role === 'training') renderTrainingExperts();
     if (state.sidebar && canManageTeam(profile)) renderManagePage();
+    if (state.sidebar && document.body.dataset.view === 'tbugs') renderTrainingBugsPage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot', { detail: botDayDetail(botRows, botCompanyRows) }); bindBotPanel(); }
     bindCompanyGroups();
