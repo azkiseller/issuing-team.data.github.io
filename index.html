@@ -1295,6 +1295,8 @@ html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,1
 
 /* ---------- تفکیک شرکتی در تولتیپ نمودار روزانه‌ی بات ---------- */
 .trend-tip .tt-detail:empty { display: none; }
+.trend-tip .tt-detail ul.cols2 { grid-template-columns: 1fr 1fr; column-gap: 18px; grid-auto-flow: column;
+  grid-template-rows: repeat(var(--rows, 6), auto); }
 .trend-tip .tt-detail { align-self: stretch; min-width: 140px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.18); }
 html[data-theme="dark"] .trend-tip .tt-detail { border-top-color: rgba(15,27,51,.15); }
 .trend-tip .tt-detail ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -3274,9 +3276,10 @@ window.APP_CONFIG = Object.freeze({
     const f1 = (n) => formatNum(Math.round(n * 10) / 10);
     return (i) => {
       const list = Object.entries(acc[i] || {}).map(([c, v]) => ({ c, a: v.a / 4, t: v.tn ? v.t / v.tn : null }))
-        .filter((x) => x.a > 0 || x.t > 0).sort((x, y) => y.a - x.a).slice(0, 12);
+        .filter((x) => x.a > 0 || x.t > 0).sort((x, y) => y.a - x.a);
       if (!list.length) return '';
-      return `<ul>${list.map((x) => `<li><span>${esc(x.c)}</span><b>${x.t != null ? `<small>(امروز ${f1(x.t)})</small> ` : ''}${f1(x.a)}</b></li>`).join('')}</ul>`;
+      // لیست بلند دو ستونه می‌شود تا تولتیپ از کادر نمودار بیرون نزند
+      return `<ul class="${list.length > 6 ? 'cols2' : ''}" style="--rows:${Math.ceil(list.length / 2)}">${list.map((x) => `<li><span>${esc(x.c)}</span><b>${x.t != null ? `<small>(امروز ${f1(x.t)})</small> ` : ''}${f1(x.a)}</b></li>`).join('')}</ul>`;
     };
   }
   function renderHourlyActive(rows) {
@@ -3367,6 +3370,41 @@ window.APP_CONFIG = Object.freeze({
   }
 
   // لایه‌ی تعاملی: نزدیک‌ترین روز به نشانگر ماوس/انگشت (یا کلیدهای جهت‌نما) انتخاب می‌شه
+  // تولتیپ بلند (لیست شرکت‌ها) نباید زیر لبه‌ی کادر/صفحه بریده شود:
+  // اول زیر یا بالای نقطه را امتحان می‌کنیم، اگر جا نشد داخل محدوده‌ی دیده‌شده جابه‌جا می‌شود
+  function clipRectOf(el) {
+    let top = 0, bottom = window.innerHeight;
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (/(hidden|auto|scroll|clip)/.test(cs.overflowY + cs.overflow)) {
+        const r = a.getBoundingClientRect();
+        top = Math.max(top, r.top); bottom = Math.min(bottom, r.bottom);
+      }
+    }
+    return { top, bottom };
+  }
+  function fitTipVertically(tip, plot, topPct) {
+    const pad = 6, gap = 12;
+    const pr = plot.getBoundingClientRect();
+    const h = tip.getBoundingClientRect().height;
+    const clip = clipRectOf(plot);
+    const pointY = pr.top + (topPct / 100) * pr.height;
+    const below = { top: pointY + gap, bottom: pointY + gap + h };
+    const above = { top: pointY - gap - h, bottom: pointY - gap };
+    const fits = (b) => b.top >= clip.top + pad && b.bottom <= clip.bottom - pad;
+    let box;
+    if (tip.classList.contains('below') ? fits(below) : !fits(above) && fits(below)) { tip.classList.add('below'); box = below; }
+    else if (fits(above)) { tip.classList.remove('below'); box = above; }
+    else {
+      // هیچ‌کدام جا نشد: بیشترین فضای ممکن، چسبیده به لبه‌ی بالای محدوده
+      tip.classList.add('below');
+      const want = Math.max(clip.top + pad, Math.min(below.top, clip.bottom - pad - h));
+      tip.style.marginTop = `${want - below.top}px`;
+      return;
+    }
+    tip.style.marginTop = '';
+    return box;
+  }
   function bindTrendChart(asc, id = 'trend', opts = {}) {
     const unit = opts.unit || 'صدور';
     const plot = $(`${id}-plot`);
@@ -3402,9 +3440,11 @@ window.APP_CONFIG = Object.freeze({
       // تولتیپ پهن (مثلاً با تفکیک شرکت‌ها) نباید از قاب نمودار بیرون بزند: اندازه می‌گیریم و به داخل می‌چسبانیم
       if (opts.detail) {
         tip.classList.remove('edge-left', 'edge-right');
+        tip.style.marginTop = '';
         const pr = plot.getBoundingClientRect(), tr = tip.getBoundingClientRect();
         if (tr.left < pr.left) tip.classList.add('edge-left');
         else if (tr.right > pr.right) tip.classList.add('edge-right');
+        fitTipVertically(tip, plot, topPct);
       }
     }
     function hide() {
@@ -4302,7 +4342,7 @@ window.APP_CONFIG = Object.freeze({
       isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] }),
       state.profile.role === 'training' ? Promise.resolve({ data: [] }) : sb.rpc('team_operator_usernames')]);
     const usernames = {};
-    ((us && us.data) || []).forEach((r) => { usernames[r.id] = r.username; });
+    (Array.isArray(us && us.data) ? us.data : []).forEach((r) => { usernames[r.id] = r.username; });
     if (us && us.error) console.error('team_operator_usernames failed', us.error);
     state.manage = Object.assign(state.manage || {}, {
       loaded: !opt.error,
