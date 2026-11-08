@@ -1295,6 +1295,8 @@ html[data-theme="dark"] .stale-banner { color: #FFB0AB; border-color: rgba(255,1
 
 /* ---------- تفکیک شرکتی در تولتیپ نمودار روزانه‌ی بات ---------- */
 .trend-tip .tt-detail:empty { display: none; }
+.trend-tip.side { transform: none; width: max-content; }
+.trend-tip .tt-note { margin-top: 6px; max-width: 230px; white-space: normal; text-align: center; font-size: 10.5px; line-height: 1.6; opacity: .65; }
 .trend-tip .tt-detail ul.cols2 { grid-template-columns: 1fr 1fr; column-gap: 18px; grid-auto-flow: column;
   grid-template-rows: repeat(var(--rows, 6), auto); }
 .trend-tip .tt-detail { align-self: stretch; min-width: 140px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.18); }
@@ -3265,21 +3267,26 @@ window.APP_CONFIG = Object.freeze({
   }
   // جزئیات هر ساعت: کاربران فعال به تفکیک شرکت (میانگین روزهای اخیر، و امروز)
   function hourlyCompanyDetail(rows) {
-    const acc = {};
+    // هر ساعت = میانگین ربع‌ساعت‌هایی که داده دارند (نه همیشه ۴)؛ شرکتی که در یک ربع نبوده = ۰
+    const acc = {}, slots = {}, tslots = {};
     (rows || []).forEach((r) => {
       const h = Math.floor(Number(r.slot) / 4);
+      (slots[h] = slots[h] || new Set()).add(Number(r.slot));
+      if (r.today != null) (tslots[h] = tslots[h] || new Set()).add(Number(r.slot));
       const k = (acc[h] = acc[h] || {});
-      const c = (k[r.company] = k[r.company] || { a: 0, n: 0, t: 0, tn: 0 });
-      c.a += Number(r.avg_active) || 0; c.n += 1;
+      const c = (k[r.company] = k[r.company] || { a: 0, t: 0, tn: 0 });
+      c.a += Number(r.avg_active) || 0;
       if (r.today != null) { c.t += Number(r.today); c.tn += 1; }
     });
     const f1 = (n) => formatNum(Math.round(n * 10) / 10);
     return (i) => {
-      const list = Object.entries(acc[i] || {}).map(([c, v]) => ({ c, a: v.a / 4, t: v.tn ? v.t / v.tn : null }))
+      const ns = (slots[i] && slots[i].size) || 1, nt = (tslots[i] && tslots[i].size) || 1;
+      const list = Object.entries(acc[i] || {}).map(([c, v]) => ({ c, a: v.a / ns, t: v.tn ? v.t / nt : null }))
         .filter((x) => x.a > 0 || x.t > 0).sort((x, y) => y.a - x.a);
       if (!list.length) return '';
       // لیست بلند دو ستونه می‌شود تا تولتیپ از کادر نمودار بیرون نزند
-      return `<ul class="${list.length > 6 ? 'cols2' : ''}" style="--rows:${Math.ceil(list.length / 2)}">${list.map((x) => `<li><span>${esc(x.c)}</span><b>${x.t != null ? `<small>(امروز ${f1(x.t)})</small> ` : ''}${f1(x.a)}</b></li>`).join('')}</ul>`;
+      return `<ul class="${list.length > 6 ? 'cols2' : ''}" style="--rows:${Math.ceil(list.length / 2)}">${list.map((x) => `<li><span>${esc(x.c)}</span><b>${x.t != null ? `<small>(امروز ${f1(x.t)})</small> ` : ''}${f1(x.a)}</b></li>`).join('')}</ul>
+        <div class="tt-note">هر کاربر می‌تواند هم‌زمان در چند شرکت فعال باشد؛ جمع شرکت‌ها با کل برابر نیست</div>`;
     };
   }
   function renderHourlyActive(rows) {
@@ -3373,15 +3380,16 @@ window.APP_CONFIG = Object.freeze({
   // تولتیپ بلند (لیست شرکت‌ها) نباید زیر لبه‌ی کادر/صفحه بریده شود:
   // اول زیر یا بالای نقطه را امتحان می‌کنیم، اگر جا نشد داخل محدوده‌ی دیده‌شده جابه‌جا می‌شود
   function clipRectOf(el) {
-    let top = 0, bottom = window.innerHeight;
+    let top = 0, bottom = window.innerHeight, left = 0, right = document.documentElement.clientWidth;
     for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
       const cs = getComputedStyle(a);
-      if (/(hidden|auto|scroll|clip)/.test(cs.overflowY + cs.overflow)) {
+      if (/(hidden|auto|scroll|clip)/.test(cs.overflowY + cs.overflowX + cs.overflow)) {
         const r = a.getBoundingClientRect();
         top = Math.max(top, r.top); bottom = Math.min(bottom, r.bottom);
+        left = Math.max(left, r.left); right = Math.min(right, r.right);
       }
     }
-    return { top, bottom };
+    return { top, bottom, left, right };
   }
   function fitTipVertically(tip, plot, topPct) {
     const pad = 6, gap = 12;
@@ -3396,10 +3404,18 @@ window.APP_CONFIG = Object.freeze({
     if (tip.classList.contains('below') ? fits(below) : !fits(above) && fits(below)) { tip.classList.add('below'); box = below; }
     else if (fits(above)) { tip.classList.remove('below'); box = above; }
     else {
-      // هیچ‌کدام جا نشد: بیشترین فضای ممکن، چسبیده به لبه‌ی بالای محدوده
-      tip.classList.add('below');
-      const want = Math.max(clip.top + pad, Math.min(below.top, clip.bottom - pad - h));
-      tip.style.marginTop = `${want - below.top}px`;
+      // بالا و پایین جا نشد: کنار نقطه (چپ یا راست) تا روی نقطه را نپوشاند، و از نظر عمودی داخل محدوده
+      const pointX = pr.left + (parseFloat(tip.style.left) / 100) * pr.width;
+      tip.classList.remove('below', 'edge-left', 'edge-right');
+      tip.classList.add('side');
+      tip.style.left = '0px';
+      const w = tip.getBoundingClientRect().width;
+      const h2 = tip.getBoundingClientRect().height;
+      const leftRoom = pointX - gap - clip.left, rightRoom = clip.right - pointX - gap;
+      const x = leftRoom >= w + pad || leftRoom >= rightRoom ? pointX - gap - w : pointX + gap;
+      const y = Math.max(clip.top + pad, Math.min(pointY - h2 / 2, clip.bottom - pad - h2));
+      tip.style.left = `${x - pr.left}px`;
+      tip.style.top = `${y - pr.top}px`;
       return;
     }
     tip.style.marginTop = '';
@@ -3439,7 +3455,7 @@ window.APP_CONFIG = Object.freeze({
       tip.classList.toggle('edge-right', x > 88);
       // تولتیپ پهن (مثلاً با تفکیک شرکت‌ها) نباید از قاب نمودار بیرون بزند: اندازه می‌گیریم و به داخل می‌چسبانیم
       if (opts.detail) {
-        tip.classList.remove('edge-left', 'edge-right');
+        tip.classList.remove('edge-left', 'edge-right', 'side');
         tip.style.marginTop = '';
         const pr = plot.getBoundingClientRect(), tr = tip.getBoundingClientRect();
         if (tr.left < pr.left) tip.classList.add('edge-left');
