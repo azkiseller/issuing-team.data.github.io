@@ -1623,28 +1623,18 @@ body.with-sidebar header.topbar {
 }
 .mg-setlogin { color: var(--warn); background: rgba(224,138,23,.14); border-color: rgba(224,138,23,.35); }
 
-/* باگ‌های ثبت‌شده توسط Training (به تفکیک کاربر) */
-.tbp-filters { display: grid; grid-template-columns: 2fr repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0 6px; }
-.tbp-filters .tree-search { margin-bottom: 0; }
-.tbp-list { display: grid; gap: 10px; }
-.tbp-group { padding: 0; overflow: hidden; }
-.tbp-head { width: 100%; display: grid; grid-template-columns: minmax(150px, 1.2fr) 2fr auto 18px; align-items: center; gap: 14px;
-  padding: 14px 18px; border: 0; background: transparent; cursor: pointer; text-align: start; font: inherit; color: var(--ink); }
-.tbp-head:hover { background: var(--surface-tint, rgba(255,255,255,.4)); }
-.tbp-who { display: grid; gap: 2px; min-width: 0; }
-.tbp-who b { font-size: 14px; font-weight: 800; }
-.tbp-who small, .tbp-sum small { font-size: 11.5px; color: var(--ink-faint); }
-.tbp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.tbp-sum { display: grid; gap: 2px; text-align: left; }
-.tbp-sum b { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.tbp-chev { color: var(--ink-faint); transition: transform .2s; }
-.tbp-group.open .tbp-chev { transform: rotate(180deg); }
-.tbp-body { border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
-@media (max-width: 900px) {
-  .tbp-filters { grid-template-columns: 1fr 1fr; }
-  .tbp-filters #tbp-q { grid-column: 1 / -1; }
-  .tbp-head { grid-template-columns: minmax(0, 1fr) auto 18px; }
-  .tbp-chips { grid-column: 1 / -1; order: 3; }
+/* باگ‌های ثبت‌شده توسط Training (لیست) */
+.tbx-tools select.tree-search { margin-bottom: 0; width: auto; min-width: 150px; }
+.tbx-sub { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--ink-faint); }
+.tbx-table td.tbx-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tbx-table td.nm { white-space: nowrap; }
+table.tbx-table { min-width: 980px; }
+.tbx-sortbtn { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.tbx-sortbtn:hover { color: var(--accent-strong); }
+@media (max-width: 760px) {
+  .tbx-tools { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .tbx-tools .mg-search { grid-column: 1 / -1; }
+  .tbx-tools select.tree-search { width: 100%; min-width: 0; }
 }
 
 </style>
@@ -4827,16 +4817,11 @@ window.APP_CONFIG = Object.freeze({
     state.tbAll = null; // صفحه‌ی «باگ‌های ثبت‌شده» دفعه‌ی بعد تازه خوانده شود
   }
   // ===== باگ‌های ثبت‌شده توسط Training (برای Training و سرپرست): همه‌ی باگ‌ها به تفکیک کاربر =====
-  function periodLabelOf(startSort) {
-    const m = Math.floor(Number(startSort) / 100) % 100;
-    return `${PERSIAN_MONTHS[m % 12]} ماه`; // دوره از ۲۱ِ ماه m تا ۲۰ِ ماه بعد = «ماه بعد»
-  }
   async function loadAllTrainingBugs() {
     const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
     const [b, tu] = await Promise.all([
       sb.from('training_bugs')
         .select('id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, period_start_sort, created_at')
-        .order('bug_date_sort', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(5000),
       // سرپرست پروفایل کاربران Training را نمی‌بیند؛ نام ثبت‌کننده از این RPC می‌آید
@@ -4848,6 +4833,14 @@ window.APP_CONFIG = Object.freeze({
     state.tbReporters = {};
     (Array.isArray(tu && tu.data) ? tu.data : []).forEach((u) => { state.tbReporters[u.id] = u.full_name; });
   }
+  // زمان ثبت (created_at) به شمسی تهران: «۱۴۰۵/۰۸/۱۷ ساعت ۱۴:۲۰»
+  function jalaliStamp(iso) {
+    if (!iso) return '—';
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date(iso)).reduce((o, x) => { o[x.type] = x.value; return o; }, {});
+    const [jy, jm, jd] = gregorianToJalali(Number(parts.year), Number(parts.month), Number(parts.day));
+    return faDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')} ساعت ${parts.hour}:${parts.minute}`);
+  }
   async function renderTrainingBugsPage() {
     const root = $('tbugs-root');
     if (!root || !state.profile) return;
@@ -4857,118 +4850,84 @@ window.APP_CONFIG = Object.freeze({
     }
     const live = $('tbugs-root');
     if (!live) return;
-    const f = state.tbpFilter || (state.tbpFilter = { period: String(CURRENT_PERIOD.startSort), q: '', type: '', lead: '', reporter: '' });
-    const open = state.tbpOpen || (state.tbpOpen = {});
-    const all = state.tbAll || [];
+    // sort: '' = جدیدترین ثبت (پیش‌فرض) | 'desc' = مبلغ زیاد به کم | 'asc' = مبلغ کم به زیاد
+    const f = state.tbpFilter || (state.tbpFilter = { q: '', type: '', sort: '' });
     const prof = (id) => state.profileById[id];
     const opName = (id) => (prof(id) && prof(id).full_name) || 'کاربر حذف‌شده';
     const leadOf = (id) => { const p = prof(id); const l = p && prof(p.reports_to); return l && l.role === 'team_lead' ? l : null; };
     const repName = (id) => (id && ((prof(id) && prof(id).full_name) || state.tbReporters[id])) || '—';
-
-    // گزینه‌های فیلتر از کل داده
-    const periods = [...new Set(all.map((r) => String(r.period_start_sort)))].sort((a, b) => b - a);
-    if (!periods.includes(String(CURRENT_PERIOD.startSort))) periods.unshift(String(CURRENT_PERIOD.startSort));
-    const leads = [...new Map(all.map((r) => leadOf(r.operator_id)).filter(Boolean).map((l) => [l.id, l])).values()]
-      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
-    const reporters = [...new Set(all.map((r) => r.reported_by).filter(Boolean))]
-      .map((id) => ({ id, name: repName(id) })).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
-
     const q = f.q.trim();
-    const rows = all.filter((r) => (f.period === 'all' || String(r.period_start_sort) === f.period)
-      && (!f.type || r.bug_type === f.type)
-      && (!f.lead || (leadOf(r.operator_id) || {}).id === f.lead)
-      && (!f.reporter || r.reported_by === f.reporter)
-      && (!q || opName(r.operator_id).includes(q) || String(r.order_number || '').includes(toEnDigits(q)) || String(r.company || '').includes(q)));
-
-    const sumBy = (list) => {
-      const o = { n: list.length, amount: 0, financial: 0, non_financial: 0, effective: 0 };
-      list.forEach((r) => { o.amount += Number(r.amount) || 0; if (o[r.bug_type] != null) o[r.bug_type] += 1; });
-      return o;
-    };
-    const tot = sumBy(rows);
-    const groups = {};
-    rows.forEach((r) => { (groups[r.operator_id] = groups[r.operator_id] || []).push(r); });
-    const ordered = Object.entries(groups).map(([id, list]) => ({ id, list, s: sumBy(list) }))
-      .sort((a, b) => (b.s.amount - a.s.amount) || (b.s.n - a.s.n) || opName(a.id).localeCompare(opName(b.id), 'fa'));
-    const typeChips = (s, cls = 'tb-chip') => TB_TYPES.filter((t) => s[t.id])
-      .map((t) => `<span class="${cls} ${t.id}">${t.label}: ${formatNum(s[t.id])}</span>`).join(' ');
-    const heroChips = TB_TYPES.filter((t) => tot[t.id])
-      .map((t) => `<span class="bug-chip ${t.id === 'non_financial' ? 'free' : 'tb-' + t.id}">${formatNum(tot[t.id])} باگ ${t.label}</span>`).join('')
+    const byNewest = (x, y) => (x.created_at < y.created_at ? 1 : x.created_at > y.created_at ? -1 : 0);
+    const rows = (state.tbAll || [])
+      .filter((r) => (!f.type || r.bug_type === f.type) && (!q || opName(r.operator_id).includes(q)))
+      .sort((x, y) => (f.sort === 'desc' ? (Number(y.amount) || 0) - (Number(x.amount) || 0)
+        : f.sort === 'asc' ? (Number(x.amount) || 0) - (Number(y.amount) || 0) : 0) || byNewest(x, y));
+    const users = new Set(rows.map((r) => r.operator_id)).size;
+    const total = rows.reduce((t, r) => t + (Number(r.amount) || 0), 0);
+    const cnt = {};
+    rows.forEach((r) => { cnt[r.bug_type] = (cnt[r.bug_type] || 0) + 1; });
+    const heroChips = TB_TYPES.filter((t) => cnt[t.id])
+      .map((t) => `<span class="bug-chip ${t.id === 'non_financial' ? 'free' : 'tb-' + t.id}">${formatNum(cnt[t.id])} باگ ${t.label}</span>`).join('')
       || '<span class="bug-chip none">بدون باگ</span>';
-    const periodText = f.period === 'all' ? 'همه‌ی دوره‌ها' : periodLabelOf(f.period);
-    const sel = (id, label, opts, val) => `<select class="tree-search" id="${id}" aria-label="${label}">${opts.map(([v, t]) => `<option value="${esc(v)}"${v === val ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
-
-    const groupHtml = (g) => {
-      const isOpen = !!open[g.id];
-      const l = leadOf(g.id);
-      const body = g.list.map((r) => `
+    const sortArrow = f.sort === 'desc' ? ' ↓' : f.sort === 'asc' ? ' ↑' : '';
+    const body = rows.map((r) => {
+      const l = leadOf(r.operator_id);
+      return `
         <tr>
-          <td>${esc(faDigits(r.bug_date_jalali))}</td>
+          <td class="nm">${esc(opName(r.operator_id))}<small class="tbx-sub">${l ? `تیم ${esc(l.full_name || '')}` : 'بدون سرگروه'}</small></td>
           <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
           <td class="num tb-amount">${rial(r.amount)}</td>
-          <td class="bug-order">${esc(r.order_number || '—')}</td>
           <td>${esc(r.company || '—')}</td>
+          <td class="bug-order">${esc(r.order_number || '—')}</td>
+          <td class="tbx-when">${jalaliStamp(r.created_at)}<small class="tbx-sub">تاریخ باگ: ${esc(faDigits(r.bug_date_jalali || '—'))}</small></td>
           <td>${esc(repName(r.reported_by))}</td>
           <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
-        </tr>`).join('');
-      return `
-        <div class="panel tbp-group ${isOpen ? 'open' : ''}">
-          <button type="button" class="tbp-head" data-tbp="${esc(g.id)}" aria-expanded="${isOpen}">
-            <span class="tbp-who"><b>${esc(opName(g.id))}</b><small>${l ? `تیم ${esc(l.full_name || '')}` : 'بدون سرگروه'}</small></span>
-            <span class="tbp-chips">${typeChips(g.s)}</span>
-            <span class="tbp-sum"><b>${formatNum(g.s.amount)}</b><small>ریال · ${formatNum(g.s.n)} باگ</small></span>
-            <span class="tbp-chev" aria-hidden="true">▾</span>
-          </button>
-          ${isOpen ? `<div class="perf-wrap tbp-body"><table class="perf-table bug-table">
-            <thead><tr><th>تاریخ</th><th>نوع باگ</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت بیمه</th><th>ثبت‌کننده</th><th>توضیحات</th></tr></thead>
-            <tbody>${body}</tbody></table></div>` : ''}
-        </div>`;
-    };
+        </tr>`;
+    }).join('');
 
     live.innerHTML = `
       ${state.tbAllError ? '<div class="panel"><div class="empty-state">خواندن باگ‌ها ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>' : ''}
       <div class="panel bug-hero">
         <div>
-          <div class="label">باگ‌های ثبت‌شده توسط Training در ${esc(periodText)}</div>
+          <div class="label">باگ‌های ثبت‌شده توسط Training</div>
           <div class="bug-chips">${heroChips}</div>
         </div>
         <div class="tb-total">
-          <div class="tb-total-n">${formatNum(tot.amount)} <small>ریال</small></div>
-          <div class="bug-meter-note">${formatNum(tot.n)} باگ برای ${formatNum(ordered.length)} کاربر</div>
+          <div class="tb-total-n">${formatNum(total)} <small>ریال</small></div>
+          <div class="bug-meter-note">${formatNum(rows.length)} باگ برای ${formatNum(users)} کاربر</div>
         </div>
       </div>
-      <div class="tbp-filters">
-        <input class="tree-search" id="tbp-q" type="search" placeholder="جستجوی کاربر، شماره سفارش یا شرکت..." value="${esc(f.q)}" aria-label="جستجو">
-        ${sel('tbp-period', 'دوره', [['all', 'همه‌ی دوره‌ها'], ...periods.map((p) => [p, periodLabelOf(p)])], f.period)}
-        ${sel('tbp-type', 'نوع باگ', [['', 'همه‌ی انواع'], ...TB_TYPES.map((t) => [t.id, t.label])], f.type)}
-        ${sel('tbp-lead', 'سرگروه', [['', 'همه‌ی تیم‌ها'], ...leads.map((l) => [l.id, `تیم ${l.full_name || '—'}`])], f.lead)}
-        ${sel('tbp-rep', 'ثبت‌کننده', [['', 'همه‌ی ثبت‌کننده‌ها'], ...reporters.map((r) => [r.id, r.name])], f.reporter)}
-      </div>
       <div class="mg-head">
-        <div class="bug-sub">به تفکیک کاربر <span class="mg-count">${formatNum(ordered.length)} نفر</span></div>
-        ${ordered.length ? `<button type="button" class="mg-btn" id="tbp-all">${ordered.every((g) => open[g.id]) ? 'بستن همه' : 'باز کردن همه'}</button>` : ''}
+        <div class="bug-sub">کاربران دارای باگ <span class="mg-count">${formatNum(users)} نفر، ${formatNum(rows.length)} باگ</span></div>
+        <div class="mg-tools tbx-tools">
+          <input class="tree-search mg-search" id="tbp-q" type="search" placeholder="جستجوی نام..." value="${esc(f.q)}" aria-label="جستجوی نام کاربر">
+          <select class="tree-search" id="tbp-type" aria-label="نوع باگ">
+            <option value="">همه‌ی انواع باگ</option>
+            ${TB_TYPES.map((t) => `<option value="${t.id}"${t.id === f.type ? ' selected' : ''}>${t.label}</option>`).join('')}
+          </select>
+          <select class="tree-search" id="tbp-sort" aria-label="مرتب‌سازی">
+            <option value=""${!f.sort ? ' selected' : ''}>جدیدترین ثبت</option>
+            <option value="desc"${f.sort === 'desc' ? ' selected' : ''}>مبلغ: زیاد به کم</option>
+            <option value="asc"${f.sort === 'asc' ? ' selected' : ''}>مبلغ: کم به زیاد</option>
+          </select>
+        </div>
       </div>
-      ${ordered.length ? `<div class="tbp-list">${ordered.map(groupHtml).join('')}</div>`
-        : '<div class="panel"><div class="empty-state">باگی با این فیلترها ثبت نشده است</div></div>'}`;
+      <div class="panel perf-wrap">
+        ${body ? `<table class="perf-table bug-table tbx-table">
+          <thead><tr><th>کاربر</th><th>نوع باگ</th><th class="num"><button type="button" class="tbx-sortbtn" id="tbp-amount" title="مرتب‌سازی بر اساس مبلغ">مبلغ${sortArrow}</button></th><th>شرکت بیمه</th><th class="num">شماره سفارش</th><th>زمان ثبت</th><th>ثبت‌کننده</th><th>توضیحات</th></tr></thead>
+          <tbody>${body}</tbody></table>` : '<div class="empty-state">باگی با این فیلترها ثبت نشده است</div>'}
+      </div>`;
 
-    const rerender = () => renderTrainingBugsPage();
     const qi = $('tbp-q');
     qi.addEventListener('input', () => {
       f.q = qi.value; const pos = qi.selectionStart;
       renderTrainingBugsPage().then(() => { const x = $('tbp-q'); if (x) { x.focus(); try { x.setSelectionRange(pos, pos); } catch (e) {} } });
     });
-    [['tbp-period', 'period'], ['tbp-type', 'type'], ['tbp-lead', 'lead'], ['tbp-rep', 'reporter']].forEach(([id, k]) => {
-      $(id).addEventListener('change', (e) => { f[k] = e.target.value; rerender(); });
-    });
-    live.querySelectorAll('[data-tbp]').forEach((b) => b.addEventListener('click', () => {
-      const id = b.getAttribute('data-tbp'); open[id] = !open[id]; rerender();
-    }));
-    const allBtn = $('tbp-all');
-    if (allBtn) allBtn.addEventListener('click', () => {
-      const openAll = !ordered.every((g) => open[g.id]);
-      ordered.forEach((g) => { open[g.id] = openAll; });
-      rerender();
-    });
+    $('tbp-type').addEventListener('change', (e) => { f.type = e.target.value; renderTrainingBugsPage(); });
+    $('tbp-sort').addEventListener('change', (e) => { f.sort = e.target.value; renderTrainingBugsPage(); });
+    // کلیک روی سرستون مبلغ: زیاد به کم ← کم به زیاد ← برگشت به جدیدترین
+    const ab = $('tbp-amount');
+    if (ab) ab.addEventListener('click', () => { f.sort = f.sort === 'desc' ? 'asc' : f.sort === 'asc' ? '' : 'desc'; renderTrainingBugsPage(); });
   }
   async function renderTrainingExperts() {
     const root = $('tx-root');
