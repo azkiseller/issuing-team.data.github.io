@@ -1602,6 +1602,21 @@ body.with-sidebar header.topbar {
   .ob-tabs { display: flex; } .ob-tab { flex: 1; justify-content: center; padding: 8px 10px; }
 }
 
+/* مدیریت تیم: نام کاربری و اطلاعات ورود */
+.mg-uname { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  font: 600 12.5px ui-monospace, Menlo, Consolas, monospace; color: var(--ink); background: var(--surface-tint, rgba(255,255,255,.5)); }
+.mg-uname svg { width: 13px; height: 13px; color: var(--ink-faint); }
+.mg-uname:hover { border-color: var(--accent); } .mg-uname:hover svg { color: var(--accent-strong); }
+.cred-box { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--line); background: var(--surface-tint, rgba(255,255,255,.5)); margin-bottom: 10px; }
+.cred-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
+.cred-box .cred-row { margin-bottom: 0; }
+.cred-row bdi { font: 700 14px ui-monospace, Menlo, Consolas, monospace; color: var(--ink); user-select: all; }
+.cred-copy { display: inline-flex; align-items: center; gap: 6px; }
+.cred-copy svg { width: 14px; height: 14px; }
+@media (max-width: 760px) {
+  .mg-table td.mg-user { grid-column: 1 / -1; order: 1; justify-self: start; }
+}
+
 </style>
 </head>
 <body>
@@ -4192,6 +4207,36 @@ window.APP_CONFIG = Object.freeze({
     if (first) first.focus();
     return dlg;
   }
+  const COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+  async function copyText(text, okMsg) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const t = document.createElement('textarea');
+      t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e2) {}
+      t.remove();
+    }
+    toast(okMsg || 'کپی شد.');
+  }
+  // بعد از ریست رمز: نمایش نام کاربری و رمز جدید برای دادن به کاربر
+  function showCredentials(dlg, uname, pw) {
+    dlg.dataset.done = '1';
+    const body = dlg.querySelector('.modal-body');
+    const text = (uname ? `نام کاربری: ${uname}\n` : '') + `رمز: ${pw}`;
+    body.innerHTML = `
+      <p class="modal-text">رمز عوض شد. این اطلاعات را به کاربر بدهید:</p>
+      <div class="cred-box">
+        ${uname ? `<div class="cred-row"><span>نام کاربری</span><bdi dir="ltr">${esc(uname)}</bdi></div>` : ''}
+        <div class="cred-row"><span>رمز</span><bdi dir="ltr">${esc(pw)}</bdi></div>
+      </div>
+      <button type="button" class="mg-btn cred-copy">${COPY_ICON} کپی نام کاربری و رمز</button>`;
+    body.querySelector('.cred-copy').addEventListener('click', () => copyText(text, 'نام کاربری و رمز کپی شد.'));
+    dlg.querySelector('[type="submit"]').textContent = 'بستن';
+    const cancel = dlg.querySelector('.modal-cancel');
+    if (cancel) cancel.hidden = true;
+  }
   // پیام خطای RPC (raise exception در SQL) به فارسی
   function rpcErrorText(error, fallback) {
     const m = String((error && error.message) || '');
@@ -4252,14 +4297,19 @@ window.APP_CONFIG = Object.freeze({
   async function loadManageData(force) {
     if (state.manage && state.manage.loaded && !force) return;
     const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
-    const [opt, un, tr] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
-      isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] })]);
+    const [opt, un, tr, us] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
+      isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] }),
+      state.profile.role === 'training' ? Promise.resolve({ data: [] }) : sb.rpc('team_operator_usernames')]);
+    const usernames = {};
+    ((us && us.data) || []).forEach((r) => { usernames[r.id] = r.username; });
+    if (us && us.error) console.error('team_operator_usernames failed', us.error);
     state.manage = Object.assign(state.manage || {}, {
       loaded: !opt.error,
       error: opt.error || un.error || null,
       options: opt.data || [],
       unassigned: un.data || [],
       training: (tr && tr.data) || [],
+      usernames,
     });
     if (opt.error) console.error('team_lead_options failed', opt.error);
     if (un.error) console.error('unassigned_operators failed', un.error);
@@ -4286,7 +4336,9 @@ window.APP_CONFIG = Object.freeze({
     const ops = state.visibleProfiles
       .filter((p) => p.role === 'operator' && state.treeIds.has(p.id) && !p.deleted_at && (p.full_name || '').trim() !== BOT_NAME)
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
-    const shown = q ? ops.filter((p) => (p.full_name || '').includes(q)) : ops;
+    const unameOf = (id) => (m.usernames || {})[id] || '';
+    const ql = q.toLowerCase();
+    const shown = q ? ops.filter((p) => (p.full_name || '').includes(q) || unameOf(p.id).includes(ql)) : ops;
     const moveSelect = (p) => `
       <select class="tree-search mg-move" data-op="${esc(p.id)}" aria-label="انتقال ${esc(p.full_name || '')} به تیم">
         ${m.options.some((o) => o.id === p.reports_to) ? '' : '<option value="" selected>—</option>'}
@@ -4295,6 +4347,7 @@ window.APP_CONFIG = Object.freeze({
     const rows = shown.map((p) => `
       <tr>
         <td class="nm">${esc(p.full_name || '—')}${newJoinerBadge(p)}</td>
+        <td class="mg-user">${unameOf(p.id) ? `<button type="button" class="mg-uname" data-copy="${esc(unameOf(p.id))}" title="کپی نام کاربری" dir="ltr">${esc(unameOf(p.id))}${COPY_ICON}</button>` : '<span class="tm">—</span>'}</td>
         <td class="tm">${esc(teamLabelOf(p.id))}</td>
         <td>${m.options.length ? moveSelect(p) : '—'}</td>
         <td class="mg-acts">
@@ -4307,14 +4360,14 @@ window.APP_CONFIG = Object.freeze({
       <div class="mg-head">
         <div class="bug-sub">اپراتورهای ${isLead ? 'تیم من' : 'زیرمجموعه'} <span class="mg-count">${formatNum(ops.length)} نفر</span></div>
         <div class="mg-tools">
-          <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام..." value="${esc(q)}" aria-label="جستجوی اپراتور">
+          <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام یا نام کاربری..." value="${esc(q)}" aria-label="جستجوی اپراتور">
           <button type="button" class="mg-btn mg-primary mg-add" id="mg-add">+ افزودن کاربر به تیم</button>
           ${SUPERVISOR_ROLES.includes(me.role) ? '<button type="button" class="mg-btn mg-primary mg-add" id="tr-add">+ تعریف کاربر Training</button>' : ''}
         </div>
       </div>
       <div class="panel perf-wrap">
         ${rows ? `<table class="perf-table mg-table">
-          <thead><tr><th>اپراتور</th><th>تیم فعلی</th><th>انتقال به</th><th></th></tr></thead>
+          <thead><tr><th>اپراتور</th><th>نام کاربری</th><th>تیم فعلی</th><th>انتقال به</th><th></th></tr></thead>
           <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
       </div>
       <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. با حذف، حساب و پروفایل کارشناس پاک می‌شود ولی آمار صدور و حقوقش برای محاسبه‌ی حقوق می‌ماند.</div>
@@ -4357,23 +4410,28 @@ window.APP_CONFIG = Object.freeze({
     const add = $('mg-add');
     if (add) add.addEventListener('click', openAddUsersModal);
     if (SUPERVISOR_ROLES.includes(state.profile.role)) bindTrainingUsers(root);
+    root.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.getAttribute('data-copy'), 'نام کاربری کپی شد.')));
     root.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
       const id = b.getAttribute('data-reset');
+      const uname = ((state.manage && state.manage.usernames) || {})[id] || '';
       openModal({
         title: `ریست رمز «${nameOf(id)}»`,
         confirmText: 'ثبت رمز جدید',
         body: `
           <p class="modal-text">رمز جدید را به خود اپراتور بدهید؛ بعد از ورود می‌تواند از «تغییر رمز» آن را عوض کند.</p>
+          ${uname ? `<div class="cred-row"><span>نام کاربری</span><bdi dir="ltr">${esc(uname)}</bdi></div>` : ''}
           <label class="modal-field">رمز جدید <span class="opt">(حداقل ۸ کاراکتر)</span>
             <span class="pw-row"><input class="tree-search" type="text" id="rp-new" autocomplete="off" dir="ltr" minlength="8"><button type="button" class="mg-btn" id="rp-gen">ساخت رمز</button></span>
           </label>`,
         onOpen: (dlg) => dlg.querySelector('#rp-gen').addEventListener('click', () => { const i = dlg.querySelector('#rp-new'); i.value = randomPassword(); i.select(); }),
         onConfirm: async (dlg) => {
+          if (dlg.dataset.done) return true;
           const pw = dlg.querySelector('#rp-new').value.trim();
           if (pw.length < 8) throw new Error('رمز باید حداقل ۸ کاراکتر باشد.');
           const { error } = await sb.rpc('team_reset_password', { p_operator: id, p_password: pw });
           if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ریست رمز ناموفق بود.')); }
-          toast(`رمز «${nameOf(id)}» عوض شد.`);
+          showCredentials(dlg, uname, pw);
+          return false;
         },
       });
     }));
@@ -4993,11 +5051,14 @@ window.APP_CONFIG = Object.freeze({
           <span class="pw-row"><input class="tree-search" type="text" id="trp-new" autocomplete="off" dir="ltr"><button type="button" class="mg-btn" id="trp-gen">ساخت رمز</button></span></label>`,
         onOpen: (dlg) => dlg.querySelector('#trp-gen').addEventListener('click', () => { const i = dlg.querySelector('#trp-new'); i.value = randomPassword(); i.select(); }),
         onConfirm: async (dlg) => {
+          if (dlg.dataset.done) return true;
           const pw = dlg.querySelector('#trp-new').value.trim();
           if (pw.length < 8) throw new Error('رمز باید حداقل ۸ کاراکتر باشد.');
           const { error } = await sb.rpc('team_reset_password', { p_operator: id, p_password: pw });
           if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ریست رمز ناموفق بود.')); }
-          toast(`رمز «${name}» عوض شد.`);
+          const tu = ((state.manage && state.manage.training) || []).find((u) => u.id === id);
+          showCredentials(dlg, (tu && tu.username) || '', pw);
+          return false;
         },
       });
     }));
