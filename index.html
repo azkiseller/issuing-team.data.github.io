@@ -1616,6 +1616,7 @@ body.with-sidebar header.topbar {
 @media (max-width: 760px) {
   .mg-table td.mg-user { grid-column: 1 / -1; order: 1; justify-self: start; }
 }
+.mg-setlogin { color: var(--warn); background: rgba(224,138,23,.14); border-color: rgba(224,138,23,.35); }
 
 </style>
 </head>
@@ -4221,12 +4222,12 @@ window.APP_CONFIG = Object.freeze({
     toast(okMsg || 'کپی شد.');
   }
   // بعد از ریست رمز: نمایش نام کاربری و رمز جدید برای دادن به کاربر
-  function showCredentials(dlg, uname, pw) {
+  function showCredentials(dlg, uname, pw, note) {
     dlg.dataset.done = '1';
     const body = dlg.querySelector('.modal-body');
     const text = (uname ? `نام کاربری: ${uname}\n` : '') + `رمز: ${pw}`;
     body.innerHTML = `
-      <p class="modal-text">رمز عوض شد. این اطلاعات را به کاربر بدهید:</p>
+      <p class="modal-text">${esc(note || 'رمز عوض شد. این اطلاعات را به کاربر بدهید:')}</p>
       <div class="cred-box">
         ${uname ? `<div class="cred-row"><span>نام کاربری</span><bdi dir="ltr">${esc(uname)}</bdi></div>` : ''}
         <div class="cred-row"><span>رمز</span><bdi dir="ltr">${esc(pw)}</bdi></div>
@@ -4347,11 +4348,11 @@ window.APP_CONFIG = Object.freeze({
     const rows = shown.map((p) => `
       <tr>
         <td class="nm">${esc(p.full_name || '—')}${newJoinerBadge(p)}</td>
-        <td class="mg-user">${unameOf(p.id) ? `<button type="button" class="mg-uname" data-copy="${esc(unameOf(p.id))}" title="کپی نام کاربری" dir="ltr">${esc(unameOf(p.id))}${COPY_ICON}</button>` : '<span class="tm">—</span>'}</td>
+        <td class="mg-user">${unameOf(p.id) ? `<button type="button" class="mg-uname" data-copy="${esc(unameOf(p.id))}" title="کپی نام کاربری" dir="ltr">${esc(unameOf(p.id))}${COPY_ICON}</button>` : `<button type="button" class="mg-btn mg-setlogin" data-setlogin="${esc(p.id)}">+ تعریف نام کاربری</button>`}</td>
         <td class="tm">${esc(teamLabelOf(p.id))}</td>
         <td>${m.options.length ? moveSelect(p) : '—'}</td>
         <td class="mg-acts">
-          <button type="button" class="mg-btn" data-reset="${esc(p.id)}">ریست رمز</button>
+          ${unameOf(p.id) ? `<button type="button" class="mg-btn" data-reset="${esc(p.id)}">ریست رمز</button>` : ''}
           <button type="button" class="bug-del" data-delop="${esc(p.id)}">حذف</button>
         </td>
       </tr>`).join('');
@@ -4411,6 +4412,35 @@ window.APP_CONFIG = Object.freeze({
     if (add) add.addEventListener('click', openAddUsersModal);
     if (SUPERVISOR_ROLES.includes(state.profile.role)) bindTrainingUsers(root);
     root.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => copyText(b.getAttribute('data-copy'), 'نام کاربری کپی شد.')));
+    root.querySelectorAll('[data-setlogin]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-setlogin');
+      openModal({
+        title: `تعریف نام کاربری برای «${nameOf(id)}»`,
+        confirmText: 'ثبت',
+        body: `
+          <p class="modal-text">این کاربر فقط برای ثبت حقوق ساخته شده و حساب ورود ندارد. با تعریف نام کاربری و رمز، می‌تواند وارد داشبورد شود. آمار و حقوقش دست نمی‌خورد.</p>
+          <label class="modal-field">نام کاربری <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+            <input class="tree-search" type="text" id="sl-user" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="a.ahmadi">
+          </label>
+          <label class="modal-field">رمز اولیه <span class="opt">(حداقل ۸ کاراکتر)</span>
+            <span class="pw-row"><input class="tree-search" type="text" id="sl-pass" autocomplete="off" dir="ltr"><button type="button" class="mg-btn" id="sl-gen">ساخت رمز</button></span>
+          </label>`,
+        onOpen: (dlg) => dlg.querySelector('#sl-gen').addEventListener('click', () => { const i = dlg.querySelector('#sl-pass'); i.value = randomPassword(); i.select(); }),
+        onConfirm: async (dlg) => {
+          if (dlg.dataset.done) return true;
+          const user = toEnDigits(dlg.querySelector('#sl-user').value).trim().toLowerCase();
+          const pw = dlg.querySelector('#sl-pass').value.trim();
+          if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(user)) throw new Error('نام کاربری فقط حروف انگلیسی کوچک، عدد، نقطه، خط تیره یا زیرخط (۳ تا ۴۰ کاراکتر).');
+          if (pw.length < 8) throw new Error('رمز باید حداقل ۸ کاراکتر باشد.');
+          const { error } = await sb.rpc('team_set_login', { p_operator: id, p_username: user, p_password: pw });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ثبت نام کاربری ناموفق بود.')); }
+          state.manage.usernames = Object.assign({}, state.manage.usernames, { [id]: user });
+          showCredentials(dlg, user, pw, 'نام کاربری تعریف شد. این اطلاعات را به کاربر بدهید:');
+          renderManagePage();
+          return false;
+        },
+      });
+    }));
     root.querySelectorAll('[data-reset]').forEach((b) => b.addEventListener('click', () => {
       const id = b.getAttribute('data-reset');
       const uname = ((state.manage && state.manage.usernames) || {})[id] || '';
