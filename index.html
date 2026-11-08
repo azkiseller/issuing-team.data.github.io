@@ -1629,8 +1629,11 @@ body.with-sidebar header.topbar {
 .tbx-table td.tbx-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tbx-table td.nm { white-space: nowrap; }
 table.tbx-table { min-width: 980px; }
-.tbx-sortbtn { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-.tbx-sortbtn:hover { color: var(--accent-strong); }
+.tbx-sortbtn { display: inline-flex; align-items: center; gap: 4px; font: inherit; color: inherit; cursor: pointer;
+  background: var(--accent-soft); border: 0; border-radius: 999px; padding: 2px 10px; }
+.tbx-sortbtn span { font-size: 12px; opacity: .7; }
+.tbx-sortbtn:hover, .tbx-sortbtn.on { color: var(--accent-strong); }
+.tbx-sortbtn.on span { opacity: 1; font-weight: 800; }
 @media (max-width: 760px) {
   .tbx-tools { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .tbx-tools .mg-search { grid-column: 1 / -1; }
@@ -4851,15 +4854,18 @@ window.APP_CONFIG = Object.freeze({
     const live = $('tbugs-root');
     if (!live) return;
     // sort: '' = جدیدترین ثبت (پیش‌فرض) | 'desc' = مبلغ زیاد به کم | 'asc' = مبلغ کم به زیاد
-    const f = state.tbpFilter || (state.tbpFilter = { q: '', type: '', sort: '' });
+    const f = state.tbpFilter || (state.tbpFilter = { q: '', type: '', lead: '', sort: '' });
     const prof = (id) => state.profileById[id];
     const opName = (id) => (prof(id) && prof(id).full_name) || 'کاربر حذف‌شده';
     const leadOf = (id) => { const p = prof(id); const l = p && prof(p.reports_to); return l && l.role === 'team_lead' ? l : null; };
     const repName = (id) => (id && ((prof(id) && prof(id).full_name) || state.tbReporters[id])) || '—';
     const q = f.q.trim();
+    const leads = [...new Map((state.tbAll || []).map((r) => leadOf(r.operator_id)).filter(Boolean).map((l) => [l.id, l])).values()]
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
     const byNewest = (x, y) => (x.created_at < y.created_at ? 1 : x.created_at > y.created_at ? -1 : 0);
     const rows = (state.tbAll || [])
-      .filter((r) => (!f.type || r.bug_type === f.type) && (!q || opName(r.operator_id).includes(q)))
+      .filter((r) => (!f.type || r.bug_type === f.type) && (!f.lead || (leadOf(r.operator_id) || {}).id === f.lead)
+        && (!q || opName(r.operator_id).includes(q)))
       .sort((x, y) => (f.sort === 'desc' ? (Number(y.amount) || 0) - (Number(x.amount) || 0)
         : f.sort === 'asc' ? (Number(x.amount) || 0) - (Number(y.amount) || 0) : 0) || byNewest(x, y));
     const users = new Set(rows.map((r) => r.operator_id)).size;
@@ -4869,7 +4875,8 @@ window.APP_CONFIG = Object.freeze({
     const heroChips = TB_TYPES.filter((t) => cnt[t.id])
       .map((t) => `<span class="bug-chip ${t.id === 'non_financial' ? 'free' : 'tb-' + t.id}">${formatNum(cnt[t.id])} باگ ${t.label}</span>`).join('')
       || '<span class="bug-chip none">بدون باگ</span>';
-    const sortArrow = f.sort === 'desc' ? ' ↓' : f.sort === 'asc' ? ' ↑' : '';
+    const sortArrow = f.sort === 'desc' ? '↓' : f.sort === 'asc' ? '↑' : '⇅';
+    const sortTitle = f.sort === 'desc' ? 'مبلغ: زیاد به کم (کلیک: کم به زیاد)' : f.sort === 'asc' ? 'مبلغ: کم به زیاد (کلیک: برگشت به جدیدترین ثبت)' : 'مرتب‌سازی بر اساس مبلغ';
     const body = rows.map((r) => {
       const l = leadOf(r.operator_id);
       return `
@@ -4905,16 +4912,15 @@ window.APP_CONFIG = Object.freeze({
             <option value="">همه‌ی انواع باگ</option>
             ${TB_TYPES.map((t) => `<option value="${t.id}"${t.id === f.type ? ' selected' : ''}>${t.label}</option>`).join('')}
           </select>
-          <select class="tree-search" id="tbp-sort" aria-label="مرتب‌سازی">
-            <option value=""${!f.sort ? ' selected' : ''}>جدیدترین ثبت</option>
-            <option value="desc"${f.sort === 'desc' ? ' selected' : ''}>مبلغ: زیاد به کم</option>
-            <option value="asc"${f.sort === 'asc' ? ' selected' : ''}>مبلغ: کم به زیاد</option>
+          <select class="tree-search" id="tbp-lead" aria-label="تیم">
+            <option value="">همه‌ی تیم‌ها</option>
+            ${leads.map((l) => `<option value="${esc(l.id)}"${l.id === f.lead ? ' selected' : ''}>تیم ${esc(l.full_name || '—')}</option>`).join('')}
           </select>
         </div>
       </div>
       <div class="panel perf-wrap">
         ${body ? `<table class="perf-table bug-table tbx-table">
-          <thead><tr><th>کاربر</th><th>نوع باگ</th><th class="num"><button type="button" class="tbx-sortbtn" id="tbp-amount" title="مرتب‌سازی بر اساس مبلغ">مبلغ${sortArrow}</button></th><th>شرکت بیمه</th><th class="num">شماره سفارش</th><th>زمان ثبت</th><th>ثبت‌کننده</th><th>توضیحات</th></tr></thead>
+          <thead><tr><th>کاربر</th><th>نوع باگ</th><th class="num"><button type="button" class="tbx-sortbtn ${f.sort ? 'on' : ''}" id="tbp-amount" title="${sortTitle}" aria-label="${sortTitle}">مبلغ <span aria-hidden="true">${sortArrow}</span></button></th><th>شرکت بیمه</th><th class="num">شماره سفارش</th><th>زمان ثبت</th><th>ثبت‌کننده</th><th>توضیحات</th></tr></thead>
           <tbody>${body}</tbody></table>` : '<div class="empty-state">باگی با این فیلترها ثبت نشده است</div>'}
       </div>`;
 
@@ -4924,7 +4930,7 @@ window.APP_CONFIG = Object.freeze({
       renderTrainingBugsPage().then(() => { const x = $('tbp-q'); if (x) { x.focus(); try { x.setSelectionRange(pos, pos); } catch (e) {} } });
     });
     $('tbp-type').addEventListener('change', (e) => { f.type = e.target.value; renderTrainingBugsPage(); });
-    $('tbp-sort').addEventListener('change', (e) => { f.sort = e.target.value; renderTrainingBugsPage(); });
+    $('tbp-lead').addEventListener('change', (e) => { f.lead = e.target.value; renderTrainingBugsPage(); });
     // کلیک روی سرستون مبلغ: زیاد به کم ← کم به زیاد ← برگشت به جدیدترین
     const ab = $('tbp-amount');
     if (ab) ab.addEventListener('click', () => { f.sort = f.sort === 'desc' ? 'asc' : f.sort === 'asc' ? '' : 'desc'; renderTrainingBugsPage(); });
