@@ -5420,9 +5420,11 @@ window.APP_CONFIG = Object.freeze({
         // تیم‌ها اول، بعد بقیه
         state.childrenOf[parentId] = grouped.filter(isVirtualId).concat(grouped.filter((id) => !isVirtualId(id)));
       });
-      // Training: زیرمجموعه ندارد؛ درختش همه‌ی کسانی است که زیر سرپرست(های) سلر هستند
-      if (profile.role === 'training') {
-        const sups = state.visibleProfiles.filter((p) => p.role === 'supervisor' && (p.unit || 'seller') === 'seller');
+      // Training (و سرپرست سلری که خودش زیرمجموعه‌ی مستقیم ندارد، مثل سرپرست دوم):
+      // درختش همه‌ی کسانی است که زیر سرپرست(های) سلر هستند
+      const sharedSup = profile.role === 'supervisor' && (profile.unit || 'seller') === 'seller' && !(state.childrenOf[profile.id] || []).length;
+      if (profile.role === 'training' || sharedSup) {
+        const sups = state.visibleProfiles.filter((p) => p.role === 'supervisor' && (p.unit || 'seller') === 'seller' && p.id !== profile.id);
         state.childrenOf[TREE_ROOT_ID] = sups.flatMap((p) => state.childrenOf[p.id] || []);
         state.treeRootId = TREE_ROOT_ID;
         summaryId = TREE_ROOT_ID;
