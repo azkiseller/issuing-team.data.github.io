@@ -1682,14 +1682,11 @@ table.ks-table { min-width: 720px; }
 .kpi-row-value { font-size: 26px; font-weight: 900; color: var(--ink); line-height: 1.2; font-variant-numeric: tabular-nums; }
 .kpi-row-value small { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin-inline-start: 4px; }
 .kpi-dash { color: var(--ink-faint); }
-.kpi-ach { display: grid; gap: 6px; padding-top: 18px; }
-.kpi-ach-track { position: relative; direction: rtl; height: 14px; border-radius: 999px; background: var(--surface-tint); border: 1px solid var(--line); }
-.kpi-ach-fill { height: 100%; border-radius: 999px; background: linear-gradient(270deg, #F0A030, #3BB273); }
-.kpi-ach-fill.full { background: linear-gradient(270deg, #3BB273, #1E9E5A); }
-.kpi-ach-fill.zero { background: none; }
-.kpi-ach-mark { position: absolute; top: 50%; transform: translate(50%, -50%); width: 0; height: 0; }
-.kpi-ach-mark::before { content: ''; position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface-solid, #fff); border: 3px solid var(--accent-strong); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
-.kpi-ach-mark b { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 900; color: var(--accent-strong); white-space: nowrap; }
+.kpi-ach { display: grid; gap: 6px; }
+.kpi-ach-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--ink-soft); }
+.kpi-ach-head b { font-size: 15px; font-weight: 900; color: var(--accent-strong); font-variant-numeric: tabular-nums; }
+.kpi-ach-track { direction: rtl; height: 10px; border-radius: 999px; background: var(--surface-tint); border: 1px solid var(--line); overflow: hidden; pointer-events: none; user-select: none; }
+.kpi-ach-fill { height: 100%; border-radius: 999px; background: var(--accent-strong); }
 .kpi-ach-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-faint); }
 .kpi-nodata { font-size: 12.5px; color: var(--ink-faint); font-style: italic; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; text-align: center; }
 .kpi-levels-inline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -3706,7 +3703,7 @@ window.APP_CONFIG = Object.freeze({
   // حقوق شاخص‌های یک سرگروه با تنظیمات دوره
   function kpiPayFor(data, leadId, shiftOf) {
     const base = Number(data.settings.base_pay) || 0;
-    let total = 0, pending = 0;
+    let total = 0, pending = 0, cap = 0;
     const per = {};
     KPI_DEFS.forEach((def) => {
       const it = data.items[def.key];
@@ -3719,9 +3716,10 @@ window.APP_CONFIG = Object.freeze({
       const max = base * (Number(it.weight) || 0);
       const pay = score == null ? null : Math.round(score * max);
       per[def.key] = { it, x, score, max, pay, manual, noData };
-      if (pay != null) total += pay; else pending += 1;
+      // سقف قابل‌دریافت فقط از شاخص‌هایی که در جمع حساب می‌شوند (شاخصِ بدون داده/حد، از سقف هم کم می‌شود)
+      if (pay != null) { total += pay; cap += max; } else pending += 1;
     });
-    return { total, pending, per, base };
+    return { total, pending, per, base, cap };
   }
   function renderViewTabs() {
     return `
@@ -3745,7 +3743,7 @@ window.APP_CONFIG = Object.freeze({
     // شیفت خودم از روی گزارش (سطح «شیفتی» فقط برای شیفت خود سرگروه برمی‌گردد)
     const myShift = (data.report.find((r) => r.scope_type === 'shift') || {}).scope_key || null;
     const shiftOf = { [me]: myShift };
-    const { total, pending, per, base } = kpiPayFor(data, me, shiftOf);
+    const { total, pending, per, cap } = kpiPayFor(data, me, shiftOf);
     const levelKey = (st) => kpiScopeKey(me, st, shiftOf);
     const levelName = (st) => (st === 'shift' && myShift ? `شیفتی (${SHIFT_SHORT[myShift]})` : KPI_SCOPE_LABEL[st]);
     const rows = KPI_DEFS.filter((def) => per[def.key]).map((def) => {
@@ -3757,9 +3755,9 @@ window.APP_CONFIG = Object.freeze({
       else if (score == null) chart = '<div class="kpi-nodata">حد صفر و سقف این شاخص هنوز تعیین نشده است</div>';
       else chart = `
         <div class="kpi-ach">
+          <div class="kpi-ach-head"><span>تحقق</span><b>${formatNum(pct)}٪</b></div>
           <div class="kpi-ach-track" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="تحقق ${esc(def.title)}">
-            <div class="kpi-ach-fill ${pct >= 100 ? 'full' : pct <= 0 ? 'zero' : ''}" style="width:${Math.max(pct, 0)}%"></div>
-            <span class="kpi-ach-mark" style="inset-inline-start:${Math.min(Math.max(pct, 0), 100)}%"><b>${formatNum(pct)}٪</b></span>
+            <div class="kpi-ach-fill" style="width:${Math.min(Math.max(pct, 0), 100)}%"></div>
           </div>
           <div class="kpi-ach-scale"><span>حد صفر · ${kpiBoundLabel(def, it.worst)}</span><span>سقف · ${kpiBoundLabel(def, it.best)}</span></div>
         </div>`;
@@ -3782,8 +3780,8 @@ window.APP_CONFIG = Object.freeze({
     return `
       <div class="panel kpi-total kpi-total-center">
         <div class="label">جمع حقوق شاخص‌های عملکرد (${esc(CURRENT_PERIOD.label)})</div>
-        <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(base)} ریال</span></div>
-        ${pending ? `<div class="kpi-note">${formatNum(pending)} شاخص هنوز در جمع حساب نشده است.</div>` : ''}
+        <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(cap)} ریال</span></div>
+        ${pending ? `<div class="kpi-note">${formatNum(pending)} شاخص هنوز در جمع (و سقف) حساب نشده است.</div>` : ''}
       </div>
       <div class="kpi-rows">${rows || '<div class="panel"><div class="empty-state">هیچ شاخصی برای این دوره فعال نیست</div></div>'}</div>`;
   }
