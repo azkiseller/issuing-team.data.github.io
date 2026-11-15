@@ -1640,6 +1640,36 @@ table.tbx-table { min-width: 980px; }
   .tbx-tools select.tree-search { width: 100%; min-width: 0; }
 }
 
+/* شاخص‌های عملکرد: سطح‌ها (سرگروه) */
+.kpi-levels { list-style: none; margin: 4px 0 0; padding: 8px 0 0; border-top: 1px dashed var(--line); display: grid; gap: 4px; }
+.kpi-levels li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-soft); padding: 3px 8px; border-radius: 8px; }
+.kpi-levels li b { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.kpi-levels li.paid { background: var(--accent-soft); color: var(--ink); }
+.kpi-levels li i { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--accent-strong); margin-inline-start: 4px; }
+/* سرپرست: خلاصه، تنظیمات، شیفت‌ها */
+.kpi-sum-table th small, .kpi-sum-table td small { font-weight: 500; }
+.kpi-cell-pay { display: block; font-size: 11px; color: var(--good); font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi-total-cell { font-weight: 900; color: var(--good); font-variant-numeric: tabular-nums; }
+table.kpi-sum-table { min-width: 860px; }
+.panel.kpi-set { margin-top: 16px; padding: 18px 20px; display: grid; gap: 14px; overflow: visible; }
+.kpi-set-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.kpi-inherit { font-size: 12px; font-weight: 700; color: var(--warn); background: rgba(224,138,23,.12); border-radius: 999px; padding: 4px 12px; }
+.kpi-set-base { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.kpi-set-base label { display: grid; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+.kpi-set-base .tree-search { margin-bottom: 0; width: 220px; }
+.kpi-wsum { font-size: 12.5px; color: var(--ink-soft); } .kpi-wsum b { color: var(--good); }
+.kpi-wsum.bad b { color: var(--danger); }
+.ks-table td { vertical-align: middle; }
+.ks-table tr.off td:not(:first-child) { opacity: .45; }
+.ks-table .tree-search { margin-bottom: 0; padding-block: 6px; font-size: 12.5px; }
+.ks-table select.tree-search { min-width: 110px; }
+.ks-in { display: inline-flex; align-items: center; gap: 6px; } .ks-in .tree-search { width: 90px; } .ks-in small { color: var(--ink-faint); font-size: 11.5px; }
+.ks-on { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--ink); cursor: pointer; }
+table.ks-table { min-width: 720px; }
+.kpi-shifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.kpi-shift { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.kpi-shift .tree-search { margin-bottom: 0; width: auto; min-width: 140px; padding-block: 6px; font-size: 12.5px; }
+
 </style>
 </head>
 <body>
@@ -2178,7 +2208,7 @@ window.APP_CONFIG = Object.freeze({
     { id: 'tbugs', label: 'باگ‌های ثبت‌شده', only: ['training', 'supervisor'] },
     { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor', 'training'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
-    { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead'], needsData: true },
+    { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead', 'supervisor'], needsData: true },
   ];
   const sidePagesFor = (role) => SIDE_PAGES.filter((p) => (!p.only || p.only.includes(role)) && !(p.notFor || []).includes(role))
     .map((p) => (p.labels && p.labels[role] ? Object.assign({}, p, { label: p.labels[role] }) : p));
@@ -3575,24 +3605,53 @@ window.APP_CONFIG = Object.freeze({
   // ---------------------------------------------------------------
   // تب «شاخص‌های عملکرد» (فقط سرگروه)
   // ---------------------------------------------------------------
-  // هر شاخص ۲۰٪ از سقف ۱۳۵ میلیون ریال. امتیاز = MAX(0, MIN(1, (بدترین − X) / (بدترین − بهترین)))
-  // (برای شاخص‌هایی که «بیشتر بهتر» است، بدترین < بهترین و همین فرمول درست کار می‌کند)
-  const KPI_BASE_PAY = 135000000;
-  const KPI_WEIGHT = 0.2;
+  // تعریف شاخص‌ها؛ حد صفر/سقف، وزن، سقف حقوق و «سطح پرداخت» هر شاخص را سرپرست برای هر دوره تنظیم می‌کند (kpi_settings).
+  // امتیاز = MAX(0, MIN(1, (حد صفر − X) / (حد صفر − سقف))) — برای «بیشتر بهتر» هم درست است (حد صفر < سقف).
   const KPI_DEFS = [
-    { key: 'oct', title: 'OCT', desc: 'میانگین زمان صدور سفارش', unit: 'min', worst: 234, best: 180 },
-    { key: 'bug_rate', title: 'Issuing Bug Rate', desc: 'نرخ باگ صدور', unit: 'pct', worst: 0.6, best: 0.4, digits: 2 },
-    { key: 'under_1h', title: 'Issuing Under 1h', desc: 'درصد صدورهای زیر یک ساعت', unit: 'pct', worst: 65, best: 75 },
-    { key: 'avg_oct_agent', title: 'AVG OCT Per Agent', desc: 'میانگین OCT اپراتورهای تیم شما', unit: 'min', worst: null, best: null },
-    { key: 'same_shift', title: 'Same Shift Issued', desc: 'سفارش‌های ثبت‌شده در شیفت که در همان شیفت صادر شده‌اند', unit: 'pct', worst: null, best: null },
+    { key: 'oct', title: 'OCT', desc: 'میانگین زمان صدور سفارش', unit: 'min', scopes: ['all'] },
+    { key: 'bug_rate', title: 'Issuing Bug Rate', desc: 'مبلغ باگ‌های Training ÷ مبلغ سفارش‌های بسته', unit: 'pct', digits: 2 },
+    { key: 'under_1h', title: 'Issuing Under 1h', desc: 'درصد صدورهای زیر یک ساعت', unit: 'pct' },
+    { key: 'avg_oct_agent', title: 'AVG OCT Per Agent', desc: 'میانگین زمان صدور اپراتورها', unit: 'min' },
+    { key: 'same_shift', title: 'Same Shift Issued', desc: 'سفارش‌هایی که در همان شیفت ثبت و صادر شده‌اند', unit: 'pct' },
   ];
-  const KPI_SCOPE_ORDER = ['team_lead', 'pair', 'shift', 'all'];
-  const KPI_SCOPE_LABEL = { team_lead: 'فردی', pair: 'مشترک با سرگروه پارتنر', all: 'کل واحد' };
+  const KPI_SCOPES = ['team_lead', 'pair', 'shift', 'all'];
+  const KPI_SCOPE_LABEL = { team_lead: 'فردی', pair: 'تیمی', shift: 'شیفتی', all: 'کل' };
   const SHIFT_LABEL = { morning: 'شیفت صبح (۸ تا ۱۶)', evening: 'شیفت عصر (۱۶ تا ۲۴)' };
+  const SHIFT_SHORT = { morning: 'صبح', evening: 'عصر' };
 
-  function kpiScore(def, x) {
-    if (def.worst == null || def.best == null || x == null) return null;
-    return Math.max(0, Math.min(1, (def.worst - x) / (def.worst - def.best)));
+  async function loadKpi(period) {
+    const [rep, set] = await Promise.all([
+      sb.rpc('kpi_report', { p_period: String(period) }),
+      sb.rpc('kpi_get_settings', { p_period: String(period) }),
+    ]);
+    if (rep.error) console.error('kpi_report failed', rep.error);
+    if (set.error) console.error('kpi_get_settings failed', set.error);
+    const settings = set.data || { items: [], base_pay: 0 };
+    const items = {};
+    (settings.items || []).forEach((it) => { items[it.kpi] = it; });
+    return { period: String(period), report: Array.isArray(rep.data) ? rep.data : [], settings, items, error: rep.error || set.error || null };
+  }
+  // مقدار یک شاخص در یک سطح برای یک سرگروه
+  function kpiScopeKey(leadId, scope, shiftOf) {
+    if (scope === 'team_lead') return leadId;
+    if (scope === 'pair') { const pid = state.partnerOf && state.partnerOf[leadId]; return pid && pid < leadId ? pid : leadId; }
+    if (scope === 'shift') return (shiftOf && shiftOf[leadId]) || null;
+    return 'all';
+  }
+  function kpiValueOf(report, kpi, scope, key) {
+    if (key == null) return null;
+    const r = report.find((x) => x.kpi === kpi && x.scope_type === scope && String(x.scope_key) === String(key));
+    return r ? Number(r.value) : null;
+  }
+  function kpiScore(it, x) {
+    if (!it || it.worst == null || it.best == null || x == null || Number(it.worst) === Number(it.best)) return null;
+    return Math.max(0, Math.min(1, (Number(it.worst) - x) / (Number(it.worst) - Number(it.best))));
+  }
+  function kpiFmt(def, x) {
+    if (x == null || isNaN(x)) return '—';
+    if (def.unit === 'min') return `${formatNum(Math.round(x))} دقیقه`;
+    const d = def.digits != null ? def.digits : 1;
+    return `${faDigits(Number(x).toFixed(d).replace(/\.?0+$/, '').replace('.', '٫'))}٪`;
   }
   function kpiValueLabel(def, x) {
     const n = Number(x);
@@ -3606,6 +3665,23 @@ window.APP_CONFIG = Object.freeze({
   }
   function kpiBoundLabel(def, v) {
     return def.unit === 'min' ? `${formatNum(v)} دقیقه` : `${faDigits(String(v).replace('.', '٫'))}٪`;
+  }
+  // حقوق شاخص‌های یک سرگروه با تنظیمات دوره
+  function kpiPayFor(data, leadId, shiftOf) {
+    const base = Number(data.settings.base_pay) || 0;
+    let total = 0, pending = 0;
+    const per = {};
+    KPI_DEFS.forEach((def) => {
+      const it = data.items[def.key];
+      if (!it || !it.active) return;
+      const x = kpiValueOf(data.report, def.key, it.scope_type, kpiScopeKey(leadId, it.scope_type, shiftOf));
+      const score = kpiScore(it, x);
+      const max = base * (Number(it.weight) || 0);
+      const pay = score == null ? null : Math.round(score * max);
+      per[def.key] = { it, x, score, max, pay };
+      if (pay != null) total += pay; else pending += 1;
+    });
+    return { total, pending, per, base };
   }
   function renderViewTabs() {
     return `
@@ -3624,54 +3700,211 @@ window.APP_CONFIG = Object.freeze({
       });
     });
   }
-  function renderKpiTab(rows) {
-    // برای هر شاخص، دقیق‌ترین دامنه‌ی موجود: فردی ← جفت ← شیفت ← کل
-    const pick = {};
-    rows.forEach((r) => {
-      const cur = pick[r.kpi];
-      if (!cur || KPI_SCOPE_ORDER.indexOf(r.scope_type) < KPI_SCOPE_ORDER.indexOf(cur.scope_type)) pick[r.kpi] = r;
-    });
-    const maxPay = KPI_BASE_PAY * KPI_WEIGHT;
-    let total = 0, pending = 0;
-    const cards = KPI_DEFS.map((def) => {
-      const r = pick[def.key];
-      const x = r ? Number(r.value) : null;
-      const score = kpiScore(def, x);
-      const pay = score == null ? null : Math.round(score * maxPay);
-      if (pay != null) total += pay; else pending += 1;
-      const scope = r ? (r.scope_type === 'shift' ? (SHIFT_LABEL[r.scope_key] || 'شیفت') : KPI_SCOPE_LABEL[r.scope_type]) : '';
-      const meter = (score != null) ? `
-        <div class="kpi-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(score * 100)}" aria-label="امتیاز ${def.title}">
+  function renderKpiTab(data) {
+    const me = state.profile.id;
+    // شیفت خودم از روی گزارش (سطح «شیفتی» فقط برای شیفت خود سرگروه برمی‌گردد)
+    const myShift = (data.report.find((r) => r.scope_type === 'shift') || {}).scope_key || null;
+    const shiftOf = { [me]: myShift };
+    const { total, pending, per, base } = kpiPayFor(data, me, shiftOf);
+    const levelKey = (st) => kpiScopeKey(me, st, shiftOf);
+    const levelName = (st) => (st === 'shift' && myShift ? `شیفتی (${SHIFT_SHORT[myShift]})` : KPI_SCOPE_LABEL[st]);
+    const cards = KPI_DEFS.filter((def) => per[def.key]).map((def) => {
+      const { it, x, score, max, pay } = per[def.key];
+      const meter = score != null ? `
+        <div class="kpi-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(score * 100)}" aria-label="امتیاز ${esc(def.title)}">
           <div class="kpi-meter-fill" style="width:${(score * 100).toFixed(1)}%"></div>
         </div>
-        <div class="kpi-bounds"><span>${kpiBoundLabel(def, def.worst)} · صفر</span><span>${kpiBoundLabel(def, def.best)} · سقف</span></div>` : '';
-      const payHtml = !r ? '<div class="kpi-pay muted">هنوز داده‌ای ثبت نشده</div>'
-        : pay == null ? '<div class="kpi-pay muted">فرمول حقوق این شاخص هنوز تعیین نشده</div>'
-        : `<div class="kpi-pay"><b>${formatNum(pay)}</b> <span>از ${formatNum(maxPay)} ریال</span><em>${formatNum(Math.round(score * 100))}٪</em></div>`;
+        <div class="kpi-bounds"><span>${kpiBoundLabel(def, it.worst)} · صفر</span><span>${kpiBoundLabel(def, it.best)} · سقف</span></div>` : '';
+      const payHtml = x == null ? '<div class="kpi-pay muted">هنوز داده‌ای برای این سطح ثبت نشده</div>'
+        : pay == null ? '<div class="kpi-pay muted">حد صفر و سقف این شاخص هنوز تعیین نشده</div>'
+        : `<div class="kpi-pay"><b>${formatNum(pay)}</b> <span>از ${formatNum(max)} ریال</span><em>${formatNum(Math.round(score * 100))}٪</em></div>`;
+      const levels = (def.scopes || KPI_SCOPES).map((st) => {
+        const v = kpiValueOf(data.report, def.key, st, levelKey(st));
+        return `<li class="${st === it.scope_type ? 'paid' : ''}"><span>${esc(levelName(st))}${st === it.scope_type ? ' <i>مبنای حقوق</i>' : ''}</span><b>${kpiFmt(def, v)}</b></li>`;
+      }).join('');
       return `
-        <div class="panel kpi-card ${r ? '' : 'empty'}">
+        <div class="panel kpi-card ${x == null ? 'empty' : ''}">
           <div class="kpi-head">
             <div><div class="kpi-title" dir="ltr">${esc(def.title)}</div><div class="kpi-desc">${esc(def.desc)}</div></div>
-            ${scope ? `<span class="kpi-scope">${esc(scope)}</span>` : ''}
+            <span class="kpi-scope">${esc(levelName(it.scope_type))}</span>
           </div>
-          <div class="kpi-value">${r ? kpiValueLabel(def, x) : '—'}</div>
+          <div class="kpi-value">${x != null ? kpiValueLabel(def, x) : '—'}</div>
           ${meter}
           ${payHtml}
+          <ul class="kpi-levels">${levels}</ul>
         </div>`;
     }).join('');
-    const updated = rows.reduce((m, r) => (r.updated_at > m ? r.updated_at : m), '');
     return `
       <div class="panel kpi-total">
         <div>
           <div class="label">جمع حقوق شاخص‌های عملکرد (${esc(CURRENT_PERIOD.label)})</div>
-          <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(KPI_BASE_PAY)} ریال</span></div>
+          <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(base)} ریال</span></div>
           ${pending ? `<div class="kpi-note">${formatNum(pending)} شاخص هنوز در جمع حساب نشده است.</div>` : ''}
         </div>
-        <div class="kpi-updated">${updated ? `آخرین به‌روزرسانی: ${esc(new Date(updated).toLocaleString('fa-IR', { timeZone: 'Asia/Tehran' }))}` : ''}</div>
+        <div class="kpi-note">«فردی» = اپراتورهای خودتان · «تیمی» = تیم مشترک با پارتنر · «شیفتی» = همه‌ی تیم‌های شیفت شما · «کل» = کل واحد</div>
       </div>
-      <div class="kpi-grid">${cards}</div>`;
+      <div class="kpi-grid">${cards || '<div class="panel"><div class="empty-state">هیچ شاخصی برای این دوره فعال نیست</div></div>'}</div>`;
   }
 
+  // ---------------------------------------------------------------
+  // سرپرست: خلاصه‌ی شاخص‌های سرگروه‌ها، تنظیمات دوره‌ای، شیفت سرگروه‌ها
+  // ---------------------------------------------------------------
+  function kpiPeriods() {
+    const cur = Number(CURRENT_PERIOD.startSort);
+    const shift = (p, k) => { let y = Math.floor(p / 10000), m = Math.floor(p / 100) % 100 + k; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y * 10000 + m * 100 + 21; };
+    const label = (p) => `${PERSIAN_MONTHS[(Math.floor(p / 100) % 100) % 12]} ماه`;
+    return [shift(cur, -1), cur, shift(cur, 1)].map((p, i) => ({ id: String(p), label: label(p) + (i === 1 ? ' (جاری)' : i === 0 ? ' (قبل)' : ' (بعد)') }));
+  }
+  async function renderKpiAdmin() {
+    const root = $('kpi-admin-root');
+    if (!root) return;
+    const period = state.kpiPeriod || (state.kpiPeriod = String(CURRENT_PERIOD.startSort));
+    if (!state.kpiAdmin || state.kpiAdmin.period !== period) {
+      root.innerHTML = '<div class="panel"><div class="empty-state">در حال بارگذاری...</div></div>';
+      const [data, sh] = await Promise.all([loadKpi(period), sb.from('team_lead_shift').select('profile_id, shift')]);
+      const shiftOf = {};
+      ((sh && sh.data) || []).forEach((r) => { shiftOf[r.profile_id] = r.shift; });
+      state.kpiAdmin = { ...data, shiftOf };
+      state.kpiDraft = null;
+    }
+    const live = $('kpi-admin-root');
+    if (!live) return;
+    const d = state.kpiAdmin;
+    const leads = state.visibleProfiles.filter((p) => p.role === 'team_lead' && !p.deleted_at)
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
+    const active = KPI_DEFS.filter((def) => d.items[def.key] && d.items[def.key].active);
+    const draft = state.kpiDraft || (state.kpiDraft = {
+      base: Number(d.settings.base_pay) || 0,
+      items: KPI_DEFS.map((def) => {
+        const it = d.items[def.key] || {};
+        return { kpi: def.key, scope_type: it.scope_type || (def.scopes ? def.scopes[0] : 'pair'), worst: it.worst, best: it.best, weight: it.weight != null ? Number(it.weight) : 0, active: it.active !== false && !!d.items[def.key] };
+      }),
+    });
+    const periods = kpiPeriods();
+    // نام تیم مشترک (برای سرگروه‌های پارتنر)
+    const leadTeamLabel = (l) => {
+      const pid = state.partnerOf && state.partnerOf[l.id];
+      const pr = pid && profileOf(pid);
+      return pr && pr.full_name ? `تیم ${[l.full_name, pr.full_name].sort((a, b) => a.localeCompare(b, 'fa')).join(' و ')}` : '';
+    };
+    const num = (v) => (v == null || v === '' ? '' : String(v));
+
+    // ۱) خلاصه
+    const rows = leads.map((l) => {
+      const p = kpiPayFor(d, l.id, d.shiftOf);
+      const cells = active.map((def) => {
+        const c = p.per[def.key];
+        return `<td class="num">${kpiFmt(def, c && c.x)}${c && c.pay != null ? `<small class="kpi-cell-pay">${formatNum(c.pay)}</small>` : ''}</td>`;
+      }).join('');
+      return `<tr><td class="nm">${esc(l.full_name || '—')}${leadTeamLabel(l) ? `<small class="tbx-sub">${esc(leadTeamLabel(l))}</small>` : ''}</td>
+        <td>${d.shiftOf[l.id] ? esc(SHIFT_SHORT[d.shiftOf[l.id]]) : '<span class="tm">—</span>'}</td>${cells}<td class="num kpi-total-cell">${formatNum(p.total)}</td></tr>`;
+    }).join('');
+    const summary = `
+      <div class="panel perf-wrap">
+        <table class="perf-table kpi-sum-table">
+          <thead><tr><th>سرگروه</th><th>شیفت</th>${active.map((def) => `<th class="num" title="${esc(def.desc)}"><span dir="ltr">${esc(def.title)}</span><small class="tbx-sub">${esc(KPI_SCOPE_LABEL[d.items[def.key].scope_type])} · ${formatNum(Math.round((Number(d.items[def.key].weight) || 0) * 100))}٪</small></th>`).join('')}<th class="num">جمع حقوق شاخص‌ها</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="${active.length + 3}"><div class="empty-state">سرگروهی پیدا نشد</div></td></tr>`}</tbody>
+        </table>
+      </div>`;
+
+    // ۲) تنظیمات
+    const wsum = draft.items.filter((x) => x.active).reduce((a, x) => a + (Number(x.weight) || 0), 0);
+    const setRows = draft.items.map((x, i) => {
+      const def = KPI_DEFS.find((k) => k.key === x.kpi);
+      const scopes = def.scopes || KPI_SCOPES;
+      const u = def.unit === 'min' ? 'دقیقه' : '٪';
+      return `<tr class="${x.active ? '' : 'off'}">
+        <td><label class="ks-on"><input type="checkbox" data-ks="${i}" data-f="active" ${x.active ? 'checked' : ''}> <span dir="ltr">${esc(def.title)}</span></label><small class="tbx-sub">${esc(def.desc)}</small></td>
+        <td><select class="tree-search" data-ks="${i}" data-f="scope_type" ${scopes.length < 2 ? 'disabled' : ''}>${scopes.map((st) => `<option value="${st}"${st === x.scope_type ? ' selected' : ''}>${KPI_SCOPE_LABEL[st]}</option>`).join('')}</select></td>
+        <td><span class="ks-in"><input class="tree-search" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="worst" value="${esc(num(x.worst))}"><small>${u}</small></span></td>
+        <td><span class="ks-in"><input class="tree-search" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="best" value="${esc(num(x.best))}"><small>${u}</small></span></td>
+        <td><span class="ks-in"><input class="tree-search" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="weight" value="${esc(String(Math.round((Number(x.weight) || 0) * 1000) / 10))}"><small>٪</small></span></td>
+      </tr>`;
+    }).join('');
+    const settings = `
+      <div class="panel kpi-set">
+        <div class="kpi-set-head">
+          <div class="pe-title">${sideIcon(SIDE_ICONS.kpi)}<span>تنظیم شاخص‌ها</span></div>
+          ${d.settings.inherited ? `<span class="kpi-inherit">این دوره هنوز ذخیره نشده؛ مقادیر از ${esc((periods.find((p) => p.id === String(d.settings.from_period)) || {}).label || faDigits(String(d.settings.from_period || '—')))} آمده</span>` : ''}
+        </div>
+        <div class="kpi-set-base">
+          <label>سقف حقوق شاخص‌ها (ریال)
+            <input class="tree-search" type="text" inputmode="numeric" dir="ltr" id="ks-base" value="${esc(String(draft.base))}">
+          </label>
+          <div class="kpi-wsum ${wsum > 1.0001 ? 'bad' : ''}">جمع وزن شاخص‌های فعال: <b>${faDigits(String(Math.round(wsum * 1000) / 10))}٪</b></div>
+        </div>
+        <div class="perf-wrap">
+          <table class="perf-table ks-table">
+            <thead><tr><th>شاخص</th><th>سطح پرداخت</th><th>حد صفر</th><th>سقف (کامل)</th><th>وزن</th></tr></thead>
+            <tbody>${setRows}</tbody>
+          </table>
+        </div>
+        <div class="tm-actions">
+          <span class="bug-msg" id="ks-msg" role="status" aria-live="polite"></span>
+          <button type="button" class="bug-submit" id="ks-save">ذخیره برای ${esc((periods.find((p) => p.id === period) || {}).label || '')}</button>
+        </div>
+        <div class="trend-foot">حد صفر = مقداری که حقوق آن شاخص صفر است؛ سقف = مقداری که حقوق کامل است (برای «کمتر بهتر» مثل OCT، حد صفر بزرگ‌تر است). سطح «فردی» = اپراتورهای خود سرگروه، «تیمی» = تیم مشترک با پارتنر، «شیفتی» = همه‌ی تیم‌های آن شیفت، «کل» = کل واحد. OCT فقط در سطح کل در دسترس است.</div>
+      </div>`;
+
+    // ۳) شیفت‌ها
+    const shifts = `
+      <div class="panel kpi-set">
+        <div class="pe-title">${sideIcon(SIDE_ICONS.team)}<span>شیفت سرگروه‌ها</span></div>
+        <div class="kpi-shifts">${leads.map((l) => `
+          <label class="kpi-shift"><span>${esc(l.full_name || '—')}</span>
+            <select class="tree-search" data-shift="${esc(l.id)}">
+              <option value=""${!d.shiftOf[l.id] ? ' selected' : ''}>بدون شیفت</option>
+              <option value="morning"${d.shiftOf[l.id] === 'morning' ? ' selected' : ''}>صبح (۸ تا ۱۶)</option>
+              <option value="evening"${d.shiftOf[l.id] === 'evening' ? ' selected' : ''}>عصر (۱۶ تا ۲۴)</option>
+            </select></label>`).join('')}</div>
+      </div>`;
+
+    const updated = d.report.length ? '' : '<div class="kpi-note">هنوز داده‌ای از ورک‌فلوی شاخص‌ها برای این دوره نرسیده است.</div>';
+    live.innerHTML = `
+      <div class="mg-head">
+        <div class="bug-sub">شاخص‌های عملکرد سرگروه‌ها</div>
+        <div class="mg-tools">
+          <select class="tree-search" id="kpi-period" aria-label="دوره">${periods.map((p) => `<option value="${p.id}"${p.id === period ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
+        </div>
+      </div>
+      ${updated}
+      ${summary}
+      ${settings}
+      ${shifts}`;
+
+    $('kpi-period').addEventListener('change', (e) => { state.kpiPeriod = e.target.value; renderKpiAdmin(); });
+    $('ks-base').addEventListener('input', (e) => { draft.base = Number(toEnDigits(e.target.value).replace(/[^\d]/g, '')) || 0; });
+    live.querySelectorAll('[data-ks]').forEach((el) => el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
+      const x = draft.items[Number(el.getAttribute('data-ks'))];
+      const f = el.getAttribute('data-f');
+      if (f === 'active') { x.active = el.checked; renderKpiAdmin(); return; }
+      if (f === 'scope_type') { x.scope_type = el.value; return; }
+      const raw = toEnDigits(el.value).replace(/٫/g, '.').trim();
+      const v = raw === '' ? null : Number(raw);
+      if (f === 'weight') x.weight = v == null || isNaN(v) ? 0 : v / 100;
+      else x[f] = v == null || isNaN(v) ? null : v;
+      if (f === 'weight') { const w = draft.items.filter((k) => k.active).reduce((a, k) => a + (Number(k.weight) || 0), 0); const box = live.querySelector('.kpi-wsum'); box.classList.toggle('bad', w > 1.0001); box.querySelector('b').textContent = faDigits(String(Math.round(w * 1000) / 10)) + '٪'; }
+    }));
+    $('ks-save').addEventListener('click', async () => {
+      const msg = $('ks-msg');
+      const btn = $('ks-save');
+      msg.className = 'bug-msg'; msg.textContent = 'در حال ذخیره...'; btn.disabled = true;
+      const { error } = await sb.rpc('kpi_save_settings', { p_period: period, p_base_pay: draft.base, p_items: draft.items });
+      btn.disabled = false;
+      if (error) { console.error(error); msg.className = 'bug-msg err'; msg.textContent = rpcErrorText(error, 'ذخیره نشد.'); return; }
+      state.kpiAdmin = null;
+      toast('تنظیمات شاخص‌ها ذخیره شد.');
+      renderKpiAdmin();
+    });
+    live.querySelectorAll('[data-shift]').forEach((sel) => sel.addEventListener('change', async () => {
+      const id = sel.getAttribute('data-shift');
+      const { error } = await sb.rpc('kpi_set_shift', { p_lead: id, p_shift: sel.value || null });
+      if (error) { console.error(error); toast(rpcErrorText(error, 'شیفت ذخیره نشد.')); sel.value = d.shiftOf[id] || ''; return; }
+      state.kpiAdmin = null;
+      toast('شیفت ذخیره شد.');
+      renderKpiAdmin();
+    }));
+  }
 
   // ---------------------------------------------------------------
   // تب «عملکرد تیم»: رتبه‌بندی اپراتورها بر اساس تعداد و زمان صدور
@@ -5335,10 +5568,8 @@ window.APP_CONFIG = Object.freeze({
       SUPERVISOR_ROLES.includes(profile.role) || profile.role === 'team_lead'
         ? sb.rpc('active_hourly_profile', { p_days: HOURLY_DAYS })
         : Promise.resolve({ data: null }),
-      // شاخص‌های عملکرد دوره‌ی جاری (RLS: سرگروه فقط فردی/جفت/شیفت/کل خودش)
-      profile.role === 'team_lead'
-        ? sb.from('kpi_values').select('kpi, scope_type, scope_key, value, sample_size, updated_at').eq('period_start_sort', CURRENT_PERIOD.startSort)
-        : Promise.resolve({ data: [] }),
+      // شاخص‌های عملکرد دوره‌ی جاری: مقدارها در همه‌ی سطح‌ها + تنظیمات دوره (سرگروه فقط سطح‌های خودش)
+      profile.role === 'team_lead' ? loadKpi(CURRENT_PERIOD.startSort) : Promise.resolve(null),
       // زمان صدور هر شرکت در دوره‌ی جاری (RLS: فقط زیرمجموعه‌ی خود کاربر)
       sb.rpc('company_issuance_time', { p_start: CURRENT_PERIOD.startSort, p_end: CURRENT_PERIOD.endSort }),
       // همان نمودار ساعتی به تفکیک شرکت (برای جزئیات هر ربع ساعت)
@@ -5518,8 +5749,9 @@ window.APP_CONFIG = Object.freeze({
     )).sort((a, b) => a.localeCompare(b, 'fa'));
 
     const teamRows = bot ? (targetsRes.data || []).filter((r) => r.operator_id !== bot.id) : (targetsRes.data || []);
-    const kpiRows = (kpiRes && kpiRes.data) || [];
-    const showKpiTab = profile.role === 'team_lead' && kpiRows.length > 0;
+    const kpiData = kpiRes || null;
+    const isKpiAdmin = SUPERVISOR_ROLES.includes(profile.role) && (profile.unit || 'seller') === 'seller';
+    const showKpiTab = (profile.role === 'team_lead' && !!kpiData && kpiData.report.length > 0) || (isKpiAdmin && !!state.sidebar);
     content.innerHTML = (hasHourly ? `
       <div class="hourly-drawer ${state.hourlyOpen ? 'open' : ''}" id="hourly-drawer" data-page="overview">
         <div class="hourly-drawer-inner">${renderHourlyActive(hourlyRes.data)}</div>
@@ -5548,10 +5780,11 @@ window.APP_CONFIG = Object.freeze({
       </div>
       </div>
       </div>
-      ${showKpiTab ? `<div id="tab-kpi" data-page="kpi" ${state.sidebar || state.activeTab === 'kpi' ? '' : 'hidden'}>${renderKpiTab(kpiRows)}</div>` : ''}
+      ${showKpiTab ? `<div id="tab-kpi" data-page="kpi" ${state.sidebar || state.activeTab === 'kpi' ? '' : 'hidden'}>${isKpiAdmin ? '<div id="kpi-admin-root"></div>' : renderKpiTab(kpiData)}</div>` : ''}
     `;
     if (showKpiTab && !state.sidebar) bindViewTabs();
     if (state.sidebar) syncKpiNav(showKpiTab);
+    if (isKpiAdmin && showKpiTab) renderKpiAdmin();
 
     renderTree(state.treeRootId);
     if (state.sidebar) renderPerf();
