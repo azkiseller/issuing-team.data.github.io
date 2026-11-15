@@ -1670,6 +1670,43 @@ table.ks-table { min-width: 720px; }
 .kpi-shift { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; font-weight: 700; color: var(--ink); }
 .kpi-shift .tree-search { margin-bottom: 0; width: auto; min-width: 140px; padding-block: 6px; font-size: 12.5px; }
 
+/* شاخص‌های سرگروه: جمع وسط + ۵ ردیف با نمودار تحقق */
+.panel.kpi-total.kpi-total-center { flex-direction: column; justify-content: center; text-align: center; gap: 4px; padding: 22px; }
+.kpi-total-center .kpi-total-value b { font-size: 34px; }
+.kpi-rows { display: grid; gap: 12px; margin-top: 14px; }
+.panel.kpi-row { margin: 0; padding: 18px 22px; display: grid; grid-template-columns: minmax(170px, 1.1fr) minmax(120px, .8fr) minmax(260px, 2.4fr) minmax(150px, 1fr); align-items: center; gap: 18px; }
+.kpi-row.empty .kpi-row-value { opacity: .6; }
+.kpi-row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.kpi-manual { font-size: 11px; font-weight: 700; color: var(--warn); background: rgba(224,138,23,.14); border-radius: 999px; padding: 3px 10px; }
+.kpi-manual-dot { font-size: 10.5px; font-weight: 700; color: var(--warn); }
+.kpi-row-value { font-size: 26px; font-weight: 900; color: var(--ink); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.kpi-row-value small { font-size: 13px; font-weight: 700; color: var(--ink-soft); margin-inline-start: 4px; }
+.kpi-dash { color: var(--ink-faint); }
+.kpi-ach { display: grid; gap: 6px; padding-top: 18px; }
+.kpi-ach-track { position: relative; direction: rtl; height: 14px; border-radius: 999px; background: var(--surface-tint); border: 1px solid var(--line); }
+.kpi-ach-fill { height: 100%; border-radius: 999px; background: linear-gradient(270deg, #F0A030, #3BB273); }
+.kpi-ach-fill.full { background: linear-gradient(270deg, #3BB273, #1E9E5A); }
+.kpi-ach-fill.zero { background: none; }
+.kpi-ach-mark { position: absolute; top: 50%; transform: translate(50%, -50%); width: 0; height: 0; }
+.kpi-ach-mark::before { content: ''; position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface-solid, #fff); border: 3px solid var(--accent-strong); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.kpi-ach-mark b { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 900; color: var(--accent-strong); white-space: nowrap; }
+.kpi-ach-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-faint); }
+.kpi-nodata { font-size: 12.5px; color: var(--ink-faint); font-style: italic; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; text-align: center; }
+.kpi-levels-inline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.kpi-lv { font-size: 11.5px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.kpi-lv b { color: var(--ink); font-weight: 800; }
+.kpi-lv.paid { background: var(--accent-soft); border-color: transparent; }
+.kpi-row-pay { display: grid; gap: 2px; text-align: left; }
+.kpi-row-pay b { font-size: 20px; font-weight: 900; color: var(--good); font-variant-numeric: tabular-nums; }
+.kpi-row-pay span { font-size: 12px; color: var(--ink-soft); }
+.kpi-row-pay .muted { color: var(--ink-faint); }
+.ks-manual::placeholder { color: var(--ink-faint); }
+@media (max-width: 900px) {
+  .panel.kpi-row { grid-template-columns: 1fr auto; }
+  .kpi-row-chart { grid-column: 1 / -1; order: 3; }
+  .kpi-row-pay { grid-column: 1 / -1; order: 4; text-align: right; display: flex; align-items: baseline; gap: 8px; }
+}
+
 </style>
 </head>
 <body>
@@ -1857,7 +1894,7 @@ window.APP_CONFIG = Object.freeze({
 
   // سرگروه‌هایی که با هم یک «گروه» هستند (برای نمایش «گروه X و Y» در هدر اپراتورهای زیرشان)
   const TEAM_LEAD_GROUPS = [
-    ['مهدی فراهانی', 'سرگروه ایران'],
+    ['مهدی فراهانی', 'مهدیه الماسی'],
     ['مهدی ایازی', 'فاطمه دهقانپور'],
     ['آتنا مالمیر', 'امیررضا فلاح'],
   ];
@@ -3674,11 +3711,14 @@ window.APP_CONFIG = Object.freeze({
     KPI_DEFS.forEach((def) => {
       const it = data.items[def.key];
       if (!it || !it.active) return;
-      const x = kpiValueOf(data.report, def.key, it.scope_type, kpiScopeKey(leadId, it.scope_type, shiftOf));
+      const manual = it.manual_value != null && it.manual_value !== '';
+      const x = manual ? Number(it.manual_value) : kpiValueOf(data.report, def.key, it.scope_type, kpiScopeKey(leadId, it.scope_type, shiftOf));
+      // نرخ باگ: تا وقتی هیچ باگی در دوره ثبت نشده، گزارش مقداری برنمی‌گرداند (صفر = ۱۰۰٪ نیست)
+      const noData = !manual && x == null && def.key === 'bug_rate';
       const score = kpiScore(it, x);
       const max = base * (Number(it.weight) || 0);
       const pay = score == null ? null : Math.round(score * max);
-      per[def.key] = { it, x, score, max, pay };
+      per[def.key] = { it, x, score, max, pay, manual, noData };
       if (pay != null) total += pay; else pending += 1;
     });
     return { total, pending, per, base };
@@ -3708,42 +3748,44 @@ window.APP_CONFIG = Object.freeze({
     const { total, pending, per, base } = kpiPayFor(data, me, shiftOf);
     const levelKey = (st) => kpiScopeKey(me, st, shiftOf);
     const levelName = (st) => (st === 'shift' && myShift ? `شیفتی (${SHIFT_SHORT[myShift]})` : KPI_SCOPE_LABEL[st]);
-    const cards = KPI_DEFS.filter((def) => per[def.key]).map((def) => {
-      const { it, x, score, max, pay } = per[def.key];
-      const meter = score != null ? `
-        <div class="kpi-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(score * 100)}" aria-label="امتیاز ${esc(def.title)}">
-          <div class="kpi-meter-fill" style="width:${(score * 100).toFixed(1)}%"></div>
-        </div>
-        <div class="kpi-bounds"><span>${kpiBoundLabel(def, it.worst)} · صفر</span><span>${kpiBoundLabel(def, it.best)} · سقف</span></div>` : '';
-      const payHtml = x == null ? '<div class="kpi-pay muted">هنوز داده‌ای برای این سطح ثبت نشده</div>'
-        : pay == null ? '<div class="kpi-pay muted">حد صفر و سقف این شاخص هنوز تعیین نشده</div>'
-        : `<div class="kpi-pay"><b>${formatNum(pay)}</b> <span>از ${formatNum(max)} ریال</span><em>${formatNum(Math.round(score * 100))}٪</em></div>`;
+    const rows = KPI_DEFS.filter((def) => per[def.key]).map((def) => {
+      const { it, x, score, max, pay, manual, noData } = per[def.key];
+      const pct = score == null ? null : Math.round(score * 100);
+      let chart;
+      if (noData) chart = '<div class="kpi-nodata">هنوز باگی در داشبورد ثبت نشده؛ این شاخص بعد از ثبت اولین باگ حساب می‌شود</div>';
+      else if (x == null) chart = '<div class="kpi-nodata">هنوز داده‌ای برای این سطح نرسیده است</div>';
+      else if (score == null) chart = '<div class="kpi-nodata">حد صفر و سقف این شاخص هنوز تعیین نشده است</div>';
+      else chart = `
+        <div class="kpi-ach">
+          <div class="kpi-ach-track" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-label="تحقق ${esc(def.title)}">
+            <div class="kpi-ach-fill ${pct >= 100 ? 'full' : pct <= 0 ? 'zero' : ''}" style="width:${Math.max(pct, 0)}%"></div>
+            <span class="kpi-ach-mark" style="inset-inline-start:${Math.min(Math.max(pct, 0), 100)}%"><b>${formatNum(pct)}٪</b></span>
+          </div>
+          <div class="kpi-ach-scale"><span>حد صفر · ${kpiBoundLabel(def, it.worst)}</span><span>سقف · ${kpiBoundLabel(def, it.best)}</span></div>
+        </div>`;
       const levels = (def.scopes || KPI_SCOPES).map((st) => {
         const v = kpiValueOf(data.report, def.key, st, levelKey(st));
-        return `<li class="${st === it.scope_type ? 'paid' : ''}"><span>${esc(levelName(st))}${st === it.scope_type ? ' <i>مبنای حقوق</i>' : ''}</span><b>${kpiFmt(def, v)}</b></li>`;
+        return `<span class="kpi-lv ${st === it.scope_type && !manual ? 'paid' : ''}">${esc(levelName(st))}: <b>${noData ? '—' : kpiFmt(def, v)}</b></span>`;
       }).join('');
       return `
-        <div class="panel kpi-card ${x == null ? 'empty' : ''}">
-          <div class="kpi-head">
-            <div><div class="kpi-title" dir="ltr">${esc(def.title)}</div><div class="kpi-desc">${esc(def.desc)}</div></div>
-            <span class="kpi-scope">${esc(levelName(it.scope_type))}</span>
+        <div class="panel kpi-row ${x == null || score == null ? 'empty' : ''}">
+          <div class="kpi-row-info">
+            <div class="kpi-title" dir="ltr">${esc(def.title)}</div>
+            <div class="kpi-desc">${esc(def.desc)}</div>
+            <div class="kpi-row-tags"><span class="kpi-scope">${esc(levelName(it.scope_type))}</span>${manual ? '<span class="kpi-manual">مقدار تعیین‌شده توسط سرپرست</span>' : ''}</div>
           </div>
-          <div class="kpi-value">${x != null ? kpiValueLabel(def, x) : '—'}</div>
-          ${meter}
-          ${payHtml}
-          <ul class="kpi-levels">${levels}</ul>
+          <div class="kpi-row-value">${x != null ? kpiValueLabel(def, x) : '<span class="kpi-dash">—</span>'}</div>
+          <div class="kpi-row-chart">${chart}<div class="kpi-levels-inline">${levels}</div></div>
+          <div class="kpi-row-pay">${pay != null ? `<b>${formatNum(pay)}</b><span>از ${formatNum(max)} ریال</span>` : `<span class="muted">از ${formatNum(max)} ریال</span>`}</div>
         </div>`;
     }).join('');
     return `
-      <div class="panel kpi-total">
-        <div>
-          <div class="label">جمع حقوق شاخص‌های عملکرد (${esc(CURRENT_PERIOD.label)})</div>
-          <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(base)} ریال</span></div>
-          ${pending ? `<div class="kpi-note">${formatNum(pending)} شاخص هنوز در جمع حساب نشده است.</div>` : ''}
-        </div>
-        <div class="kpi-note">«فردی» = اپراتورهای خودتان · «تیمی» = تیم مشترک با پارتنر · «شیفتی» = همه‌ی تیم‌های شیفت شما · «کل» = کل واحد</div>
+      <div class="panel kpi-total kpi-total-center">
+        <div class="label">جمع حقوق شاخص‌های عملکرد (${esc(CURRENT_PERIOD.label)})</div>
+        <div class="kpi-total-value"><b>${formatNum(total)}</b> <span>از ${formatNum(base)} ریال</span></div>
+        ${pending ? `<div class="kpi-note">${formatNum(pending)} شاخص هنوز در جمع حساب نشده است.</div>` : ''}
       </div>
-      <div class="kpi-grid">${cards || '<div class="panel"><div class="empty-state">هیچ شاخصی برای این دوره فعال نیست</div></div>'}</div>`;
+      <div class="kpi-rows">${rows || '<div class="panel"><div class="empty-state">هیچ شاخصی برای این دوره فعال نیست</div></div>'}</div>`;
   }
 
   // ---------------------------------------------------------------
@@ -3777,7 +3819,7 @@ window.APP_CONFIG = Object.freeze({
       base: Number(d.settings.base_pay) || 0,
       items: KPI_DEFS.map((def) => {
         const it = d.items[def.key] || {};
-        return { kpi: def.key, scope_type: it.scope_type || (def.scopes ? def.scopes[0] : 'pair'), worst: it.worst, best: it.best, weight: it.weight != null ? Number(it.weight) : 0, active: it.active !== false && !!d.items[def.key] };
+        return { kpi: def.key, scope_type: it.scope_type || (def.scopes ? def.scopes[0] : 'pair'), worst: it.worst, best: it.best, weight: it.weight != null ? Number(it.weight) : 0, active: it.active !== false && !!d.items[def.key], manual_value: it.manual_value != null ? Number(it.manual_value) : null };
       }),
     });
     const periods = kpiPeriods();
@@ -3794,7 +3836,8 @@ window.APP_CONFIG = Object.freeze({
       const p = kpiPayFor(d, l.id, d.shiftOf);
       const cells = active.map((def) => {
         const c = p.per[def.key];
-        return `<td class="num">${kpiFmt(def, c && c.x)}${c && c.pay != null ? `<small class="kpi-cell-pay">${formatNum(c.pay)}</small>` : ''}</td>`;
+        if (c && c.noData) return '<td class="num"><span class="tm">بدون باگ ثبت‌شده</span></td>';
+        return `<td class="num">${kpiFmt(def, c && c.x)}${c && c.manual ? ' <small class="kpi-manual-dot" title="مقدار دستی سرپرست">دستی</small>' : ''}${c && c.pay != null ? `<small class="kpi-cell-pay">${formatNum(c.pay)}</small>` : ''}</td>`;
       }).join('');
       return `<tr><td class="nm">${esc(l.full_name || '—')}${leadTeamLabel(l) ? `<small class="tbx-sub">${esc(leadTeamLabel(l))}</small>` : ''}</td>
         <td>${d.shiftOf[l.id] ? esc(SHIFT_SHORT[d.shiftOf[l.id]]) : '<span class="tm">—</span>'}</td>${cells}<td class="num kpi-total-cell">${formatNum(p.total)}</td></tr>`;
@@ -3819,6 +3862,7 @@ window.APP_CONFIG = Object.freeze({
         <td><span class="ks-in"><input class="tree-search" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="worst" value="${esc(num(x.worst))}"><small>${u}</small></span></td>
         <td><span class="ks-in"><input class="tree-search" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="best" value="${esc(num(x.best))}"><small>${u}</small></span></td>
         <td><span class="ks-in"><input class="tree-search" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="weight" value="${esc(String(Math.round((Number(x.weight) || 0) * 1000) / 10))}"><small>٪</small></span></td>
+        <td><span class="ks-in"><input class="tree-search ks-manual" type="text" inputmode="decimal" dir="ltr" data-ks="${i}" data-f="manual_value" placeholder="خودکار" value="${esc(num(x.manual_value))}"><small>${u}</small></span></td>
       </tr>`;
     }).join('');
     const settings = `
@@ -3835,7 +3879,7 @@ window.APP_CONFIG = Object.freeze({
         </div>
         <div class="perf-wrap">
           <table class="perf-table ks-table">
-            <thead><tr><th>شاخص</th><th>سطح پرداخت</th><th>حد صفر</th><th>سقف (کامل)</th><th>وزن</th></tr></thead>
+            <thead><tr><th>شاخص</th><th>سطح پرداخت</th><th>حد صفر</th><th>سقف (کامل)</th><th>وزن</th><th title="اگر پر شود، به‌جای مقدار محاسبه‌شده مبنای حقوق همه‌ی سرگروه‌ها است">مقدار (Value)</th></tr></thead>
             <tbody>${setRows}</tbody>
           </table>
         </div>
@@ -3843,7 +3887,7 @@ window.APP_CONFIG = Object.freeze({
           <span class="bug-msg" id="ks-msg" role="status" aria-live="polite"></span>
           <button type="button" class="bug-submit" id="ks-save">ذخیره برای ${esc((periods.find((p) => p.id === period) || {}).label || '')}</button>
         </div>
-        <div class="trend-foot">حد صفر = مقداری که حقوق آن شاخص صفر است؛ سقف = مقداری که حقوق کامل است (برای «کمتر بهتر» مثل OCT، حد صفر بزرگ‌تر است). سطح «فردی» = اپراتورهای خود سرگروه، «تیمی» = تیم مشترک با پارتنر، «شیفتی» = همه‌ی تیم‌های آن شیفت، «کل» = کل واحد. OCT فقط در سطح کل در دسترس است.</div>
+        <div class="trend-foot">مقدار (Value) = عدد واقعی شاخص برای این دوره؛ اگر خالی بماند، عدد محاسبه‌شده‌ی ورک‌فلو برای هر سرگروه استفاده می‌شود. حد صفر = مقداری که حقوق آن شاخص صفر است؛ سقف = مقداری که حقوق کامل است (برای «کمتر بهتر» مثل OCT، حد صفر بزرگ‌تر است). سطح «فردی» = اپراتورهای خود سرگروه، «تیمی» = تیم مشترک با پارتنر، «شیفتی» = همه‌ی تیم‌های آن شیفت، «کل» = کل واحد. OCT فقط در سطح کل در دسترس است.</div>
       </div>`;
 
     // ۳) شیفت‌ها
