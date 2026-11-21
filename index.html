@@ -4650,9 +4650,11 @@ window.APP_CONFIG = Object.freeze({
   async function loadManageData(force) {
     if (state.manage && state.manage.loaded && !force) return;
     const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
-    const [opt, un, tr, us] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
+    const [opt, un, tr, us, tl] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
       isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] }),
-      state.profile.role === 'training' ? Promise.resolve({ data: [] }) : sb.rpc('team_operator_usernames')]);
+      state.profile.role === 'training' ? Promise.resolve({ data: [] }) : sb.rpc('team_operator_usernames'),
+      isSup ? sb.rpc('team_lead_logins') : Promise.resolve({ data: [] })]);
+    if (tl && tl.error) console.error('team_lead_logins failed', tl.error);
     const usernames = {};
     (Array.isArray(us && us.data) ? us.data : []).forEach((r) => { usernames[r.id] = r.username; });
     if (us && us.error) console.error('team_operator_usernames failed', us.error);
@@ -4662,6 +4664,7 @@ window.APP_CONFIG = Object.freeze({
       options: opt.data || [],
       unassigned: un.data || [],
       training: (tr && tr.data) || [],
+      leads: (tl && tl.data) || [],
       usernames,
     });
     if (opt.error) console.error('team_lead_options failed', opt.error);
@@ -4724,7 +4727,7 @@ window.APP_CONFIG = Object.freeze({
           <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
       </div>
       <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. با حذف، حساب و پروفایل کارشناس پاک می‌شود ولی آمار صدور و حقوقش برای محاسبه‌ی حقوق می‌ماند.</div>
-      ${SUPERVISOR_ROLES.includes(me.role) ? trainingUsersHtml() : ''}`;
+      ${SUPERVISOR_ROLES.includes(me.role) ? teamLeadUsersHtml() + trainingUsersHtml() : ''}`;
     bindManagePage(root2);
   }
   function bindManagePage(root) {
@@ -5503,6 +5506,21 @@ window.APP_CONFIG = Object.freeze({
       </div>`;
   }
 
+  // سرپرست: سرگروه‌ها (نام کاربری و ریست رمز؛ دکمه‌ی ریست همان مودال Training را باز می‌کند)
+  function teamLeadUsersHtml() {
+    const list = (state.manage && state.manage.leads) || [];
+    return `
+      <div class="bug-sub">سرگروه‌ها <span class="mg-count">${formatNum(list.length)} نفر</span></div>
+      <div class="panel perf-wrap">
+        ${list.length ? `<table class="perf-table mg-table">
+          <thead><tr><th>نام</th><th>نام کاربری</th><th></th></tr></thead>
+          <tbody>${list.map((u) => `<tr><td class="nm">${esc(u.full_name || '—')}</td>
+            <td class="mg-user">${u.username ? `<button type="button" class="mg-uname" data-copy="${esc(u.username)}" title="کپی نام کاربری" dir="ltr">${esc(u.username)}${COPY_ICON}</button>` : '—'}</td>
+            <td class="mg-acts">${u.username ? `<button type="button" class="mg-btn" data-rename="${esc(u.id)}" data-name="${esc(u.full_name || '')}">ویرایش نام کاربری</button>
+              <button type="button" class="mg-btn" data-trreset="${esc(u.id)}" data-name="${esc(u.full_name || '')}">ریست رمز</button>` : ''}</td></tr>`).join('')}</tbody>
+        </table>` : '<div class="empty-state">سرگروهی پیدا نشد</div>'}
+      </div>`;
+  }
   // سرپرست: کاربران Training (ساخت، ریست رمز)
   function trainingUsersHtml() {
     const list = (state.manage && state.manage.training) || [];
@@ -5541,6 +5559,26 @@ window.APP_CONFIG = Object.freeze({
         await afterManageChange(`کاربر Training «${name}» ساخته شد. نام کاربری: ${user}`);
       },
     }));
+    root.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.getAttribute('data-rename'), name = b.getAttribute('data-name');
+      const cur = (((state.manage && state.manage.leads) || []).find((u) => u.id === id) || {}).username || '';
+      openModal({
+        title: `ویرایش نام کاربری «${name}»`,
+        confirmText: 'ذخیره',
+        body: `<p class="modal-text">رمز عوض نمی‌شود؛ از این به بعد باید با نام کاربری جدید وارد شود.</p>
+          <label class="modal-field">نام کاربری جدید <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+          <input class="tree-search" id="rn-user" type="text" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(cur)}"></label>`,
+        onOpen: (dlg) => { const i = dlg.querySelector('#rn-user'); i.focus(); i.select(); },
+        onConfirm: async (dlg) => {
+          const user = toEnDigits(dlg.querySelector('#rn-user').value).trim().toLowerCase();
+          if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(user)) throw new Error('نام کاربری فقط حروف انگلیسی کوچک، عدد، نقطه، خط تیره یا زیرخط (۳ تا ۴۰ کاراکتر).');
+          if (user === cur) return true;
+          const { error } = await sb.rpc('team_rename_login', { p_user: id, p_username: user });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'تغییر نام کاربری ناموفق بود.')); }
+          await afterManageChange(`نام کاربری «${name}» شد: ${user}`);
+        },
+      });
+    }));
     root.querySelectorAll('[data-trreset]').forEach((b) => b.addEventListener('click', () => {
       const id = b.getAttribute('data-trreset'), name = b.getAttribute('data-name');
       openModal({
@@ -5555,7 +5593,7 @@ window.APP_CONFIG = Object.freeze({
           if (pw.length < 8) throw new Error('رمز باید حداقل ۸ کاراکتر باشد.');
           const { error } = await sb.rpc('team_reset_password', { p_operator: id, p_password: pw });
           if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ریست رمز ناموفق بود.')); }
-          const tu = ((state.manage && state.manage.training) || []).find((u) => u.id === id);
+          const tu = [].concat((state.manage && state.manage.training) || [], (state.manage && state.manage.leads) || []).find((u) => u.id === id);
           showCredentials(dlg, (tu && tu.username) || '', pw);
           return false;
         },
