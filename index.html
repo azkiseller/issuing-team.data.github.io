@@ -4650,11 +4650,13 @@ window.APP_CONFIG = Object.freeze({
   async function loadManageData(force) {
     if (state.manage && state.manage.loaded && !force) return;
     const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
-    const [opt, un, tr, us, tl] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
+    const [opt, un, tr, us, tl, sv] = await Promise.all([sb.rpc('team_lead_options'), sb.rpc('unassigned_operators'),
       isSup ? sb.rpc('training_users') : Promise.resolve({ data: [] }),
       state.profile.role === 'training' ? Promise.resolve({ data: [] }) : sb.rpc('team_operator_usernames'),
-      isSup ? sb.rpc('team_lead_logins') : Promise.resolve({ data: [] })]);
+      isSup ? sb.rpc('team_lead_logins') : Promise.resolve({ data: [] }),
+      isSup ? sb.rpc('supervisor_logins') : Promise.resolve({ data: [] })]);
     if (tl && tl.error) console.error('team_lead_logins failed', tl.error);
+    if (sv && sv.error) console.error('supervisor_logins failed', sv.error);
     const usernames = {};
     (Array.isArray(us && us.data) ? us.data : []).forEach((r) => { usernames[r.id] = r.username; });
     if (us && us.error) console.error('team_operator_usernames failed', us.error);
@@ -4665,6 +4667,7 @@ window.APP_CONFIG = Object.freeze({
       unassigned: un.data || [],
       training: (tr && tr.data) || [],
       leads: (tl && tl.data) || [],
+      supervisors: (sv && sv.data) || [],
       usernames,
     });
     if (opt.error) console.error('team_lead_options failed', opt.error);
@@ -4718,7 +4721,7 @@ window.APP_CONFIG = Object.freeze({
         <div class="mg-tools">
           <input class="tree-search mg-search" id="mg-search" type="search" placeholder="جستجوی نام یا نام کاربری..." value="${esc(q)}" aria-label="جستجوی اپراتور">
           <button type="button" class="mg-btn mg-primary mg-add" id="mg-add">+ افزودن کاربر به تیم</button>
-          ${SUPERVISOR_ROLES.includes(me.role) ? '<button type="button" class="mg-btn mg-primary mg-add" id="tr-add">+ تعریف کاربر Training</button>' : ''}
+          ${SUPERVISOR_ROLES.includes(me.role) ? '<button type="button" class="mg-btn mg-primary mg-add" id="tr-add">+ تعریف کاربر Training</button><button type="button" class="mg-btn mg-primary mg-add" id="sv-add">+ تعریف سرپرست</button>' : ''}
         </div>
       </div>
       <div class="panel perf-wrap">
@@ -4727,7 +4730,7 @@ window.APP_CONFIG = Object.freeze({
           <tbody>${rows}</tbody></table>` : '<div class="empty-state">اپراتوری پیدا نشد</div>'}
       </div>
       <div class="trend-foot">انتقال، ریست رمز و حذف در سامانه ثبت می‌شود. با حذف، حساب و پروفایل کارشناس پاک می‌شود ولی آمار صدور و حقوقش برای محاسبه‌ی حقوق می‌ماند.</div>
-      ${SUPERVISOR_ROLES.includes(me.role) ? teamLeadUsersHtml() + trainingUsersHtml() : ''}`;
+      ${SUPERVISOR_ROLES.includes(me.role) ? supervisorUsersHtml() + teamLeadUsersHtml() + trainingUsersHtml() : ''}`;
     bindManagePage(root2);
   }
   function bindManagePage(root) {
@@ -5506,6 +5509,19 @@ window.APP_CONFIG = Object.freeze({
       </div>`;
   }
 
+  // سرپرست: سرپرست‌های سلر (فقط فهرست؛ ساخت با «+ تعریف سرپرست»)
+  function supervisorUsersHtml() {
+    const list = (state.manage && state.manage.supervisors) || [];
+    return `
+      <div class="bug-sub">سرپرست‌ها <span class="mg-count">${formatNum(list.length)} نفر</span></div>
+      <div class="panel perf-wrap">
+        ${list.length ? `<table class="perf-table mg-table">
+          <thead><tr><th>نام</th><th>نام کاربری</th></tr></thead>
+          <tbody>${list.map((u) => `<tr><td class="nm">${esc(u.full_name || '—')}${u.id === state.profile.id ? ' <span class="opt">(شما)</span>' : ''}</td>
+            <td class="mg-user">${u.username ? `<button type="button" class="mg-uname" data-copy="${esc(u.username)}" title="کپی نام کاربری" dir="ltr">${esc(u.username)}${COPY_ICON}</button>` : '—'}</td></tr>`).join('')}</tbody>
+        </table>` : '<div class="empty-state">سرپرستی پیدا نشد</div>'}
+      </div>`;
+  }
   // سرپرست: سرگروه‌ها (نام کاربری و ریست رمز؛ دکمه‌ی ریست همان مودال Training را باز می‌کند)
   function teamLeadUsersHtml() {
     const list = (state.manage && state.manage.leads) || [];
@@ -5535,6 +5551,33 @@ window.APP_CONFIG = Object.freeze({
       </div>`;
   }
   function bindTrainingUsers(root) {
+    const svAdd = $('sv-add');
+    if (svAdd) svAdd.addEventListener('click', () => openModal({
+      title: 'تعریف سرپرست',
+      confirmText: 'ساخت سرپرست',
+      body: `
+        <p class="modal-text">سرپرست جدید همه‌ی دسترسی‌های شما را دارد: کل تیم‌ها و کارشناسان سلر را می‌بیند، تیم‌ها را مدیریت می‌کند، رمز سرگروه‌ها را ریست می‌کند و می‌تواند سرپرست یا کاربر Training بسازد.</p>
+        <label class="modal-field">نام و نام خانوادگی<input class="tree-search" id="sv-name" type="text" maxlength="80" autocomplete="off"></label>
+        <label class="modal-field">نام کاربری <span class="opt">(حروف انگلیسی کوچک، عدد، نقطه)</span>
+          <input class="tree-search" id="sv-user" type="text" dir="ltr" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="a-ahmadi"></label>
+        <label class="modal-field">رمز اولیه <span class="opt">(حداقل ۸ کاراکتر)</span>
+          <span class="pw-row"><input class="tree-search" id="sv-pass" type="text" dir="ltr" autocomplete="off"><button type="button" class="mg-btn" id="sv-gen">ساخت رمز</button></span></label>`,
+      onOpen: (dlg) => dlg.querySelector('#sv-gen').addEventListener('click', () => { const i = dlg.querySelector('#sv-pass'); i.value = randomPassword(); i.select(); }),
+      onConfirm: async (dlg) => {
+        if (dlg.dataset.done) return true;
+        const name = dlg.querySelector('#sv-name').value.trim().replace(/\s+/g, ' ');
+        const user = toEnDigits(dlg.querySelector('#sv-user').value).trim().toLowerCase();
+        const pass = dlg.querySelector('#sv-pass').value.trim();
+        if (name.length < 3) throw new Error('نام و نام خانوادگی را کامل وارد کنید.');
+        if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(user)) throw new Error('نام کاربری فقط حروف انگلیسی کوچک، عدد، نقطه، خط تیره یا زیرخط (۳ تا ۴۰ کاراکتر).');
+        if (pass.length < 8) throw new Error('رمز اولیه باید حداقل ۸ کاراکتر باشد.');
+        const { error } = await sb.rpc('admin_create_user', { p_full_name: name, p_username: user, p_password: pass, p_role: 'supervisor' });
+        if (error) { console.error(error); throw new Error(rpcErrorText(error, 'ساخت سرپرست ناموفق بود.')); }
+        showCredentials(dlg, user, pass, `سرپرست «${name}» ساخته شد. این اطلاعات را به او بدهید:`);
+        loadManageData(true).then(renderManagePage);
+        return false;
+      },
+    }));
     const add = $('tr-add');
     if (add) add.addEventListener('click', () => openModal({
       title: 'تعریف کاربر Training',
