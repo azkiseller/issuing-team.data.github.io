@@ -1710,16 +1710,23 @@ table.ks-table { min-width: 720px; }
 .pm-tab { font: 600 13px var(--font); color: var(--ink-soft); background: none; border: 0; border-radius: 999px; padding: 7px 16px; cursor: pointer; }
 .pm-tab.on { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); }
 .pm-tab:focus-visible, .pm-cat:focus-visible, .pm-it:focus-visible, .pm-tpl-t:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.pm-cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.pm-cat { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: right; font-family: var(--font); color: var(--ink); cursor: pointer;
-  padding: 28px 24px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c, var(--accent));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%); backdrop-filter: blur(var(--glass-blur)) saturate(180%); box-shadow: var(--shadow-card); transition: transform .2s, box-shadow .2s; }
-.pm-cat:hover { transform: translateY(-3px); box-shadow: var(--shadow-float); }
-.pm-cat-permit { --c: var(--accent-deep); }
-.pm-cat-fix { --c: var(--warn); }
-.pm-cat-ic { font-size: 34px; line-height: 1; }
-.pm-cat-t { font-size: 17px; font-weight: 800; }
-.pm-cat-n { font-size: 12.5px; color: var(--ink-faint); }
+.pm-cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 14px; }
+.pm-cat { display: flex; align-items: center; gap: 14px; text-align: right; font-family: var(--font); color: var(--ink); cursor: pointer;
+  padding: 20px 20px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%); backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  box-shadow: var(--shadow-card); transition: transform .2s, box-shadow .2s, border-color .2s; }
+.pm-cat:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow-float); }
+.pm-cat-ic { flex: none; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #fff;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); box-shadow: 0 8px 18px -8px rgba(22,86,245,.6); }
+.pm-cat-ic svg { width: 24px; height: 24px; }
+.pm-cat-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pm-cat-t { font-size: 15.5px; font-weight: 800; }
+.pm-cat-d { font-size: 12px; color: var(--ink-faint); }
+.pm-cat-n { flex: none; }
+.pm-cat-go { flex: none; color: var(--ink-faint); display: flex; }
+.pm-cat-go svg { width: 18px; height: 18px; }
+.pm-cat:hover .pm-cat-go { color: var(--accent); }
+.pm-empty { margin-bottom: 6px; }
 .pm-back-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--ink); }
 .pm-grid { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
 .pm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
@@ -5702,7 +5709,12 @@ window.APP_CONFIG = Object.freeze({
   // سرگروه و سرپرست قالب‌ها را مدیریت می‌کنند و گزارش استفاده را می‌بینند.
   // ---------------------------------------------------------------
   const PM_COMPANIES = ['البرز', 'آرمان', 'آسیا', 'سینا', 'ایران', 'ما', 'کوثر', 'معلم', 'پارسیان', 'تجارت نو', 'تعاون', 'سامان', 'نوین', 'حکمت', 'دی', 'رازی', 'پردیس', 'هوشمند فردا'];
-  const PM_CATS = { permit: { label: 'پیام‌های مجوزی', icon: '📄' }, fix: { label: 'پیام‌های اصلاحی', icon: '🛠️' } };
+  const PM_CATS = {
+    permit: { label: 'پیام‌های مجوزی', desc: 'پیام آماده برای خطاهای دریافت مجوز',
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/>' },
+    fix: { label: 'پیام‌های اصلاحی', desc: 'پیام آماده برای اصلاح اطلاعات صدور',
+      icon: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.5 17.3a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.3-.6-.6-2.3z"/>' },
+  };
   const PM_CODE = 'کد رایانه';
   const pmIsAdmin = () => !!state.profile && (state.profile.role === 'team_lead' || SUPERVISOR_ROLES.includes(state.profile.role));
   const pmDayKey = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran' }).format(new Date(iso));
@@ -5765,12 +5777,14 @@ window.APP_CONFIG = Object.freeze({
     const all = s.tpls || [];
     if (!s.cat) {
       return `<div class="pm-cats">${Object.entries(PM_CATS).map(([k, c]) => `
-        <button type="button" class="pm-cat pm-cat-${k}" data-pmcat="${k}">
-          <span class="pm-cat-ic" aria-hidden="true">${c.icon}</span>
-          <span class="pm-cat-t">${c.label}</span>
-          <span class="pm-cat-n">${formatNum(all.filter((t) => pmCat(t) === k).length)} قالب</span>
+        <button type="button" class="pm-cat" data-pmcat="${k}">
+          <span class="pm-cat-ic">${sideIcon(c.icon)}</span>
+          <span class="pm-cat-body"><span class="pm-cat-t">${c.label}</span><span class="pm-cat-d">${c.desc}</span></span>
+          <span class="pm-pill pm-cat-n">${formatNum(all.filter((t) => pmCat(t) === k).length)} قالب</span>
+          <span class="pm-cat-go" aria-hidden="true">${sideIcon('<path d="M15 6l-6 6 6 6"/>')}</span>
         </button>`).join('')}</div>
-        ${all.length ? '' : `<div class="trend-foot">هنوز قالبی ثبت نشده است.${pmIsAdmin() ? ' از «مدیریت قالب‌ها» قالب اضافه کنید.' : ''}</div>`}`;
+        ${all.length ? '' : `<div class="panel pm-empty"><div class="empty-state">هنوز قالبی ثبت نشده است${pmIsAdmin() ? '؛ از «مدیریت قالب‌ها» قالب اضافه کنید' : ''}</div></div>`}
+        <div class="trend-foot">دسته را انتخاب کنید، خطای دریافتی را پیدا کنید و بعد از وارد کردن ${PM_CODE} و شرکت بیمه، پیام را کپی کنید. هر کپی در گزارش استفاده ثبت می‌شود.</div>`;
     }
     const t = pmCurrent();
     const list = all.filter((x) => pmCat(x) === s.cat);
