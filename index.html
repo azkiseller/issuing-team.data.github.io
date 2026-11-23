@@ -1345,7 +1345,8 @@ button.ghost#pw-btn:hover { color: var(--accent-strong); }
 
 /* ---------- مدیریت تیم ---------- */
 body.with-sidebar[data-view="manage"] [data-page]:not([data-page="manage"]),
-body.with-sidebar[data-view="tbugs"] [data-page]:not([data-page="tbugs"]) { display: none !important; }
+body.with-sidebar[data-view="tbugs"] [data-page]:not([data-page="tbugs"]),
+body.with-sidebar[data-view="msgs"] [data-page]:not([data-page="msgs"]) { display: none !important; }
 .mg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 10px; }
 .mg-head .bug-sub { margin: 0; }
 .mg-search { max-width: 240px; margin-bottom: 0; }
@@ -1703,6 +1704,54 @@ table.ks-table { min-width: 720px; }
   .kpi-row-chart { grid-column: 1 / -1; order: 3; }
   .kpi-row-pay { grid-column: 1 / -1; order: 4; text-align: right; display: flex; align-items: baseline; gap: 8px; }
 }
+
+/* پیام آماده */
+.pm-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-tint); border: 1px solid var(--line); margin: 4px 0 16px; flex-wrap: wrap; }
+.pm-tab { font: 600 13px var(--font); color: var(--ink-soft); background: none; border: 0; border-radius: 999px; padding: 7px 16px; cursor: pointer; }
+.pm-tab.on { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); }
+.pm-tab:focus-visible, .pm-cat:focus-visible, .pm-it:focus-visible, .pm-tpl-t:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pm-cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.pm-cat { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: right; font-family: var(--font); color: var(--ink); cursor: pointer;
+  padding: 28px 24px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c, var(--accent));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%); backdrop-filter: blur(var(--glass-blur)) saturate(180%); box-shadow: var(--shadow-card); transition: transform .2s, box-shadow .2s; }
+.pm-cat:hover { transform: translateY(-3px); box-shadow: var(--shadow-float); }
+.pm-cat-permit { --c: var(--accent-deep); }
+.pm-cat-fix { --c: var(--warn); }
+.pm-cat-ic { font-size: 34px; line-height: 1; }
+.pm-cat-t { font-size: 17px; font-weight: 800; }
+.pm-cat-n { font-size: 12.5px; color: var(--ink-faint); }
+.pm-back-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--ink); }
+.pm-grid { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
+.pm-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 860px) { .pm-grid, .pm-grid2 { grid-template-columns: 1fr; } }
+.pm-pane { padding: 4px 18px 18px; }
+.pm-pane > .bug-sub:first-child, .pm-pane > .mg-head:first-child { margin-top: 14px; }
+.pm-pane .tree-search { margin-bottom: 12px; }
+.pm-pane .modal-field { display: block; }
+.pm-list { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.pm-it { display: block; width: 100%; text-align: right; font: 500 13px/1.8 var(--font); color: var(--ink); background: var(--surface-tint); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 12px; cursor: pointer; }
+.pm-it:hover { border-color: var(--accent); }
+.pm-it.on { border-color: var(--accent); background: var(--accent-soft); }
+.pm-it[hidden] { display: none; }
+.pm-tpl { display: flex; align-items: center; gap: 8px; cursor: default; }
+.pm-tpl-t { flex: 1; text-align: right; font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.pm-pill { font-size: 11px; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); white-space: nowrap; }
+.pm-out { min-height: 170px; resize: vertical; line-height: 1.9; white-space: pre-wrap; }
+.pm-edit { min-height: 240px; }
+.pm-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pm-actions .mg-btn svg { width: 14px; height: 14px; vertical-align: -2px; }
+.pm-msg { font-size: 12.5px; }
+.pm-msg.ok { color: var(--good); }
+.pm-msg.err { color: var(--danger); }
+.pm-sel { width: auto; margin: 0; padding: 7px 12px; }
+.pm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.pm-stats .value.pm-small { font-size: 18px; }
+.pm-bar-row { margin-bottom: 10px; }
+.pm-bar-h { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink); }
+.pm-bar-h span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-bar { height: 8px; border-radius: 6px; background: var(--surface-tint); margin-top: 4px; overflow: hidden; }
+.pm-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-deep)); }
+td.pm-wrap { white-space: normal; min-width: 240px; }
 
 </style>
 </head>
@@ -2230,6 +2279,7 @@ window.APP_CONFIG = Object.freeze({
     kpi: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/>',
     manage: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5 1.3 0 2.5.3 3.5.9"/><circle cx="18" cy="17" r="2.2"/><path d="M18 12.6v1.6M18 19.8v1.6M14.2 17h1.6M20.2 17h1.6M15.3 14.3l1.1 1.1M19.6 18.6l1.1 1.1M15.3 19.7l1.1-1.1M19.6 15.4l1.1-1.1"/>',
     tbugs: '<rect x="5" y="3.5" width="14" height="18" rx="2"/><path d="M9 3.5V2.5h6v1M8.5 9h7M8.5 13h7M8.5 17h4"/>',
+    msgs: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z"/><path d="M8.5 8h7M8.5 11.5h4.5"/>',
     days: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13.5h2M11 13.5h2M14.5 13.5h2M7.5 17h2M11 17h2"/>',
   };
   // roles: کدام نقش‌ها این بخش را دارند (خالی = همه)
@@ -2242,6 +2292,7 @@ window.APP_CONFIG = Object.freeze({
     { id: 'tbugs', label: 'باگ‌های ثبت‌شده', only: ['training', 'supervisor'] },
     { id: 'manage', label: 'مدیریت تیم', only: ['team_lead', 'supervisor', 'training'] },
     { id: 'days', label: 'کارکرد روزانه', only: ['operator'] },
+    { id: 'msgs', label: 'پیام آماده', only: ['operator', 'team_lead', 'supervisor'] },
     { id: 'kpi', label: 'شاخص‌های عملکرد', only: ['team_lead', 'supervisor'], needsData: true },
   ];
   const sidePagesFor = (role) => SIDE_PAGES.filter((p) => (!p.only || p.only.includes(role)) && !(p.notFor || []).includes(role))
@@ -2372,6 +2423,7 @@ window.APP_CONFIG = Object.freeze({
     $('page-title').textContent = page.label;
     if (page.id === 'days') requestAnimationFrame(layoutDaysPath);
     if (page.id === 'tbugs') renderTrainingBugsPage();
+    if (page.id === 'msgs') renderMsgsPage();
     try { localStorage.setItem('azki-side-page', page.id); } catch (e) {}
   }
 
@@ -2611,18 +2663,19 @@ window.APP_CONFIG = Object.freeze({
 
     if (rows.length === 0) {
       content.innerHTML = topHtml + '<div class="panel" data-page="overview"><div class="empty-state">هنوز رکوردی برای شما ثبت نشده است</div></div>'
-        + (state.sidebar ? renderDaysPage() + '<div data-page="bugs" id="bugs-root"></div>' : '');
-      if (state.sidebar) { bindDaysPage(profile, rows); loadBugsPage(); }
+        + (state.sidebar ? renderDaysPage() + '<div data-page="bugs" id="bugs-root"></div><div data-page="msgs" id="msgs-root"></div>' : '');
+      if (state.sidebar) { bindDaysPage(profile, rows); loadBugsPage(); if (document.body.dataset.view === 'msgs') renderMsgsPage(); }
       return;
     }
 
     const asc = sortAsc(rows);
     const series = dailySeries(rows);
     if (state.sidebar) {
-      content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + renderDaysPage() + '<div data-page="bugs" id="bugs-root"></div>';
+      content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + renderDaysPage() + '<div data-page="bugs" id="bugs-root"></div><div data-page="msgs" id="msgs-root"></div>';
       bindTrendChart(series);
       bindDaysPage(profile, rows);
       loadBugsPage();
+      if (document.body.dataset.view === 'msgs') renderMsgsPage();
       return;
     }
     content.innerHTML = topHtml + `<div data-page="overview">${renderDailyTrendChart(series)}</div>` + `
@@ -5644,6 +5697,278 @@ window.APP_CONFIG = Object.freeze({
     }));
   }
 
+  // ---------------------------------------------------------------
+  // پیام آماده: کارشناس، سرگروه و سرپرست پیام آماده‌ی خطاها را می‌سازند؛
+  // سرگروه و سرپرست قالب‌ها را مدیریت می‌کنند و گزارش استفاده را می‌بینند.
+  // ---------------------------------------------------------------
+  const PM_COMPANIES = ['البرز', 'آرمان', 'آسیا', 'سینا', 'ایران', 'ما', 'کوثر', 'معلم', 'پارسیان', 'تجارت نو', 'تعاون', 'سامان', 'نوین', 'حکمت', 'دی', 'رازی', 'پردیس', 'هوشمند فردا'];
+  const PM_CATS = { permit: { label: 'پیام‌های مجوزی', icon: '📄' }, fix: { label: 'پیام‌های اصلاحی', icon: '🛠️' } };
+  const PM_CODE = 'کد رایانه';
+  const pmIsAdmin = () => !!state.profile && (state.profile.role === 'team_lead' || SUPERVISOR_ROLES.includes(state.profile.role));
+  const pmDayKey = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran' }).format(new Date(iso));
+  const pmCat = (t) => (t.category === 'fix' ? 'fix' : 'permit');
+  const pmVars = (t) => [...new Set([...String(t.template).matchAll(/\[([^\]]+)\]/g)].map((m) => m[1]))].filter((x) => x !== PM_CODE);
+  function pmState() {
+    return state.pm || (state.pm = { tpls: null, tab: 'gen', cat: null, sel: null, q: '', code: '', co: '', ex: {}, logs: null, fc: '', days: 31, ed: null });
+  }
+  async function pmLoadTemplates() {
+    const s = pmState();
+    const { data, error } = await sb.rpc('pm_templates_list');
+    if (error) { console.error('pm_templates_list failed', error); s.err = true; s.tpls = []; return; }
+    s.err = false;
+    s.tpls = data || [];
+  }
+  async function pmLoadLogs() {
+    const s = pmState();
+    const { data, error } = await sb.rpc('pm_logs_report', { p_days: s.days });
+    if (error) { console.error('pm_logs_report failed', error); s.logs = []; return; }
+    s.logs = data || [];
+  }
+  function pmCurrent() {
+    const s = pmState();
+    const list = (s.tpls || []).filter((t) => pmCat(t) === s.cat);
+    return list.find((t) => t.id === s.sel) || list[0] || null;
+  }
+  function pmBuild(t) {
+    const s = pmState();
+    if (!t) return '';
+    let m = String(t.template);
+    if (s.code.trim()) m = m.split(`[${PM_CODE}]`).join(toEnDigits(s.code.trim()));
+    pmVars(t).forEach((v) => { if (s.ex[v]) m = m.split(`[${v}]`).join(s.ex[v]); });
+    return m;
+  }
+  async function renderMsgsPage() {
+    const root = $('msgs-root');
+    if (!root || !state.profile) return;
+    const s = pmState();
+    if (!s.tpls) {
+      root.innerHTML = '<div class="panel"><div class="empty-state">در حال بارگذاری...</div></div>';
+      await pmLoadTemplates();
+    }
+    if (s.tab === 'logs' && !s.logs && pmIsAdmin()) {
+      root.innerHTML = '<div class="panel"><div class="empty-state">در حال بارگذاری...</div></div>';
+      await pmLoadLogs();
+    }
+    const live = $('msgs-root');
+    if (!live) return;
+    const admin = pmIsAdmin();
+    if (!admin) s.tab = 'gen';
+    const tabs = admin ? `<div class="pm-tabs" role="tablist">${[['gen', 'تولید پیام'], ['logs', 'گزارش استفاده'], ['tpls', 'مدیریت قالب‌ها']]
+      .map(([k, v]) => `<button type="button" role="tab" class="pm-tab${s.tab === k ? ' on' : ''}" aria-selected="${s.tab === k}" data-pmtab="${k}">${v}</button>`).join('')}</div>` : '';
+    const body = s.err ? '<div class="panel"><div class="empty-state">خواندن قالب‌ها ناموفق بود. صفحه را دوباره بارگذاری کنید.</div></div>'
+      : s.tab === 'logs' ? pmLogsHtml() : s.tab === 'tpls' ? pmTemplatesHtml() : pmGenHtml();
+    live.innerHTML = tabs + body;
+    pmBind(live);
+  }
+  function pmGenHtml() {
+    const s = pmState();
+    const all = s.tpls || [];
+    if (!s.cat) {
+      return `<div class="pm-cats">${Object.entries(PM_CATS).map(([k, c]) => `
+        <button type="button" class="pm-cat pm-cat-${k}" data-pmcat="${k}">
+          <span class="pm-cat-ic" aria-hidden="true">${c.icon}</span>
+          <span class="pm-cat-t">${c.label}</span>
+          <span class="pm-cat-n">${formatNum(all.filter((t) => pmCat(t) === k).length)} قالب</span>
+        </button>`).join('')}</div>
+        ${all.length ? '' : `<div class="trend-foot">هنوز قالبی ثبت نشده است.${pmIsAdmin() ? ' از «مدیریت قالب‌ها» قالب اضافه کنید.' : ''}</div>`}`;
+    }
+    const t = pmCurrent();
+    const list = all.filter((x) => pmCat(x) === s.cat);
+    const vars = t ? pmVars(t) : [];
+    return `
+      <div class="pm-back-row"><button type="button" class="mg-btn" id="pm-back">→ بازگشت</button><b>${PM_CATS[s.cat].label}</b></div>
+      <div class="pm-grid">
+        <div class="panel pm-pane">
+          <div class="bug-sub">خطای دریافتی</div>
+          <input class="tree-search" id="pm-q" type="search" placeholder="جستجو در خطاها..." value="${esc(s.q)}" aria-label="جستجو در خطاها">
+          <div class="pm-list" id="pm-list">
+            ${list.map((x) => `<button type="button" class="pm-it${t && x.id === t.id ? ' on' : ''}" data-pmsel="${x.id}" data-err="${esc(x.error)}">${esc(x.error.length > 110 ? x.error.slice(0, 110) + '…' : x.error)}</button>`).join('')}
+            <div class="empty-state pm-none" ${list.length ? 'hidden' : ''}>موردی پیدا نشد</div>
+          </div>
+        </div>
+        <div class="panel pm-pane">
+          <div class="bug-sub">ساخت پیام</div>
+          ${t ? `
+          <label class="modal-field">${PM_CODE}<input class="tree-search" id="pm-code" inputmode="numeric" dir="ltr" autocomplete="off" placeholder="${PM_CODE} را وارد کنید" value="${esc(s.code)}"></label>
+          <label class="modal-field">شرکت بیمه<select class="tree-search" id="pm-co"><option value="">انتخاب شرکت بیمه...</option>${PM_COMPANIES.map((c) => `<option${s.co === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
+          ${vars.map((v) => `<label class="modal-field">${esc(v)}<input class="tree-search" data-pmvar="${esc(v)}" value="${esc(s.ex[v] || '')}" autocomplete="off"></label>`).join('')}
+          <label class="modal-field">پیام نهایی<textarea class="tree-search pm-out" id="pm-out" readonly>${esc(pmBuild(t))}</textarea></label>
+          <div class="pm-actions"><button type="button" class="mg-btn mg-primary" id="pm-copy">${COPY_ICON} کپی پیام</button><span class="pm-msg" id="pm-msg" role="status"></span></div>`
+          : '<div class="empty-state">در این دسته قالبی نیست</div>'}
+        </div>
+      </div>`;
+  }
+  function pmLogsHtml() {
+    const s = pmState();
+    const all = s.logs || [];
+    const L = s.fc ? all.filter((l) => l.company === s.fc) : all;
+    const by = (key, n, rows) => {
+      const m = new Map();
+      rows.forEach((l) => { const k = l[key]; if (k) m.set(k, (m.get(k) || 0) + 1); });
+      return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+    };
+    const bars = (arr, cut) => {
+      const mx = arr.length ? arr[0][1] : 1;
+      return arr.length ? arr.map(([k, v]) => `<div class="pm-bar-row"><div class="pm-bar-h"><span title="${esc(k)}">${esc(cut && k.length > cut ? k.slice(0, cut) + '…' : k)}</span><b>${formatNum(v)}</b></div>
+        <div class="pm-bar"><i style="width:${Math.max(4, (v / mx) * 100).toFixed(1)}%"></i></div></div>`).join('') : '<div class="empty-state">هنوز داده‌ای نیست</div>';
+    };
+    const today = pmDayKey(new Date().toISOString());
+    const byCo = by('company', 30, all);
+    const scope = SUPERVISOR_ROLES.includes(state.profile.role) ? 'همه‌ی کارشناسان' : 'شما و تیمتان';
+    return `
+      <div class="mg-head">
+        <div class="bug-sub">گزارش استفاده <span class="mg-count">${esc(scope)}</span></div>
+        <div class="mg-tools">
+          <select class="tree-search pm-sel" id="pm-days" aria-label="بازه">${[[1, 'امروز'], [7, '۷ روز اخیر'], [31, '۳۱ روز اخیر'], [90, '۹۰ روز اخیر']].map(([d, l]) => `<option value="${d}"${s.days === d ? ' selected' : ''}>${l}</option>`).join('')}</select>
+          <select class="tree-search pm-sel" id="pm-fc" aria-label="شرکت"><option value="">همه‌ی شرکت‌ها</option>${PM_COMPANIES.map((c) => `<option${s.fc === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="pm-stats">
+        <div class="summary-card"><div class="label">کل استفاده‌ها</div><div class="value">${formatNum(L.length)}</div></div>
+        <div class="summary-card"><div class="label">امروز</div><div class="value">${formatNum(L.filter((l) => pmDayKey(l.created_at) === today).length)}</div></div>
+        <div class="summary-card"><div class="label">کاربران فعال</div><div class="value">${formatNum(new Set(L.map((l) => l.user_id || l.user_name)).size)}</div></div>
+        <div class="summary-card"><div class="label">شرکت پرمجوز</div><div class="value pm-small">${byCo.length ? esc(byCo[0][0]) : '—'}</div></div>
+      </div>
+      <div class="panel pm-pane"><div class="bug-sub">مجوزها به تفکیک شرکت بیمه</div>${bars(byCo)}</div>
+      <div class="pm-grid2">
+        <div class="panel pm-pane"><div class="bug-sub">پرکاربردترین کاربران</div>${bars(by('user_name', 8, L))}</div>
+        <div class="panel pm-pane"><div class="bug-sub">پرتکرارترین خطاها</div>${bars(by('err', 8, L), 55)}</div>
+      </div>
+      <div class="bug-sub">آخرین استفاده‌ها <span class="mg-count">${formatNum(Math.min(L.length, 200))} مورد</span></div>
+      <div class="panel perf-wrap">
+        ${L.length ? `<table class="perf-table">
+          <thead><tr><th>زمان</th><th>کاربر</th><th>${PM_CODE}</th><th>شرکت</th><th>خطا</th></tr></thead>
+          <tbody>${L.slice(0, 200).map((l) => `<tr><td class="tm">${esc(jalaliStamp(l.created_at))}</td><td class="nm">${esc(l.user_name || '—')}</td>
+            <td dir="ltr">${esc(l.code || '—')}</td><td>${esc(l.company || '—')}</td><td class="pm-wrap">${esc(l.err || '—')}</td></tr>`).join('')}</tbody>
+        </table>` : '<div class="empty-state">در این بازه استفاده‌ای ثبت نشده است</div>'}
+      </div>`;
+  }
+  function pmTemplatesHtml() {
+    const s = pmState();
+    const all = s.tpls || [];
+    const e = s.ed || { id: null, error: '', template: `خطا: \n${PM_CODE}: [${PM_CODE}]\n`, category: 'permit' };
+    s.ed = e;
+    return `
+      <div class="pm-grid">
+        <div class="panel pm-pane">
+          <div class="mg-head"><div class="bug-sub">قالب‌ها <span class="mg-count">${formatNum(all.length)}</span></div><button type="button" class="mg-btn mg-primary" id="pm-new">+ قالب جدید</button></div>
+          <div class="pm-list">
+            ${all.map((x) => `<div class="pm-it pm-tpl${e.id === x.id ? ' on' : ''}">
+              <button type="button" class="pm-tpl-t" data-pmedit="${x.id}">${esc(x.error.length > 90 ? x.error.slice(0, 90) + '…' : x.error)}</button>
+              <span class="pm-pill">${pmCat(x) === 'fix' ? 'اصلاحی' : 'مجوزی'}</span>
+              <button type="button" class="bug-del" data-pmdel="${x.id}">حذف</button></div>`).join('') || '<div class="empty-state">هنوز قالبی نیست</div>'}
+          </div>
+        </div>
+        <div class="panel pm-pane">
+          <div class="bug-sub">${e.id ? 'ویرایش قالب' : 'قالب جدید'}</div>
+          <label class="modal-field">دسته<select class="tree-search" id="pm-ecat">${Object.entries(PM_CATS).map(([k, c]) => `<option value="${k}"${e.category === k ? ' selected' : ''}>${c.label}</option>`).join('')}</select></label>
+          <label class="modal-field">عنوان خطا<input class="tree-search" id="pm-eerr" value="${esc(e.error)}" autocomplete="off"></label>
+          <label class="modal-field">متن کامل پیام <span class="opt">(جای ${PM_CODE} بنویسید [${PM_CODE}]؛ هر [متغیر] دیگر خودش یک فیلد ورودی می‌شود)</span>
+            <textarea class="tree-search pm-out pm-edit" id="pm-etpl">${esc(e.template)}</textarea></label>
+          <div class="pm-actions"><button type="button" class="mg-btn mg-primary" id="pm-save">ذخیره</button><button type="button" class="mg-btn" id="pm-cancel">انصراف</button><span class="pm-msg err" id="pm-emsg" role="alert"></span></div>
+        </div>
+      </div>`;
+  }
+  function pmBind(root) {
+    const s = pmState();
+    root.querySelectorAll('[data-pmtab]').forEach((b) => b.addEventListener('click', () => {
+      s.tab = b.getAttribute('data-pmtab');
+      if (s.tab === 'gen') s.cat = null;
+      if (s.tab === 'logs') s.logs = null; // هر بار تازه
+      renderMsgsPage();
+    }));
+    root.querySelectorAll('[data-pmcat]').forEach((b) => b.addEventListener('click', () => {
+      s.cat = b.getAttribute('data-pmcat'); s.q = ''; s.ex = {}; s.sel = null;
+      renderMsgsPage();
+    }));
+    const back = $('pm-back');
+    if (back) back.addEventListener('click', () => { s.cat = null; renderMsgsPage(); });
+    const q = $('pm-q');
+    if (q) {
+      const filter = () => {
+        const v = q.value.trim();
+        let n = 0;
+        root.querySelectorAll('#pm-list [data-pmsel]').forEach((b) => { const hit = !v || b.getAttribute('data-err').includes(v); b.hidden = !hit; if (hit) n++; });
+        const none = root.querySelector('.pm-none'); if (none) none.hidden = n > 0;
+      };
+      q.addEventListener('input', () => { s.q = q.value; filter(); });
+      filter();
+    }
+    root.querySelectorAll('[data-pmsel]').forEach((b) => b.addEventListener('click', () => {
+      s.sel = Number(b.getAttribute('data-pmsel')); s.ex = {};
+      renderMsgsPage();
+    }));
+    const upd = () => { const o = $('pm-out'); if (o) o.value = pmBuild(pmCurrent()); };
+    const code = $('pm-code');
+    if (code) code.addEventListener('input', () => { s.code = code.value; upd(); });
+    const co = $('pm-co');
+    if (co) co.addEventListener('change', () => { s.co = co.value; });
+    root.querySelectorAll('[data-pmvar]').forEach((i) => i.addEventListener('input', () => { s.ex[i.getAttribute('data-pmvar')] = i.value; upd(); }));
+    const cp = $('pm-copy');
+    if (cp) cp.addEventListener('click', async () => {
+      const msg = $('pm-msg');
+      const t = pmCurrent();
+      msg.className = 'pm-msg err';
+      if (!t) return;
+      if (!s.code.trim()) { msg.textContent = `اول ${PM_CODE} را وارد کنید`; return; }
+      if (!s.co) { msg.textContent = 'شرکت بیمه را انتخاب کنید'; return; }
+      await copyText($('pm-out').value, 'پیام کپی شد.');
+      msg.className = 'pm-msg ok';
+      msg.textContent = 'کپی شد ✓';
+      const { error } = await sb.rpc('pm_log_use', { p_tpl: t.id, p_code: toEnDigits(s.code.trim()), p_company: s.co });
+      if (error) console.error('pm_log_use failed', error);
+    });
+    const days = $('pm-days');
+    if (days) days.addEventListener('change', () => { s.days = Number(days.value) || 31; s.logs = null; renderMsgsPage(); });
+    const fc = $('pm-fc');
+    if (fc) fc.addEventListener('change', () => { s.fc = fc.value; renderMsgsPage(); });
+    // مدیریت قالب‌ها
+    const nw = $('pm-new');
+    if (nw) nw.addEventListener('click', () => { s.ed = null; renderMsgsPage(); });
+    root.querySelectorAll('[data-pmedit]').forEach((b) => b.addEventListener('click', () => {
+      const t = (s.tpls || []).find((x) => x.id === Number(b.getAttribute('data-pmedit')));
+      if (t) { s.ed = { id: t.id, error: t.error, template: t.template, category: pmCat(t) }; renderMsgsPage(); }
+    }));
+    const ecat = $('pm-ecat'), eerr = $('pm-eerr'), etpl = $('pm-etpl');
+    if (ecat) ecat.addEventListener('change', () => { s.ed.category = ecat.value; });
+    if (eerr) eerr.addEventListener('input', () => { s.ed.error = eerr.value; });
+    if (etpl) etpl.addEventListener('input', () => { s.ed.template = etpl.value; });
+    const cancel = $('pm-cancel');
+    if (cancel) cancel.addEventListener('click', () => { s.ed = null; renderMsgsPage(); });
+    const save = $('pm-save');
+    if (save) save.addEventListener('click', async () => {
+      const m = $('pm-emsg');
+      if (!s.ed.error.trim() || !s.ed.template.trim()) { m.textContent = 'عنوان خطا و متن پیام را پر کنید'; return; }
+      save.disabled = true;
+      const { error } = await sb.rpc('pm_save_template', { p_id: s.ed.id, p_error: s.ed.error.trim(), p_template: s.ed.template, p_category: s.ed.category });
+      save.disabled = false;
+      if (error) { console.error(error); m.textContent = rpcErrorText(error, 'ذخیره ناموفق بود.'); return; }
+      toast(s.ed.id ? 'قالب ذخیره شد.' : 'قالب جدید اضافه شد.');
+      s.ed = null;
+      await pmLoadTemplates();
+      renderMsgsPage();
+    });
+    root.querySelectorAll('[data-pmdel]').forEach((b) => b.addEventListener('click', () => {
+      const id = Number(b.getAttribute('data-pmdel'));
+      const t = (s.tpls || []).find((x) => x.id === id);
+      openModal({
+        title: 'حذف قالب',
+        confirmText: 'حذف',
+        danger: true,
+        body: `<p class="modal-text">قالب «${esc(t ? t.error.slice(0, 80) : '')}» حذف شود؟ گزارش‌های قبلی آن می‌ماند.</p>`,
+        onConfirm: async () => {
+          const { error } = await sb.rpc('pm_delete_template', { p_id: id });
+          if (error) { console.error(error); throw new Error(rpcErrorText(error, 'حذف ناموفق بود.')); }
+          if (s.ed && s.ed.id === id) s.ed = null;
+          if (s.sel === id) s.sel = null;
+          await pmLoadTemplates();
+          renderMsgsPage();
+          toast('قالب حذف شد.');
+        },
+      });
+    }));
+  }
+
   // تارگت‌های دوره: بار اول کامل؛ در تازه‌سازی خودکار فقط از «روزِ تغییرکرده» به بعد و ادغام با نسخه‌ی قبلی
   const TARGET_COLS = 'operator_id, report_date_jalali, report_date_sort, target_count, daily_salary, transfer_count, non_transfer_count, avg_issuance_minutes';
   async function loadPeriodTargets(changedFrom) {
@@ -5887,6 +6212,7 @@ window.APP_CONFIG = Object.freeze({
       ${state.sidebar && profile.role === 'team_lead' ? '<div data-page="bugs" id="bugs-root"></div>' : ''}
       ${state.sidebar && canManageTeam(profile) ? '<div data-page="manage" id="manage-root"></div>' : ''}
       ${state.sidebar && (profile.role === 'training' || SUPERVISOR_ROLES.includes(profile.role)) ? '<div data-page="tbugs" id="tbugs-root"></div>' : ''}
+      ${state.sidebar && (profile.role === 'team_lead' || SUPERVISOR_ROLES.includes(profile.role)) ? '<div data-page="msgs" id="msgs-root"></div>' : ''}
       <div data-page="team">
       ${profile.role === 'training' ? '<div id="tx-root"></div>' : ''}
       <div ${profile.role === 'training' ? 'hidden' : ''}>
@@ -5915,6 +6241,7 @@ window.APP_CONFIG = Object.freeze({
     if (profile.role === 'training') renderTrainingExperts();
     if (state.sidebar && canManageTeam(profile)) renderManagePage();
     if (state.sidebar && document.body.dataset.view === 'tbugs') renderTrainingBugsPage();
+    if (state.sidebar && document.body.dataset.view === 'msgs') renderMsgsPage();
     if (state.sidebar) bindTrendChart(dailySeries(teamRows), 'team-trend');
     if (bot) { bindTrendChart(dailySeries(botRows), 'bot', { detail: botDayDetail(botRows, botCompanyRows) }); bindBotPanel(); }
     bindCompanyGroups();
