@@ -1775,6 +1775,16 @@ tr.tb-pending-row td:first-child { box-shadow: inset -3px 0 0 var(--warn); }
 .mg-btn.tbs-no { color: var(--danger); background: var(--danger-soft); }
 .lead-tb { margin-bottom: 18px; }
 .tbs-inline { display: flex; gap: 6px; margin-top: 6px; }
+/* جدول‌های باگ Training: هر ردیف وسط‌چین؛ توضیح بلند در سه خط (کلیک = کامل) */
+table.tb-table td, table.tb-table th { vertical-align: middle; }
+table.tb-table td.tbs-acts { text-align: center; }
+table.tb-table .bug-hint { min-width: 200px; max-width: 320px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+table.tb-table .bug-hint.empty { cursor: default; min-width: 0; }
+table.tb-table .bug-hint.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.tbs-note { max-width: 260px; white-space: normal; color: var(--ink-soft); }
+.tbs-reason { min-height: 96px; resize: vertical; line-height: 1.8; }
+.tbs-acts .mg-btn + .mg-btn { margin-inline-start: 0; }
+table.tb-table td { padding-top: 12px; padding-bottom: 12px; }
 
 </style>
 </head>
@@ -4412,7 +4422,7 @@ window.APP_CONFIG = Object.freeze({
       </div>
       <div class="bug-sub">باگ‌های ثبت‌شده توسط Training برای شما</div>
       <div class="panel perf-wrap">
-        ${body ? `<table class="perf-table bug-table">
+        ${body ? `<table class="perf-table bug-table tb-table">
           <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th></tr></thead>
           <tbody>${body}</tbody></table>` : '<div class="empty-state">در این دوره باگی توسط Training برای شما ثبت نشده است 👏</div>'}
       </div>
@@ -5178,13 +5188,14 @@ window.APP_CONFIG = Object.freeze({
     approved: { label: 'تایید سرگروه', cls: 'approved' },
     rejected: { label: 'عدم تایید سرگروه', cls: 'rejected' },
   };
-  const TB_COLS = 'id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, period_start_sort, created_at, status, reporter_name, reviewer_name, reviewed_at, duplicate_of';
+  const TB_COLS = 'id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, period_start_sort, created_at, status, reporter_name, reviewer_name, reviewed_at, review_note, duplicate_of';
   const tbCounted = (r) => r.status !== 'rejected';
   function tbStatusHtml(r) {
     const st = TB_STATUS[r.status] || TB_STATUS.pending;
     const by = r.status !== 'pending' && r.reviewer_name
       ? `<small class="tbx-sub">توسط ${esc(r.reviewer_name)}${r.reviewed_at ? `، ${jalaliStamp(r.reviewed_at)}` : ''}</small>` : '';
-    return `<span class="tbs-chip ${st.cls}">${st.label}</span>${by}`;
+    const note = r.status !== 'pending' && r.review_note ? `<small class="tbx-sub tbs-note">علت: ${esc(r.review_note)}</small>` : '';
+    return `<span class="tbs-chip ${st.cls}">${st.label}</span>${by}${note}`;
   }
   const tbDupHtml = (r) => (r.duplicate_of ? ' <span class="tbs-dup" title="برای همین شماره سفارش قبلاً باگ ثبت شده است">تکراری</span>' : '');
   const tbReporter = (r) => r.reporter_name || (r.reported_by && state.profileById[r.reported_by] && state.profileById[r.reported_by].full_name) || (r.reported_by && state.tbReporters && state.tbReporters[r.reported_by]) || '—';
@@ -5313,7 +5324,7 @@ window.APP_CONFIG = Object.freeze({
         </div>
       </div>
       <div class="panel perf-wrap">
-        ${body ? `<table class="perf-table bug-table tbx-table">
+        ${body ? `<table class="perf-table bug-table tbx-table tb-table">
           <thead><tr><th>کاربر</th><th>نوع باگ</th><th class="num"><button type="button" class="tbx-sortbtn ${f.sort ? 'on' : ''}" id="tbp-amount" title="${sortTitle}" aria-label="${sortTitle}">مبلغ <span aria-hidden="true">${sortArrow}</span></button></th><th>شرکت بیمه</th><th class="num">شماره سفارش</th><th>زمان ثبت</th><th>ثبت‌کننده</th><th>وضعیت</th><th>توضیحات</th></tr></thead>
           <tbody>${body}</tbody></table>` : '<div class="empty-state">باگی با این فیلترها ثبت نشده است</div>'}
       </div>`;
@@ -5435,7 +5446,7 @@ window.APP_CONFIG = Object.freeze({
           </div>
         </form>
         ${list ? `<div class="tx-bugs-head">باگ‌های ${esc(CURRENT_PERIOD.label)} <span class="mg-count">${formatNum(bugs.length)} باگ · جمع ${rial(total)}</span></div>
-          <div class="perf-wrap"><table class="perf-table bug-table">
+          <div class="perf-wrap"><table class="perf-table bug-table tb-table">
             <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th><th></th></tr></thead>
             <tbody>${list}</tbody></table></div>` : ''}
       </div>`;
@@ -5613,6 +5624,11 @@ window.APP_CONFIG = Object.freeze({
     });
   }
 
+  // توضیح بلند باگ: سه خط اول؛ با کلیک باز و بسته می‌شود
+  document.addEventListener('click', (e) => {
+    const h = e.target.closest && e.target.closest('.tb-table .bug-hint:not(.empty)');
+    if (h && !window.getSelection().toString()) h.classList.toggle('open');
+  });
   // سرگروه: کارتابل باگ‌های Training اعضای تیمش (تایید / عدم تایید)
   function trainingBugsForLeadHtml(rows) {
     const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
@@ -5633,11 +5649,10 @@ window.APP_CONFIG = Object.freeze({
         <td>${esc(r.company || '—')}</td>
         <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
         <td>${esc(tbReporter(r))}</td>
-        <td>${tbStatusHtml(r)}</td>
-        <td class="mg-acts tbs-acts">
+        <td>${tbStatusHtml(r)}<div class="tbs-acts tbs-inline">
           ${r.status !== 'approved' ? `<button type="button" class="mg-btn tbs-ok" data-tbreview="approved" data-id="${esc(r.id)}">تایید</button>` : ''}
           ${r.status !== 'rejected' ? `<button type="button" class="mg-btn tbs-no" data-tbreview="rejected" data-id="${esc(r.id)}">عدم تایید</button>` : ''}
-        </td>
+        </div></td>
       </tr>`).join('');
     return `
       <div class="lead-tb" id="lead-tb">
@@ -5645,26 +5660,31 @@ window.APP_CONFIG = Object.freeze({
         ${pending ? `<span class="tbs-chip pending">${formatNum(pending)} در انتظار تایید شما</span>` : ''}</div>
       ${counts ? `<div class="tb-counts">${counts}</div>` : ''}
       <div class="panel perf-wrap">
-        ${body ? `<table class="perf-table bug-table">
-          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th><th></th></tr></thead>
+        ${body ? `<table class="perf-table bug-table tb-table">
+          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th></tr></thead>
           <tbody>${body}</tbody></table>` : `<div class="empty-state">در ${esc(CURRENT_PERIOD.label)} برای اعضای تیم شما باگی توسط Training ثبت نشده است</div>`}
       </div>
       <div class="trend-foot">هر باگی که Training ثبت می‌کند اول «در انتظار تایید سرگروه» است. باگ «عدم تایید» در شمارش، جمع مبلغ و شاخص‌های عملکرد حساب نمی‌شود. تصمیم را بعداً هم می‌توانید عوض کنید.</div>
       </div>`;
   }
   function bindLeadTrainingReview(root, reload) {
-    root.querySelectorAll('[data-tbreview]').forEach((b) => b.addEventListener('click', async () => {
+    root.querySelectorAll('[data-tbreview]').forEach((b) => b.addEventListener('click', () => {
       const id = b.getAttribute('data-id'), st = b.getAttribute('data-tbreview');
-      root.querySelectorAll(`[data-tbreview][data-id="${CSS.escape(id)}"]`).forEach((x) => { x.disabled = true; });
-      const { error } = await sb.rpc('training_bug_review', { p_id: id, p_status: st });
-      if (error) {
-        console.error('training_bug_review failed', error);
-        root.querySelectorAll(`[data-tbreview][data-id="${CSS.escape(id)}"]`).forEach((x) => { x.disabled = false; });
-        toast(rpcErrorText(error, 'ثبت تصمیم ناموفق بود.'), 'err');
-        return;
-      }
-      toast(st === 'approved' ? 'باگ تایید شد.' : 'باگ تایید نشد.');
-      await (reload ? reload() : loadBugsPage());
+      const ok = st === 'approved';
+      openModal({
+        title: ok ? 'تایید باگ' : 'عدم تایید باگ',
+        confirmText: ok ? 'تایید' : 'عدم تایید',
+        danger: !ok,
+        body: `<label class="modal-field">علت <span class="opt">(اختیاری؛ کارشناس، Training و سرپرست می‌بینند)</span>
+          <textarea class="tree-search tbs-reason" id="tbr-note" maxlength="1000" placeholder="${ok ? 'مثلاً: بررسی شد و باگ درست است' : 'مثلاً: سفارش طبق دستورالعمل صادر شده است'}"></textarea></label>`,
+        onConfirm: async (dlg) => {
+          const note = dlg.querySelector('#tbr-note').value.trim();
+          const { error } = await sb.rpc('training_bug_decide', { p_id: id, p_status: st, p_note: note || null });
+          if (error) { console.error('training_bug_decide failed', error); throw new Error(rpcErrorText(error, 'ثبت تصمیم ناموفق بود.')); }
+          toast(ok ? 'باگ تایید شد.' : 'باگ تایید نشد.');
+          await (reload ? reload() : loadBugsPage());
+        },
+      });
     }));
   }
 
