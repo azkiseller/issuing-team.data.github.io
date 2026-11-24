@@ -1785,6 +1785,9 @@ table.tb-table .bug-hint.open { display: block; -webkit-line-clamp: unset; overf
 .tbs-reason { min-height: 96px; resize: vertical; line-height: 1.8; }
 .tbs-acts .mg-btn + .mg-btn { margin-inline-start: 0; }
 table.tb-table td { padding-top: 12px; padding-bottom: 12px; }
+/* صفحه‌های جدول‌محور باگ: عریض‌تر تا جدول بدون اسکرول افقی جا شود */
+body.with-sidebar[data-view="tbugs"] main,
+body.with-sidebar[data-view="bugs"] main { max-width: 1440px; }
 
 </style>
 </head>
