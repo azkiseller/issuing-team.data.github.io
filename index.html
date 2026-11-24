@@ -1760,6 +1760,22 @@ table.ks-table { min-width: 720px; }
 .pm-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-deep)); }
 td.pm-wrap { white-space: normal; min-width: 240px; }
 
+/* وضعیت باگ‌های Training (کارتابل سرگروه) */
+.tbs-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; vertical-align: middle; }
+.tbs-chip.pending { color: var(--warn); background: rgba(224,138,23,.16); }
+.tbs-chip.approved { color: var(--good); background: var(--good-soft); }
+.tbs-chip.rejected { color: var(--danger); background: var(--danger-soft); }
+.bug-sub .tbs-chip, .label .tbs-chip { margin-inline-start: 8px; }
+.tbs-row { margin-top: 8px; }
+.tbs-dup { display: inline-block; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; color: #6A4BD6; background: rgba(124,92,224,.16); white-space: nowrap; }
+tr.tb-rejected .tb-amount { text-decoration: line-through; opacity: .6; }
+tr.tb-pending-row td:first-child { box-shadow: inset -3px 0 0 var(--warn); }
+.tbs-acts { white-space: nowrap; }
+.mg-btn.tbs-ok { color: var(--good); background: var(--good-soft); }
+.mg-btn.tbs-no { color: var(--danger); background: var(--danger-soft); }
+.lead-tb { margin-bottom: 18px; }
+.tbs-inline { display: flex; gap: 6px; margin-top: 6px; }
+
 </style>
 </head>
 <body>
@@ -4315,7 +4331,7 @@ window.APP_CONFIG = Object.freeze({
       fetchBugs(),
       // سرگروه: باگ‌های Training اعضای تیمش | کاربر صدور: باگ‌های Training خودش (RLS)
       (isLead || isOp) ? sb.from('training_bugs')
-        .select('id, operator_id, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, created_at')
+        .select(TB_COLS)
         .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
         .order('created_at', { ascending: false })
         .limit(1000) : Promise.resolve({ data: [] }),
@@ -4334,7 +4350,13 @@ window.APP_CONFIG = Object.freeze({
       renderBugsOperatorTabs(live);
     } else {
       renderBugsLead(live, data);
-      if (isLead) live.insertAdjacentHTML('beforeend', trainingBugsForLeadHtml((tr && tr.data) || []));
+      if (isLead) {
+        // کارتابل: اگر باگ در انتظار تایید هست بالای صفحه، وگرنه پایین
+        const trRows = (tr && tr.data) || [];
+        state.leadTrainingBugs = trRows;
+        live.insertAdjacentHTML(trRows.some((r) => r.status === 'pending') ? 'afterbegin' : 'beforeend', trainingBugsForLeadHtml(trRows));
+        bindLeadTrainingReview(live);
+      }
     }
   }
   // کاربر صدور: دو تب — باگ‌های Training (بار مالی / بدون بار مالی / مؤثر) و باگ‌های عملکردی
@@ -4356,8 +4378,10 @@ window.APP_CONFIG = Object.freeze({
   function renderTrainingBugsOperator(rows, perfCount) {
     const cnt = { financial: 0, non_financial: 0, effective: 0 };
     const sum = { financial: 0, non_financial: 0, effective: 0 };
-    rows.forEach((r) => { if (cnt[r.bug_type] != null) { cnt[r.bug_type] += 1; sum[r.bug_type] += Number(r.amount) || 0; } });
+    rows.filter(tbCounted).forEach((r) => { if (cnt[r.bug_type] != null) { cnt[r.bug_type] += 1; sum[r.bug_type] += Number(r.amount) || 0; } });
     const converted = bugSplit(perfCount).free;
+    const nPending = rows.filter((r) => r.status === 'pending').length;
+    const nRejected = rows.filter((r) => r.status === 'rejected').length;
     const total = sum.financial + sum.effective;
     const chips = [];
     if (cnt.financial) chips.push(`<span class="bug-chip tb-financial">${formatNum(cnt.financial)} باگ بار مالی</span>`);
@@ -4365,18 +4389,20 @@ window.APP_CONFIG = Object.freeze({
     if (cnt.effective) chips.push(`<span class="bug-chip tb-effective">${formatNum(cnt.effective)} باگ مؤثر</span>`);
     if (!chips.length) chips.push('<span class="bug-chip none">بدون باگ</span>');
     const body = rows.slice().sort((a, b) => (Number(b.bug_date_sort) - Number(a.bug_date_sort)) || (a.created_at < b.created_at ? 1 : -1)).map((r) => `
-      <tr>
+      <tr class="${r.status === 'rejected' ? 'tb-rejected' : ''}">
         <td>${esc(faDigits(r.bug_date_jalali))}</td>
         <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
         <td class="num tb-amount">${rial(r.amount)}</td>
         <td class="bug-order">${esc(r.order_number || '—')}</td>
         <td>${esc(r.company || '—')}</td>
         <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
+        <td>${esc(tbReporter(r))}</td>
+        <td>${tbStatusHtml(r)}</td>
       </tr>`).join('');
     return `
       <div class="panel bug-hero">
         <div>
-          <div class="label">وضعیت باگ‌های Training شما در ${esc(CURRENT_PERIOD.label)}</div>
+          <div class="label">وضعیت باگ‌های Training شما در ${esc(CURRENT_PERIOD.label)}${nPending ? ` <span class="tbs-chip pending">${formatNum(nPending)} در انتظار تایید سرگروه</span>` : ''}</div>
           <div class="bug-chips">${chips.join('')}</div>
         </div>
         <div class="tb-total">
@@ -4387,10 +4413,10 @@ window.APP_CONFIG = Object.freeze({
       <div class="bug-sub">باگ‌های ثبت‌شده توسط Training برای شما</div>
       <div class="panel perf-wrap">
         ${body ? `<table class="perf-table bug-table">
-          <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th></tr></thead>
+          <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th></tr></thead>
           <tbody>${body}</tbody></table>` : '<div class="empty-state">در این دوره باگی توسط Training برای شما ثبت نشده است 👏</div>'}
       </div>
-      <div class="trend-foot">${converted ? `${formatNum(converted)} باگ بدون بارمالی از تبدیل باگ‌های عملکردی (هر ${formatNum(BUG_GROUP)} باگ عملکردی = یک باگ بدون بارمالی) در شمارش بالا آمده است.` : `هر ${formatNum(BUG_GROUP)} باگ عملکردی هم یک «باگ بدون بارمالی» حساب می‌شود و در شمارش بالا می‌آید.`}</div>`;
+      <div class="trend-foot">${nRejected ? `${formatNum(nRejected)} باگ را سرگروه تایید نکرده و در شمارش و جمع مبلغ حساب نشده است. ` : ''}${converted ? `${formatNum(converted)} باگ بدون بارمالی از تبدیل باگ‌های عملکردی (هر ${formatNum(BUG_GROUP)} باگ عملکردی = یک باگ بدون بارمالی) در شمارش بالا آمده است.` : `هر ${formatNum(BUG_GROUP)} باگ عملکردی هم یک «باگ بدون بارمالی» حساب می‌شود و در شمارش بالا می‌آید.`}</div>`;
   }
   function renderBugsOperator(rows) {
     const n = rows.length;
@@ -5146,12 +5172,28 @@ window.APP_CONFIG = Object.freeze({
     { id: 'effective', label: 'مؤثر' },
   ];
   const TB_FIXED_AMOUNT = { non_financial: 0, effective: 15000000 };
+  // وضعیت باگ Training (کارتابل سرگروه): هر باگ تازه «در انتظار» است؛ باگ ردشده در جمع‌ها و KPI حساب نمی‌شود
+  const TB_STATUS = {
+    pending: { label: 'در انتظار تایید سرگروه', cls: 'pending' },
+    approved: { label: 'تایید سرگروه', cls: 'approved' },
+    rejected: { label: 'عدم تایید سرگروه', cls: 'rejected' },
+  };
+  const TB_COLS = 'id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, period_start_sort, created_at, status, reporter_name, reviewer_name, reviewed_at, duplicate_of';
+  const tbCounted = (r) => r.status !== 'rejected';
+  function tbStatusHtml(r) {
+    const st = TB_STATUS[r.status] || TB_STATUS.pending;
+    const by = r.status !== 'pending' && r.reviewer_name
+      ? `<small class="tbx-sub">توسط ${esc(r.reviewer_name)}${r.reviewed_at ? `، ${jalaliStamp(r.reviewed_at)}` : ''}</small>` : '';
+    return `<span class="tbs-chip ${st.cls}">${st.label}</span>${by}`;
+  }
+  const tbDupHtml = (r) => (r.duplicate_of ? ' <span class="tbs-dup" title="برای همین شماره سفارش قبلاً باگ ثبت شده است">تکراری</span>' : '');
+  const tbReporter = (r) => r.reporter_name || (r.reported_by && state.profileById[r.reported_by] && state.profileById[r.reported_by].full_name) || (r.reported_by && state.tbReporters && state.tbReporters[r.reported_by]) || '—';
   const tbLabel = (t) => (TB_TYPES.find((x) => x.id === t) || { label: t }).label;
   const digitsOnly = (v) => toEnDigits(v).replace(/[^\d]/g, '');
   const rial = (n) => (n == null ? '—' : `${formatNum(n)} ریال`);
   async function loadTrainingBugs() {
     const { data, error } = await sb.from('training_bugs')
-      .select('id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, created_at')
+      .select(TB_COLS)
       .eq('period_start_sort', Number(CURRENT_PERIOD.startSort))
       .order('created_at', { ascending: false })
       .limit(3000);
@@ -5165,7 +5207,7 @@ window.APP_CONFIG = Object.freeze({
     const isSup = SUPERVISOR_ROLES.includes(state.profile.role);
     const [b, tu] = await Promise.all([
       sb.from('training_bugs')
-        .select('id, operator_id, reported_by, bug_type, amount, order_number, company, description, bug_date_sort, bug_date_jalali, period_start_sort, created_at')
+        .select(TB_COLS)
         .order('created_at', { ascending: false })
         .limit(5000),
       // سرپرست پروفایل کاربران Training را نمی‌بیند؛ نام ثبت‌کننده از این RPC می‌آید
@@ -5199,20 +5241,23 @@ window.APP_CONFIG = Object.freeze({
     const prof = (id) => state.profileById[id];
     const opName = (id) => (prof(id) && prof(id).full_name) || 'کاربر حذف‌شده';
     const leadOf = (id) => { const p = prof(id); const l = p && prof(p.reports_to); return l && l.role === 'team_lead' ? l : null; };
-    const repName = (id) => (id && ((prof(id) && prof(id).full_name) || state.tbReporters[id])) || '—';
     const q = f.q.trim();
+    if (f.status == null) f.status = '';
+    const isSupView = SUPERVISOR_ROLES.includes(state.profile.role);
     const leads = [...new Map((state.tbAll || []).map((r) => leadOf(r.operator_id)).filter(Boolean).map((l) => [l.id, l])).values()]
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '', 'fa'));
     const byNewest = (x, y) => (x.created_at < y.created_at ? 1 : x.created_at > y.created_at ? -1 : 0);
     const rows = (state.tbAll || [])
-      .filter((r) => (!f.type || r.bug_type === f.type) && (!f.lead || (leadOf(r.operator_id) || {}).id === f.lead)
+      .filter((r) => (!f.type || r.bug_type === f.type) && (!f.status || (r.status || 'pending') === f.status) && (!f.lead || (leadOf(r.operator_id) || {}).id === f.lead)
         && (!q || opName(r.operator_id).includes(q)))
       .sort((x, y) => (f.sort === 'desc' ? (Number(y.amount) || 0) - (Number(x.amount) || 0)
         : f.sort === 'asc' ? (Number(x.amount) || 0) - (Number(y.amount) || 0) : 0) || byNewest(x, y));
     const users = new Set(rows.map((r) => r.operator_id)).size;
-    const total = rows.reduce((t, r) => t + (Number(r.amount) || 0), 0);
+    const total = rows.filter(tbCounted).reduce((t, r) => t + (Number(r.amount) || 0), 0);
     const cnt = {};
-    rows.forEach((r) => { cnt[r.bug_type] = (cnt[r.bug_type] || 0) + 1; });
+    rows.filter(tbCounted).forEach((r) => { cnt[r.bug_type] = (cnt[r.bug_type] || 0) + 1; });
+    const stCnt = {};
+    rows.forEach((r) => { const k = r.status || 'pending'; stCnt[k] = (stCnt[k] || 0) + 1; });
     const heroChips = TB_TYPES.filter((t) => cnt[t.id])
       .map((t) => `<span class="bug-chip ${t.id === 'non_financial' ? 'free' : 'tb-' + t.id}">${formatNum(cnt[t.id])} باگ ${t.label}</span>`).join('')
       || '<span class="bug-chip none">بدون باگ</span>';
@@ -5221,14 +5266,17 @@ window.APP_CONFIG = Object.freeze({
     const body = rows.map((r) => {
       const l = leadOf(r.operator_id);
       return `
-        <tr>
+        <tr class="${r.status === 'rejected' ? 'tb-rejected' : ''}">
           <td class="nm">${esc(opName(r.operator_id))}<small class="tbx-sub">${l ? `تیم ${esc(l.full_name || '')}` : 'بدون سرگروه'}</small></td>
           <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
           <td class="num tb-amount">${rial(r.amount)}</td>
           <td>${esc(r.company || '—')}</td>
-          <td class="bug-order">${esc(r.order_number || '—')}</td>
+          <td class="bug-order">${esc(r.order_number || '—')}${tbDupHtml(r)}</td>
           <td class="tbx-when">${jalaliStamp(r.created_at)}<small class="tbx-sub">تاریخ باگ: ${esc(faDigits(r.bug_date_jalali || '—'))}</small></td>
-          <td>${esc(repName(r.reported_by))}</td>
+          <td>${esc(tbReporter(r))}</td>
+          <td>${tbStatusHtml(r)}${!l && isSupView ? `<div class="tbs-acts tbs-inline">
+            ${r.status !== 'approved' ? `<button type="button" class="mg-btn tbs-ok" data-tbreview="approved" data-id="${esc(r.id)}">تایید</button>` : ''}
+            ${r.status !== 'rejected' ? `<button type="button" class="mg-btn tbs-no" data-tbreview="rejected" data-id="${esc(r.id)}">عدم تایید</button>` : ''}</div>` : ''}</td>
           <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
         </tr>`;
     }).join('');
@@ -5239,10 +5287,11 @@ window.APP_CONFIG = Object.freeze({
         <div>
           <div class="label">باگ‌های ثبت‌شده توسط Training</div>
           <div class="bug-chips">${heroChips}</div>
+          <div class="bug-chips tbs-row">${Object.entries(TB_STATUS).filter(([k]) => stCnt[k]).map(([k, v]) => `<span class="tbs-chip ${v.cls}">${v.label}: ${formatNum(stCnt[k])}</span>`).join('')}</div>
         </div>
         <div class="tb-total">
           <div class="tb-total-n">${formatNum(total)} <small>ریال</small></div>
-          <div class="bug-meter-note">${formatNum(rows.length)} باگ برای ${formatNum(users)} کاربر</div>
+          <div class="bug-meter-note">${formatNum(rows.length)} باگ برای ${formatNum(users)} کاربر${stCnt.rejected ? `، بدون ${formatNum(stCnt.rejected)} باگ ردشده` : ''}</div>
         </div>
       </div>
       <div class="mg-head">
@@ -5253,6 +5302,10 @@ window.APP_CONFIG = Object.freeze({
             <option value="">همه‌ی انواع باگ</option>
             ${TB_TYPES.map((t) => `<option value="${t.id}"${t.id === f.type ? ' selected' : ''}>${t.label}</option>`).join('')}
           </select>
+          <select class="tree-search" id="tbp-status" aria-label="وضعیت">
+            <option value="">همه‌ی وضعیت‌ها</option>
+            ${Object.entries(TB_STATUS).map(([k, v]) => `<option value="${k}"${k === f.status ? ' selected' : ''}>${v.label}</option>`).join('')}
+          </select>
           <select class="tree-search" id="tbp-lead" aria-label="تیم">
             <option value="">همه‌ی تیم‌ها</option>
             ${leads.map((l) => `<option value="${esc(l.id)}"${l.id === f.lead ? ' selected' : ''}>تیم ${esc(l.full_name || '—')}</option>`).join('')}
@@ -5261,7 +5314,7 @@ window.APP_CONFIG = Object.freeze({
       </div>
       <div class="panel perf-wrap">
         ${body ? `<table class="perf-table bug-table tbx-table">
-          <thead><tr><th>کاربر</th><th>نوع باگ</th><th class="num"><button type="button" class="tbx-sortbtn ${f.sort ? 'on' : ''}" id="tbp-amount" title="${sortTitle}" aria-label="${sortTitle}">مبلغ <span aria-hidden="true">${sortArrow}</span></button></th><th>شرکت بیمه</th><th class="num">شماره سفارش</th><th>زمان ثبت</th><th>ثبت‌کننده</th><th>توضیحات</th></tr></thead>
+          <thead><tr><th>کاربر</th><th>نوع باگ</th><th class="num"><button type="button" class="tbx-sortbtn ${f.sort ? 'on' : ''}" id="tbp-amount" title="${sortTitle}" aria-label="${sortTitle}">مبلغ <span aria-hidden="true">${sortArrow}</span></button></th><th>شرکت بیمه</th><th class="num">شماره سفارش</th><th>زمان ثبت</th><th>ثبت‌کننده</th><th>وضعیت</th><th>توضیحات</th></tr></thead>
           <tbody>${body}</tbody></table>` : '<div class="empty-state">باگی با این فیلترها ثبت نشده است</div>'}
       </div>`;
 
@@ -5271,6 +5324,9 @@ window.APP_CONFIG = Object.freeze({
       renderTrainingBugsPage().then(() => { const x = $('tbp-q'); if (x) { x.focus(); try { x.setSelectionRange(pos, pos); } catch (e) {} } });
     });
     $('tbp-type').addEventListener('change', (e) => { f.type = e.target.value; renderTrainingBugsPage(); });
+    $('tbp-status').addEventListener('change', (e) => { f.status = e.target.value; renderTrainingBugsPage(); });
+    // سرپرست: تایید / رد باگ کارشناس‌های بدون سرگروه
+    bindLeadTrainingReview(live, async () => { await loadAllTrainingBugs(); await renderTrainingBugsPage(); });
     $('tbp-lead').addEventListener('change', (e) => { f.lead = e.target.value; renderTrainingBugsPage(); });
     // کلیک روی سرستون مبلغ: زیاد به کم ← کم به زیاد ← برگشت به جدیدترین
     const ab = $('tbp-amount');
@@ -5335,16 +5391,18 @@ window.APP_CONFIG = Object.freeze({
     const fixed = TB_FIXED_AMOUNT[d.type];
     const amountVal = fixed != null ? formatNum(fixed) : (d.amount ? Number(d.amount).toLocaleString('en-US') : '');
     const list = bugs.map((r) => `
-      <tr>
+      <tr class="${r.status === 'rejected' ? 'tb-rejected' : ''}">
         <td>${esc(faDigits(r.bug_date_jalali))}</td>
         <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
         <td class="num tb-amount">${rial(r.amount)}</td>
-        <td class="bug-order">${esc(r.order_number || '—')}</td>
+        <td class="bug-order">${esc(r.order_number || '—')}${tbDupHtml(r)}</td>
         <td>${esc(r.company || '—')}</td>
         <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
-        <td>${r.reported_by === state.profile.id ? `<button type="button" class="bug-del" data-tbdel="${esc(r.id)}">حذف</button>` : ''}</td>
+        <td>${esc(tbReporter(r))}</td>
+        <td>${tbStatusHtml(r)}</td>
+        <td>${r.reported_by === state.profile.id && (r.status || 'pending') === 'pending' ? `<button type="button" class="bug-del" data-tbdel="${esc(r.id)}">حذف</button>` : ''}</td>
       </tr>`).join('');
-    const total = bugs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const total = bugs.filter(tbCounted).reduce((s, r) => s + (Number(r.amount) || 0), 0);
     return `
       <div class="tx-panel">
         <form class="bug-form tx-form" data-form="${esc(p.id)}" autocomplete="off" novalidate>
@@ -5378,7 +5436,7 @@ window.APP_CONFIG = Object.freeze({
         </form>
         ${list ? `<div class="tx-bugs-head">باگ‌های ${esc(CURRENT_PERIOD.label)} <span class="mg-count">${formatNum(bugs.length)} باگ · جمع ${rial(total)}</span></div>
           <div class="perf-wrap"><table class="perf-table bug-table">
-            <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th></th></tr></thead>
+            <thead><tr><th>تاریخ</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th><th></th></tr></thead>
             <tbody>${list}</tbody></table></div>` : ''}
       </div>`;
   }
@@ -5435,6 +5493,18 @@ window.APP_CONFIG = Object.freeze({
         if (!order) return setMsg('شماره سفارش را وارد کنید.', 'err');
         const btn = form.querySelector('[type="submit"]');
         btn.disabled = true;
+        // این شماره سفارش قبلاً باگ داشته؟ یک بار هشدار؛ با زدن دوباره‌ی «ثبت باگ» ثبت می‌شود
+        if (d.dupOk !== order) {
+          setMsg('در حال بررسی شماره سفارش...', '');
+          const { data: prev, error: le } = await sb.rpc('training_bug_lookup', { p_order: order });
+          if (le) console.error('training_bug_lookup failed', le);
+          if (Array.isArray(prev) && prev.length) {
+            d.dupOk = order;
+            btn.disabled = false;
+            const p0 = prev[prev.length - 1];
+            return setMsg(`این شماره سفارش قبلاً ${formatNum(prev.length)} بار باگ خورده است؛ آخرین بار برای «${p0.operator_name || '—'}» توسط ${p0.reporter_name || '—'} در ${faDigits(p0.bug_date_jalali || '')} (${(TB_STATUS[p0.status] || TB_STATUS.pending).label}). اگر باز هم باید ثبت شود، دوباره «ثبت باگ» را بزنید.`, 'err');
+          }
+        }
         setMsg('در حال ثبت...', '');
         const day = Number(d.day);
         const { error } = await sb.from('training_bugs').insert({
@@ -5455,6 +5525,7 @@ window.APP_CONFIG = Object.freeze({
           return setMsg(error.code === '42501' ? 'اجازه‌ی ثبت این باگ را ندارید.' : `ثبت ناموفق بود. (کد خطا: ${error.code || error.status || 'نامشخص'})`, 'err');
         }
         state.txDrafts[op] = { day: d.day, type: d.type, amount: '', order: '', company: '', desc: '' };
+        d.dupOk = null;
         state.txMsg = { op, text: `باگ «${tbLabel(d.type)}» ثبت شد.`, kind: 'ok' };
         await loadTrainingBugs();
         await renderTrainingExperts();
@@ -5542,31 +5613,59 @@ window.APP_CONFIG = Object.freeze({
     });
   }
 
-  // سرگروه: باگ‌های Training برای اعضای تیمش (فقط مشاهده)
+  // سرگروه: کارتابل باگ‌های Training اعضای تیمش (تایید / عدم تایید)
   function trainingBugsForLeadHtml(rows) {
     const nameOf = (id) => (state.profileById[id] && state.profileById[id].full_name) || '—';
-    const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const counted = rows.filter(tbCounted);
+    const total = counted.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const by = {};
-    rows.forEach((r) => { by[r.bug_type] = (by[r.bug_type] || 0) + 1; });
+    counted.forEach((r) => { by[r.bug_type] = (by[r.bug_type] || 0) + 1; });
+    const pending = rows.filter((r) => r.status === 'pending').length;
     const counts = TB_TYPES.filter((t) => by[t.id]).map((t) => `<span class="tb-chip ${t.id}">${t.label}: ${formatNum(by[t.id])}</span>`).join(' ');
-    const body = rows.slice().sort((a, b) => (Number(b.bug_date_sort) - Number(a.bug_date_sort)) || (a.created_at < b.created_at ? 1 : -1)).map((r) => `
-      <tr>
+    const order = { pending: 0, approved: 1, rejected: 2 };
+    const body = rows.slice().sort((a, b) => (order[a.status] - order[b.status]) || (Number(b.bug_date_sort) - Number(a.bug_date_sort)) || (a.created_at < b.created_at ? 1 : -1)).map((r) => `
+      <tr class="${r.status === 'rejected' ? 'tb-rejected' : ''}${r.status === 'pending' ? ' tb-pending-row' : ''}">
         <td>${esc(faDigits(r.bug_date_jalali))}</td>
         <td class="nm">${esc(nameOf(r.operator_id))}</td>
         <td><span class="tb-chip ${esc(r.bug_type)}">${esc(tbLabel(r.bug_type))}</span></td>
         <td class="num tb-amount">${rial(r.amount)}</td>
-        <td class="bug-order">${esc(r.order_number || '—')}</td>
+        <td class="bug-order">${esc(r.order_number || '—')}${tbDupHtml(r)}</td>
         <td>${esc(r.company || '—')}</td>
         <td><div class="bug-hint ${r.description ? '' : 'empty'}">${r.description ? esc(r.description) : '—'}</div></td>
+        <td>${esc(tbReporter(r))}</td>
+        <td>${tbStatusHtml(r)}</td>
+        <td class="mg-acts tbs-acts">
+          ${r.status !== 'approved' ? `<button type="button" class="mg-btn tbs-ok" data-tbreview="approved" data-id="${esc(r.id)}">تایید</button>` : ''}
+          ${r.status !== 'rejected' ? `<button type="button" class="mg-btn tbs-no" data-tbreview="rejected" data-id="${esc(r.id)}">عدم تایید</button>` : ''}
+        </td>
       </tr>`).join('');
     return `
-      <div class="bug-sub">باگ‌های ثبت‌شده توسط Training <span class="mg-count">${formatNum(rows.length)} باگ · جمع ${rial(total)}</span></div>
+      <div class="lead-tb" id="lead-tb">
+      <div class="bug-sub">کارتابل باگ‌های Training <span class="mg-count">${formatNum(rows.length)} باگ · جمع ${rial(total)}</span>
+        ${pending ? `<span class="tbs-chip pending">${formatNum(pending)} در انتظار تایید شما</span>` : ''}</div>
       ${counts ? `<div class="tb-counts">${counts}</div>` : ''}
       <div class="panel perf-wrap">
         ${body ? `<table class="perf-table bug-table">
-          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th></tr></thead>
+          <thead><tr><th>تاریخ</th><th>کارشناس</th><th>نوع</th><th class="num">مبلغ</th><th class="num">شماره سفارش</th><th>شرکت</th><th>توضیحات</th><th>ثبت‌کننده</th><th>وضعیت</th><th></th></tr></thead>
           <tbody>${body}</tbody></table>` : `<div class="empty-state">در ${esc(CURRENT_PERIOD.label)} برای اعضای تیم شما باگی توسط Training ثبت نشده است</div>`}
+      </div>
+      <div class="trend-foot">هر باگی که Training ثبت می‌کند اول «در انتظار تایید سرگروه» است. باگ «عدم تایید» در شمارش، جمع مبلغ و شاخص‌های عملکرد حساب نمی‌شود. تصمیم را بعداً هم می‌توانید عوض کنید.</div>
       </div>`;
+  }
+  function bindLeadTrainingReview(root, reload) {
+    root.querySelectorAll('[data-tbreview]').forEach((b) => b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-id'), st = b.getAttribute('data-tbreview');
+      root.querySelectorAll(`[data-tbreview][data-id="${CSS.escape(id)}"]`).forEach((x) => { x.disabled = true; });
+      const { error } = await sb.rpc('training_bug_review', { p_id: id, p_status: st });
+      if (error) {
+        console.error('training_bug_review failed', error);
+        root.querySelectorAll(`[data-tbreview][data-id="${CSS.escape(id)}"]`).forEach((x) => { x.disabled = false; });
+        toast(rpcErrorText(error, 'ثبت تصمیم ناموفق بود.'), 'err');
+        return;
+      }
+      toast(st === 'approved' ? 'باگ تایید شد.' : 'باگ تایید نشد.');
+      await (reload ? reload() : loadBugsPage());
+    }));
   }
 
   // سرپرست: سرپرست‌های سلر (فقط فهرست؛ ساخت با «+ تعریف سرپرست»)
