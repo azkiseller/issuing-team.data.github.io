@@ -6163,7 +6163,9 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
     } catch (e) { console.error('slides local save failed', e); return false; }
   }
   const canUseSlides = (p) => !!p && (p.role === 'team_lead' || SUPERVISOR_ROLES.includes(p.role));
-  const canUploadSlides = (p) => !!p && SUPERVISOR_ROLES.includes(p.role) && (p.unit || 'seller') === 'seller';
+  // بارگذاری / به‌روزرسانی فایل اسلایدساز فقط علیرضا زمانیان (در Storage هم همین محدودیت هست)
+  const SLIDES_ADMIN_ID = '46b95342-889a-4a78-aa02-509ebbf61e95';
+  const canUploadSlides = (p) => !!p && p.id === SLIDES_ADMIN_ID;
   function mountSlidesRoot() {
     if ($('slides-root') || !canUseSlides(state.profile)) return;
     const main = document.querySelector('main');
@@ -6217,7 +6219,7 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
       state.slides = null;
       const up = canUploadSlides(state.profile);
       root.innerHTML = `<div class="panel sl-empty"><div class="empty-state">
-        ${up ? 'فایل اسلایدساز هنوز بارگذاری نشده است. فایل HTML اسلایدساز را یک بار انتخاب کنید؛ بعد از آن برای همه‌ی سرگروه‌ها و سرپرست‌ها باز می‌شود.' : 'اسلایدساز هنوز آماده نیست؛ سرپرست باید فایل آن را بارگذاری کند.'}
+        ${up ? 'فایل اسلایدساز هنوز بارگذاری نشده است. فایل HTML اسلایدساز را یک بار انتخاب کنید؛ بعد از آن برای همه‌ی سرگروه‌ها و سرپرست‌ها باز می‌شود.' : 'اسلایدساز هنوز آماده نیست؛ فایل آن باید بارگذاری شود.'}
         ${up ? `<div class="sl-empty-act">${slidesUploadHtml(false)}</div>` : ''}</div></div>`;
       bindSlidesUpload(root);
       return;
