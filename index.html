@@ -6217,10 +6217,13 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
     });
   }
   // فایل ابزار: نسخه‌ی نگه‌داشته‌شده در مرورگر اگر با نسخه‌ی روی سرور یکی باشد، وگرنه دانلود
+  const SLIDES_DEFAULT_FILE = 'default-deck.json';
+  const slidesVer = (item) => (item ? `${item.updated_at || ''}|${(item.metadata && (item.metadata.eTag || item.metadata.size)) || ''}` : '');
   async function loadSlidesTool() {
-    const { data: list, error: le } = await sb.storage.from('tools').list('', { search: SLIDES_FILE });
+    const { data: list, error: le } = await sb.storage.from('tools').list('', { limit: 100 });
     if (le) console.warn('slides list', le);
-    const item = Array.isArray(list) ? list.find((x) => x.name === SLIDES_FILE) : null;
+    state.slidesFiles = Array.isArray(list) ? list : [];
+    const item = state.slidesFiles.find((x) => x.name === SLIDES_FILE) || null;
     if (!item && !le) return null;
     const ver = item ? `${item.updated_at || ''}|${(item.metadata && (item.metadata.eTag || item.metadata.size)) || ''}` : '';
     const cached = await slidesGet('tool');
@@ -6238,7 +6241,9 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
     if (state.slides && (state.slides.frame || state.slides.loading)) return; // یک بار بار می‌شود و با رفت‌وآمد بین صفحه‌ها می‌ماند
     state.slides = { loading: true };
     root.innerHTML = '<div class="panel"><div class="empty-state">در حال بارگذاری اسلایدساز...</div></div>';
-    const [tool, saved] = await Promise.all([loadSlidesTool(), slidesGet(`deck:${state.profile.id}`)]);
+    const [tool, saved0] = await Promise.all([loadSlidesTool(), slidesGet(`deck:${state.profile.id}`)]);
+    const saved = tool ? await slidesApplyDefault(typeof saved0 === 'string' ? saved0 : null) : saved0;
+    state.slidesStore = typeof saved === 'string' ? saved : null;
     if (!tool) {
       state.slides = null;
       const up = canUploadSlides(state.profile);
@@ -6252,8 +6257,8 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
     const html = tool.replace(/<head>/i, `<head><script>${slidesShim(init)}<\/script>`);
     root.innerHTML = `
       <div class="sl-bar">
-        <span class="sl-note">ارائه‌ها فقط روی همین سیستم (همین مرورگر) ذخیره می‌شود و به سرور فرستاده نمی‌شود. برای نگه داشتن یا فرستادن، از منوی «خروجی» فایل HTML بگیرید.</span>
-        <span class="sl-acts">${canUploadSlides(state.profile) ? slidesUploadHtml(true) : ''}
+        <span class="sl-note">ارائه‌ی پیش‌فرض را اصلاح کنید؛ تغییرات فقط روی همین سیستم (همین مرورگر) ذخیره می‌شود. برای نگه داشتن یا فرستادن، از منوی «خروجی» فایل HTML بگیرید.</span>
+        <span class="sl-acts">${canUploadSlides(state.profile) ? `<button type="button" class="mg-btn mg-primary" id="sl-pub">انتشار ارائه‌ی فعلی به‌عنوان پیش‌فرض</button>${slidesUploadHtml(true)}` : ''}
           <button type="button" class="mg-btn" id="sl-full">تمام‌صفحه</button></span>
       </div>
       <iframe class="sl-frame" title="اسلایدساز" sandbox="allow-scripts allow-downloads allow-modals allow-forms allow-popups" allow="fullscreen; clipboard-write"></iframe>`;
@@ -6262,6 +6267,56 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
     state.slides = { frame };
     bindSlidesUpload(root);
     $('sl-full').addEventListener('click', () => { try { root.requestFullscreen(); } catch (e) {} });
+    const pub = $('sl-pub');
+    if (pub) pub.addEventListener('click', slidesPublishDefault);
+  }
+  // ارائه‌ی پیش‌فرض: علیرضا زمانیان ارائه‌ی فعلی‌اش را منتشر می‌کند؛ هر سرگروه / سرپرست هر نسخه‌ی تازه را یک بار
+  // به‌عنوان یک ارائه‌ی جدید در اسلایدساز خودش می‌گیرد (نسخه‌های ویرایش‌شده‌ی قبلی‌اش دست نمی‌خورد).
+  async function slidesApplyDefault(store) {
+    const item = (state.slidesFiles || []).find((x) => x.name === SLIDES_DEFAULT_FILE);
+    if (!item) return store;
+    const ver = slidesVer(item);
+    const seenKey = `defseen:${state.profile.id}`;
+    if ((await slidesGet(seenKey)) === ver) return store;
+    const { data, error } = await sb.storage.from('tools').download(SLIDES_DEFAULT_FILE);
+    if (error || !data) { console.warn('default deck download', error); return store; }
+    let pkg;
+    try { pkg = JSON.parse(await data.text()); } catch (e) { return store; }
+    const deck = pkg && pkg.deck;
+    if (!deck || !Array.isArray(deck.slides)) return store;
+    let st = null;
+    try { st = store ? JSON.parse(store) : null; } catch (e) { st = null; }
+    const id = `def${String(pkg.publishedAt || Date.now()).slice(-9)}`;
+    const copy = Object.assign({}, deck, { id, updatedAt: Date.now() });
+    if (!st || !st.decks || !Array.isArray(st.order)) st = { decks: {}, order: [], current: id };
+    if (!st.decks[id]) { st.decks[id] = copy; st.order.unshift(id); }
+    st.current = id;
+    const out = JSON.stringify(st);
+    await slidesSet(`deck:${state.profile.id}`, out);
+    await slidesSet(seenKey, ver);
+    toast(st.order.length > 1 ? 'ارائه‌ی پیش‌فرض تازه به اسلایدساز شما اضافه شد.' : 'ارائه‌ی پیش‌فرض آماده است.');
+    return out;
+  }
+  function slidesPublishDefault() {
+    let st = null;
+    try { st = state.slidesStore ? JSON.parse(state.slidesStore) : null; } catch (e) { st = null; }
+    const deck = st && st.decks && st.decks[st.current];
+    if (!deck) { toast('اول یک ارائه بسازید یا تغییری در آن بدهید.', 'err'); return; }
+    openModal({
+      title: 'انتشار ارائه‌ی پیش‌فرض',
+      confirmText: 'انتشار',
+      body: `<p class="modal-text">ارائه‌ی «${esc(deck.title || 'بدون عنوان')}» (${formatNum((deck.slides || []).length)} اسلاید) برای همه‌ی سرگروه‌ها و سرپرست‌ها فرستاده می‌شود. هر نفر آن را به‌عنوان یک ارائه‌ی جدید در اسلایدساز خودش می‌گیرد، روی سیستم خودش اصلاح می‌کند و خروجی می‌گیرد. ارائه‌های خود افراد دست نمی‌خورد.</p>`,
+      onConfirm: async () => {
+        const body = JSON.stringify({ publishedAt: Date.now(), by: state.profile.full_name || '', deck });
+        const { error } = await sb.storage.from('tools').upload(SLIDES_DEFAULT_FILE, new Blob([body], { type: 'application/json' }), { upsert: true, contentType: 'application/json' });
+        if (error) { console.error('default deck upload failed', error); throw new Error('انتشار ناموفق بود.'); }
+        // خود منتشرکننده نسخه‌ی تازه را دوباره دریافت نکند
+        const { data: list } = await sb.storage.from('tools').list('', { limit: 100 });
+        const item = Array.isArray(list) ? list.find((x) => x.name === SLIDES_DEFAULT_FILE) : null;
+        if (item) await slidesSet(`defseen:${state.profile.id}`, slidesVer(item));
+        toast('ارائه‌ی پیش‌فرض منتشر شد.');
+      },
+    });
   }
   // ذخیره‌ی ارائه‌ها از قاب در همین مرورگر (آخرین نسخه، با کمی تأخیر)
   let slidesSaveT = null, slidesPending = null;
@@ -6282,6 +6337,7 @@ parent.postMessage({__sm:1,op:'download',name:a.download,type:b.type||'',data:t}
     }
     if (d.op !== 'save' || d.key !== SLIDES_KEY || !state.profile) return;
     slidesPending = { key: `deck:${state.profile.id}`, value: typeof d.value === 'string' ? d.value : null };
+    state.slidesStore = slidesPending.value;
     clearTimeout(slidesSaveT);
     slidesSaveT = setTimeout(() => { const x = slidesPending; slidesPending = null; if (x) slidesSet(x.key, x.value); }, 500);
   });
